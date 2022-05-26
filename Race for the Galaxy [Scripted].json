@@ -1,7 +1,7 @@
 {
   "SaveName": "Race for the Galaxy [Scripted]",
-  "EpochTime": 1653492551,
-  "Date": "5/25/2022 8:29:11 AM",
+  "EpochTime": 1653537265,
+  "Date": "5/25/2022 8:54:25 PM",
   "VersionNumber": "v13.1.1",
   "GameMode": "Race for the Galaxy",
   "GameType": "Game",
@@ -246,8 +246,8 @@
     "TurnColor": ""
   },
   "DecalPallet": [],
-  "LuaScript": "-- -1: starting hand, 0: select phase. Otherwise, index of selectedPhases\r\ncurrentPhase = -1\r\ngameStarted = false\r\nselectedPhases = {}\r\n-- holds information based on phase\r\nphasePowerSnapshot = {[\"Yellow\"] = {}, [\"Red\"] = {}, [\"Blue\"] = {}, [\"Green\"] = {}}\r\nhandCountSnapshot = {0,0,0,0}\r\n\r\ngameEndMessage = false\r\n\r\ndisableInteract_GUID = {\"082406\", \"3e3772\", \"a5737a\", \"2c39a5\",\"b44250\", \"7552ef\", \"5c95f7\", \"74c6f0\",\"63866b\", \"3a5272\", \"8dbdb4\", \"821f8e\",\r\n     \"3f1c4d\", \"bcf758\", \"a22fe5\", \"b4aab3\"}\r\n\r\nplayerColorIndexMap = {\r\n     [\"Yellow\"] = 1,\r\n     [\"Red\"] = 2,\r\n     [\"Blue\"] = 3,\r\n     [\"Green\"] = 4\r\n}\r\n\r\ngoodsHighlightColor = {\r\n     [\"NOVELTY\"] = color(0.345, 0.709, 0.974),\r\n     [\"RARE\"] = color(0.709, 0.407, 0.129),\r\n     [\"GENE\"] = color(0.278, 0.760, 0.141),\r\n     [\"ALIEN\"] = color(0.933, 0.909, 0.105),\r\n}\r\n\r\nhandZone_GUID = {\"7556a6\", \"2a2c18\", \"0180e0\", \"84db02\"}\r\ntableauZone_GUID = {\"2f8337\", \"6a2b88\", \"6707c2\", \"970244\"}\r\nactionSelectorMenu_GUID = {\"b44250\", \"7552ef\", \"5c95f7\", \"74c6f0\"}\r\nactionZone_GUID = {\"98db35\", \"992223\", \"be1ba1\", \"dc1b97\"}\r\nselectedActionZone_GUID = {\"d507c0\", \"820d9e\", \"b1409d\", \"326786\"}\r\nphaseCardTable_GUID = {\"63866b\", \"3a5272\", \"8dbdb4\", \"821f8e\"}\r\npresentedPhaseCardTile_GUID = {\"082406\", \"3e3772\", \"a5737a\", \"2c39a5\"}\r\ntableau_GUID = {\"3f1c4d\", \"bcf758\", \"a22fe5\", \"b4aab3\"}\r\n\r\nhandZoneOwner = {\r\n     [\"7556a6\"] = \"Yellow\",\r\n     [\"2a2c18\"] = \"Red\",\r\n     [\"0180e0\"] = \"Blue\",\r\n     [\"84db02\"] = \"Green\"\r\n}\r\n\r\ntableauZoneOwner = {\r\n     [\"2f8337\"] = \"Yellow\",\r\n     [\"6a2b88\"] = \"Red\",\r\n     [\"6707c2\"] = \"Blue\",\r\n     [\"970244\"] = \"Green\",\r\n}\r\n\r\nphaseTilePlacement = {\r\n     {\"e536e3\", {-4.48, 1.68, -5.60}},\r\n     {\"34d2e8\", {-2.24, 1.68, -5.60}},\r\n     {\"8df356\", {0.00, 1.68, -5.60}},\r\n     {\"842722\", {2.24, 1.68, -5.60}},\r\n     {\"6c0780\", {4.48, 1.68, -5.60}},\r\n}\r\n\r\nphaseIndex = {\r\n     [\"Explore\"] = 1,\r\n     [\"Develop\"] = 2,\r\n     [\"Settle\"] = 3,\r\n     [\"Consume\"] = 4,\r\n     [\"Produce\"] = 5\r\n}\r\nphaseText = {\"Phase I: Explore\", \"Phase II: Develop\", \"Phase III: Settle\", \"Phase IV: Consume\", \"Phase V: Produce\"}\r\n\r\ndrawZone_GUID = \"32297e\"\r\ndiscardZone_GUID = \"fe5c37\"\r\n\r\nactivePhaseTiles_GUID = {\"e536e3\", \"34d2e8\", \"8df356\", \"842722\", \"6c0780\"}\r\n\r\nphaseCardNames = {\"Explore (+5)\", \"Explore (+1,+1)\", \"Develop\", \"Settle\", \"Consume ($)\", \"Consume (x2)\", \"Produce\"}\r\nreadyTokens_GUID = {\"8f6042\", \"6ed6bc\", \"169b57\", \"718265\"}\r\nsmallReadyTokens_GUID = {\"dd182c\", \"ab5795\", \"37d9aa\", \"476374\"}\r\ntwoPlayerAdvancedMode = false\r\n\r\nhelpDisplay_GUID = {\"f9c4ee\", \"5a39e2\", \"515d9a\", \"1dbea0\"}\r\n\r\ngoodsSnapPointOffset = {-0.6, 0.1, 0.4}\r\ndrawDeck_GUID = \"\"\r\n\r\nactionCardPowers = {\r\n     [\"Explore (+5)\"] = {\r\n          powers = {[\"1\"] = {\r\n               [\"DRAW\"] = {codes = {}, strength = 5, times = 0}\r\n          }}\r\n     },\r\n     [\"Explore (+1,+1)\"] = {\r\n          powers = {[\"1\"] = {\r\n               [\"DRAW\"] = {codes = {}, strength = 1, times = 0},\r\n               [\"KEEP\"] = {codes = {}, strength = 1, times = 0}\r\n          }}\r\n     },\r\n     [\"Develop\"] = {\r\n          powers = {[\"2\"] = {\r\n               [\"REDUCE\"] = {codes = {}, strength = 1, times = 0}\r\n          }}\r\n     }\r\n}\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.gameStarted = gameStarted\r\n    saved_data.currentPhase = currentPhase\r\n    saved_data.selectedPhases = selectedPhases\r\n    saved_data.drawDeck_GUID = drawDeck_GUID\r\n    saved_data.handCountSnapshot = handCountSnapshot\r\n    saved_data.phasePowerSnapshot = phasePowerSnapshot\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          gameStarted = data.gameStarted\r\n          currentPhase = data.currentPhase\r\n          selectedPhases = data.selectedPhases\r\n          drawDeck_GUID = data.drawDeck_GUID\r\n          handCountSnapshot = data.handCountSnapshot\r\n          phasePowerSnapshot = data.phasePowerSnapshot\r\n     end\r\n\r\n     drawDeck = getObjectFromGUID(drawDeck_GUID)\r\n\r\n     for i=1, #disableInteract_GUID do\r\n          local obj = getObjectFromGUID(disableInteract_GUID[i])\r\n          --obj.interactable = false\r\n     end\r\n\r\n     handZoneMap = {}\r\n     for i=1, #handZone_GUID do\r\n          handZoneMap[handZone_GUID[i]] = true\r\n     end\r\n\r\n     tableauZoneMap = {}\r\n     for i=1, #tableauZone_GUID do\r\n          tableauZoneMap[tableauZone_GUID[i]] = true\r\n     end\r\n\r\n     for color, index in pairs(playerColorIndexMap) do\r\n          local o = getObjectFromGUID(readyTokens_GUID[index])\r\n          if o then\r\n               o.setVar(\"player\", color)\r\n          end\r\n\r\n          o = getObjectFromGUID(smallReadyTokens_GUID[index])\r\n          if o then\r\n               o.setVar(\"player\", color)\r\n          end\r\n     end\r\n\r\n     drawZone = getObjectFromGUID(drawZone_GUID)\r\n     discardZone = getObjectFromGUID(discardZone_GUID)\r\n\r\n     componentsBag = getObjectFromGUID(\"4c1650\")\r\n     --self.UI.setAttribute(\"title\", \"active\", false)\r\nend\r\n\r\n-- ======================\r\n-- Helper functions\r\n-- ======================\r\n\r\nfunction wait(time)\r\n    local start = os.time()\r\n    repeat\r\n        coroutine.yield(0)\r\n    until os.time() > start + time\r\nend\r\n\r\nfunction shuffle(tbl)\r\n     for i = #tbl, 2, -1 do\r\n          local j = math.random(i)\r\n          tbl[i], tbl[j] = tbl[j], tbl[i]\r\n     end\r\n     return tbl\r\nend\r\n\r\nfunction split(str, delimiter)\r\n     local fields = {}\r\n\r\n     local sep = delimiter or \" \"\r\n     local pattern = string.format(\"([^%s]+)\", delimiter)\r\n     string.gsub(str, pattern, function(c) fields[#fields + 1] = c end)\r\n\r\n     return fields\r\nend\r\n\r\nfunction getSeatedPlayersWithHands()\r\n     local results = {}\r\n     local players = getSeatedPlayers()\r\n\r\n     for i=1, #players do\r\n          if Player[players[i]].seated and Player[players[i]].getHandCount() > 0 then\r\n               results[#results + 1] = players[i]\r\n          end\r\n     end\r\n     return results\r\nend\r\n\r\n-- ======================\r\n-- Game specific helper functions\r\n-- ======================\r\n\r\n-- countMarked = whether or not to include face-down cards in the count (default is true)\r\nfunction countCardsInHand(player, countMarked)\r\n     if countMarked == nil then\r\n          countMarked = true\r\n     end\r\n\r\n     local objs = Player[player].getHandObjects(1)\r\n\r\n     if countMarked then\r\n          return #objs\r\n     else\r\n          local n = 0\r\n\r\n          for _, obj in pairs(objs) do\r\n               if not obj.hasTag(\"Discard\") and not obj.hasTag(\"Action Card\") then\r\n                    n = n + 1\r\n               end\r\n          end\r\n\r\n          return n\r\n     end\r\nend\r\n\r\nfunction setHelpTextAll(text)\r\n     for player, _ in pairs(playerColorIndexMap) do\r\n          setHelpText(player, text)\r\n     end\r\nend\r\n\r\nfunction setHelpText(player, text)\r\n     local i = playerColorIndexMap[player]\r\n     local obj = getObjectFromGUID(helpDisplay_GUID[i])\r\n     if obj then\r\n          obj.UI.setValue(\"label\", text)\r\n     end\r\nend\r\n\r\nfunction checkIfSelectedPhase(player)\r\n     local index = playerColorIndexMap[player]\r\n     local zone = getObjectFromGUID(selectedActionZone_GUID[index])\r\n\r\n     for _, obj in pairs(zone.getObjects()) do\r\n          if obj.hasTag(\"Action Card\") then\r\n               return true\r\n          end\r\n     end\r\n\r\n     return false\r\nend\r\n\r\nfunction discardMarkedCards()\r\n     local players = getSeatedPlayersWithHands()\r\n     local markedCards = {}\r\n\r\n     for _, player in pairs(players) do\r\n          for _, obj in pairs(Player[player].getHandObjects(1)) do\r\n               if obj.type == 'Card' and (obj.hasTag(\"Discard\") or obj.is_face_down) then\r\n                    markedCards[#markedCards + 1] = obj\r\n               end\r\n          end\r\n     end\r\n\r\n     local discardEmpty = true\r\n     for _, obj in pairs(discardZone.getObjects()) do\r\n          if obj.type == 'Card' or obj.type == 'Deck' then\r\n               discardEmpty = false\r\n               break\r\n          end\r\n     end\r\n\r\n     if discardEmpty and #markedCards > 0 then\r\n          markedCards[1].highlightOff()\r\n          markedCards[1].removeTag(\"Discard\")\r\n          markedCards[1].setPosition(discardZone.getPosition())\r\n          markedCards[1].setRotation({0, 0, 180})\r\n     end\r\n\r\n     wait(0.05)\r\n\r\n     for _, obj in pairs(discardZone.getObjects()) do\r\n          if obj.type == 'Card' then\r\n               local startIndex = 1\r\n               if discardEmpty then\r\n                    startIndex = 2\r\n               end\r\n               for i=startIndex, #markedCards do\r\n                    obj.highlightOff()\r\n                    obj.removeTag(\"Discard\")\r\n                    obj = obj.putObject(markedCards[i])\r\n               end\r\n               return\r\n          end\r\n     end\r\nend\r\n\r\n-- check zone for any 'Selected' cards and attempt to play them\r\nfunction attemptPlayCard(card, player)\r\n     if type(card) == \"table\" then\r\n          player = card[2]\r\n          card = card[1]\r\n     end\r\n\r\n     local tableau = getObjectFromGUID(tableau_GUID[playerColorIndexMap[player]])\r\n     local sp = tableau.getSnapPoints()\r\n\r\n     -- Find first empty spot on tableau\r\n     for i=1, #sp do\r\n          local hits = Physics.cast({\r\n               origin = tableau.positionToWorld({sp[i].position[1], sp[i].position[2] + 1, sp[i].position[3]}),\r\n               direction = {0, -1, 0},\r\n               max_direction = 2\r\n          })\r\n\r\n          -- found empty spot\r\n          if hits[1].hit_object == tableau then\r\n               local pos = tableau.positionToWorld(sp[i].position)\r\n               local rot = tableau.getRotation()\r\n               card.setPosition({pos[1], pos[2] + 0.02, pos[3]})\r\n               card.setRotation({rot[1], rot[2], 0})\r\n               card.removeTag(\"Selected\")\r\n               card.highlightOff()\r\n\r\n               -- if windfall, place a goods on top\r\n               local cardData = componentsBag.getVar(\"cardData\")\r\n               if cardData[card.getName()].flags[\"WINDFALL\"] then\r\n                    placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2])\r\n               end\r\n               return\r\n          end\r\n     end\r\nend\r\n\r\nfunction placeGoodsAt(position, yRotation)\r\n     local card = drawCard()\r\n\r\n     if card then\r\n          card.setPositionSmooth({position[1], position[2] + 1.5, position[3]})\r\n          card.setRotationSmooth({0, yRotation, 180})\r\n     else\r\n          -- shouldn't ever happen, but just in case\r\n          broadcastToAll(\"No cards detected in draw or discard pile\", \"Red\")\r\n     end\r\nend\r\n\r\nfunction reshuffleDiscardPile()\r\n     -- no deck or card found, reshuffle discard and return that\r\n     item = getDeckOrCardInZone(discardZone)\r\n     if item then\r\n          broadcastToAll(\"Reshuffling the discard pile.\", \"White\")\r\n          item.setRotationSmooth({0,180,180})\r\n          item.setPositionSmooth(drawZone.getPosition())\r\n          item.shuffle()\r\n     end\r\n\r\n     return item\r\nend\r\n\r\nfunction getDeckOrCardInZone(zone)\r\n     for _, obj in pairs(zone.getObjects()) do\r\n          if obj.type == 'Deck' or obj.type == 'Card' then\r\n               return obj\r\n          end\r\n     end\r\n\r\n     return nil\r\nend\r\n\r\nfunction drawCard()\r\n     local card = nil\r\n     if drawDeck == nil then\r\n          drawDeck = getDeckOrCardInZone(drawZone)\r\n          if not drawDeck then\r\n               drawDeck = reshuffleDiscardPile()\r\n          end\r\n     end\r\n\r\n     if drawDeck.type == 'Deck' then\r\n          card = drawDeck.takeObject()\r\n\r\n          if drawDeck.remainder then\r\n               drawDeck = drawDeck.remainder\r\n          end\r\n     elseif drawDeck.type == 'Card' then\r\n          card = drawDeck\r\n          drawDeck = reshuffleDiscardPile()\r\n     end\r\n\r\n     drawDeck_GUID = drawDeck.getGUID()\r\n\r\n     return card\r\nend\r\n\r\n-- ======================\r\n-- Event functions\r\n-- ======================\r\n\r\nfunction onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)\r\n     if object.hasTag(\"Action Card\") then\r\n          return\r\n     end\r\n\r\n     local playerIndex = playerColorIndexMap[player_color]\r\n     local inHandZone = false\r\n\r\n     local zones = object.getZones()\r\n     for i=1, #zones do\r\n          if handZoneMap[zones[i].getGUID()] then\r\n               inHandZone = true\r\n               break\r\n          end\r\n     end\r\n\r\n     if inHandZone and (flip == 180 or flip == 0) then\r\n          if flip == 180 then\r\n               object.addTag(\"Discard\")\r\n          elseif flip == 0 then\r\n               object.removeTag(\"Discard\")\r\n          end\r\n\r\n          updateHelpText(player_color)\r\n     end\r\n\r\n     -- check to see if the object is in the player's hand zone to prevent mark for deletion\r\n     if object.hasTag(\"Selected\") and inHandZone and flip == 180 then\r\n          local rot = object.getRotation()\r\n          object.setRotation({rot[1], rot[2], 0})\r\n          return\r\n     end\r\nend\r\n\r\nfunction onObjectLeaveZone(zone, leave_object)\r\n     if leave_object.isDestroyed() then\r\n          return\r\n     end\r\n\r\n     local isHandZone = handZoneMap[zone.getGUID()]\r\n     local isTableauZone = tableauZoneMap[zone.getGUID()]\r\n\r\n     if isHandZone then\r\n          if leave_object.hasTag(\"Selected\") then\r\n               leave_object.highlightOff()\r\n          end\r\n\r\n          leave_object.removeTag(\"Discard\")\r\n          updateHelpText(handZoneOwner[zone.getGUID()])\r\n     elseif isTableauZone then\r\n          if leave_object.type == 'Card' then\r\n               leave_object.setSnapPoints({})\r\n\r\n               if leave_object.hasTag(\"Explore Highlight\") == false then\r\n                    leave_object.highlightOff()\r\n               end\r\n\r\n               if leave_object.getScale()[1] < 1 then\r\n                    leave_object.setScale({1, 1, 1})\r\n               end\r\n\r\n               updateHelpText(tableauZoneOwner[zone.getGUID()])\r\n          end\r\n     end\r\nend\r\n\r\nfunction onObjectEnterZone(zone, enter_object)\r\n     if enter_object.isDestroyed() then\r\n          return\r\n     end\r\n\r\n     local isHandZone = handZoneMap[zone.getGUID()]\r\n     local isTableauZone = tableauZoneMap[zone.getGUID()]\r\n\r\n     if isHandZone then\r\n          if enter_object.hasTag(\"Explore Highlight\") then\r\n               enter_object.removeTag(\"Explore Highlight\")\r\n          end\r\n          if enter_object.hasTag(\"Selected\") then\r\n               enter_object.highlightOn(\"Yellow\")\r\n          end\r\n\r\n          if enter_object.is_face_down then\r\n               enter_object.addTag(\"Discard\")\r\n          end\r\n\r\n          updateHelpText(handZoneOwner[zone.getGUID()])\r\n     elseif isTableauZone and enter_object.type == 'Card' then\r\n          if enter_object.is_face_down then\r\n               -- Check to see if card is below it to decide if this card is a goods card\r\n               local hits = Physics.cast({\r\n                    origin = enter_object.getPosition(),\r\n                    direction = {0, -1, 0},\r\n                    max_distance = 2\r\n               })\r\n\r\n               for _, hit in pairs(hits) do\r\n                    local o = hit.hit_object\r\n                    if o.type == 'Card' and not o.is_face_down then\r\n                         local cardData = componentsBag.getVar(\"cardData\")\r\n                         local data = cardData[o.getName()]\r\n                         if data and data.goods then\r\n                              enter_object.setScale({0.6, 1, 0.6})\r\n                              enter_object.highlightOn(goodsHighlightColor[data.goods])\r\n                         end\r\n                    end\r\n               end\r\n          -- face up card, check if need to place snap point for goods placement\r\n          else\r\n               local cardData = componentsBag.getVar(\"cardData\")\r\n               local data = cardData[enter_object.getName()]\r\n               if data and data.goods then\r\n                    enter_object.setSnapPoints({{\r\n                         position = goodsSnapPointOffset,\r\n                         rotation = {0, 0, 0},\r\n                         rotation_snap = true\r\n                    }})\r\n               end\r\n          end\r\n\r\n          updateHelpText(tableauZoneOwner[zone.getGUID()])\r\n     end\r\nend\r\n\r\n-- ======================\r\n-- UI\r\n-- ======================\r\n\r\n-- function uiSetVisibilityToPlayer(id, playerColor, visible)\r\n--      local attr = UI.getAttribute(id, \"visibility\")\r\n--      if visible then\r\n--           attr = attr .. \"|\" .. playerColor\r\n--      else\r\n--           local newAttr = \"\"\r\n--           tokens = split(attr, \"|\")\r\n--\r\n--           for i=1, #tokens do\r\n--                if tokens[i] ~= playerColor then\r\n--                     newAttr = newAttr .. tokens[i] .. \"|\"\r\n--                end\r\n--           end\r\n--\r\n--           if newAttr == \"\" then\r\n--                attr = \"Brown\"\r\n--           else\r\n--                attr = newAttr:sub(1, newAttr:len() - 1)\r\n--           end\r\n--      end\r\n--\r\n--      UI.setAttribute(id, \"visibility\", attr)\r\n-- end\r\n--\r\n-- function closeHelpClick(player, button)\r\n--      if button == \"-1\" then\r\n--           uiSetVisibilityToPlayer(\"helpWindow\", player.color, false)\r\n--      end\r\n-- end\r\n--\r\n-- function showHelpClick(player, button)\r\n--      if button == \"-1\" then\r\n--           uiSetVisibilityToPlayer(\"helpWindow\", player.color, true)\r\n--      end\r\n-- end\r\n\r\n-- ======================\r\n-- Game functions\r\n-- ======================\r\n\r\nfunction gameStart()\r\n     gameStarted = true\r\n     currentPhase = -1\r\n\r\n     for _, data in pairs(phaseTilePlacement) do\r\n          local tile = componentsBag.takeObject({\r\n               guid = data[1],\r\n               position = data[2],\r\n               rotation = {0, 180, 180},\r\n               smooth = false\r\n          })\r\n\r\n          tile.setLock(true)\r\n          tile.interactable = false\r\n     end\r\n\r\n     broadcastToAll(\"Determine your starting hand.\", \"White\")\r\nend\r\n\r\nfunction playerReadyClicked(player)\r\n     local i = playerColorIndexMap[player]\r\n\r\n     -- perform some necessary checks first\r\n     if currentPhase == -1 then\r\n     elseif currentPhase == 0 and not checkIfSelectedPhase(player) then\r\n          broadcastToColor(\"You must select an action card!\", player, \"White\")\r\n          getObjectFromGUID(readyTokens_GUID[i]).call(\"setToggleState\", false)\r\n          getObjectFromGUID(smallReadyTokens_GUID[i]).call(\"setToggleState\", false)\r\n          return\r\n     end\r\n\r\n     startLuaCoroutine(Global, \"checkAllReadyCo\")\r\nend\r\n\r\n-- Makes all the ready buttons belonging to player the same toggle state\r\n-- [1] = owner, [2] = state\r\nfunction updateReadyButtons(params)\r\n     local ind = playerColorIndexMap[params[1]]\r\n     local btn1 = getObjectFromGUID(readyTokens_GUID[ind])\r\n     btn1.call(\"setToggleState\", params[2])\r\n     local btn2 = getObjectFromGUID(smallReadyTokens_GUID[ind])\r\n     btn2.call(\"setToggleState\", params[2])\r\nend\r\n\r\nfunction checkAllReadyCo()\r\n     -- Check if all players are ready to move on to next step of game\r\n     local players = getSeatedPlayersWithHands()\r\n\r\n     for i=1, #players do\r\n          local readyToken = getObjectFromGUID(readyTokens_GUID[playerColorIndexMap[players[i]]])\r\n          if readyToken.getVar(\"isReady\") == false then\r\n               return 1\r\n          end\r\n     end\r\n\r\n     -- play selected cards in hand\r\n     for i=1, #players do\r\n          for _, obj in pairs(Player[players[i]].getHandObjects(1)) do\r\n               if obj.type == 'Card' and obj.hasTag(\"Selected\") then\r\n                    attemptPlayCard(obj, players[i])\r\n               end\r\n          end\r\n     end\r\n\r\n     wait(0.1)\r\n\r\n     for i=1, #readyTokens_GUID do\r\n          local token = getObjectFromGUID(readyTokens_GUID[i])\r\n          if token then\r\n               token.call(\"setToggleState\", false)\r\n          end\r\n     end\r\n\r\n     for i=1, #smallReadyTokens_GUID do\r\n          local token = getObjectFromGUID(smallReadyTokens_GUID[i])\r\n          if token then\r\n               token.call(\"setToggleState\", false)\r\n          end\r\n     end\r\n\r\n     discardMarkedCards()\r\n\r\n     if gameStarted and currentPhase == -1 then\r\n          currentPhase = 0\r\n          for i=1, #players do\r\n               local menu = getObjectFromGUID(actionSelectorMenu_GUID[playerColorIndexMap[players[i]]])\r\n               menu.call(\"rearrangePhaseCards\")\r\n          end\r\n\r\n          startNewRound()\r\n          return 1\r\n     end\r\n\r\n     if currentPhase == 0 then\r\n          local phases = {}\r\n\r\n          setHelpTextAll(\"\")\r\n\r\n          -- flip over all selected phase cards and phase tiles\r\n          for _, guid in pairs(selectedActionZone_GUID) do\r\n               local zone = getObjectFromGUID(guid)\r\n               for _, obj in pairs(zone.getObjects()) do\r\n                    if obj.hasTag(\"Action Card\") and obj.is_face_down then\r\n                         obj.flip()\r\n                         phases[split(obj.getName(), \" \")[1]] = true\r\n                    end\r\n               end\r\n          end\r\n\r\n          for phase, _ in pairs(phases) do\r\n               local index = phaseIndex[phase]\r\n               local tile = getObjectFromGUID(phaseTilePlacement[index][1])\r\n               tile.setRotationSmooth({0, 180, 0})\r\n               selectedPhases[#selectedPhases + 1] = phaseIndex[phase]\r\n          end\r\n\r\n          table.sort(selectedPhases)\r\n\r\n          currentPhase = -1000\r\n\r\n          wait(1.2)\r\n\r\n          startLuaCoroutine(self, \"beginNextPhase\")\r\n          return 1\r\n     elseif currentPhase >= 1 then\r\n          setHelpTextAll(\"\")\r\n          if currentPhase > #selectedPhases then\r\n               -- round end check\r\n\r\n          else\r\n               startLuaCoroutine(self, \"beginNextPhase\")\r\n          end\r\n     end\r\n     return 1\r\nend\r\n\r\nfunction startNewRound()\r\n     currentPhase = 0\r\n     selectedPhases = {}\r\n     resetPhaseTiles()\r\n\r\n     broadcastToAll(\"Starting new round.\", \"White\")\r\n     setHelpTextAll(\"↑ Select an action card.\")\r\nend\r\n\r\nfunction beginNextPhase()\r\n     -- This shouldn't happen at all, but if it did...\r\n     if not selectedPhases or #selectedPhases <= 0  then\r\n          broadcastToAll(\"Error: No phases selected.\", \"Red\")\r\n          startNewRound()\r\n          return 1\r\n     end\r\n\r\n     if currentPhase <= 0 then\r\n          currentPhase = 0\r\n     end\r\n\r\n     currentPhase = currentPhase + 1\r\n\r\n     -- Remove highlights if they exists\r\n     for _, guid in pairs(handZone_GUID) do\r\n          local zone = getObjectFromGUID(guid)\r\n          for _, obj in pairs(zone.getObjects()) do\r\n               obj.highlightOff()\r\n          end\r\n     end\r\n\r\n     if currentPhase <= #selectedPhases then\r\n          local phase = selectedPhases[currentPhase]\r\n          broadcastToAll(phaseText[phase], \"White\")\r\n\r\n          phaseTilesHighlightOff()\r\n\r\n          -- hilight current phase tile\r\n          local tile = getObjectFromGUID(phaseTilePlacement[phase][1])\r\n          tile.UI.setXml('<Panel color=\"rgb(0.8,0.2,1)\" width=\"240\" height=\"240\" position=\"0 0 0\"></Panel>')\r\n\r\n          if phase == 1 then\r\n               startExplorePhase()\r\n          elseif phase == 2 then\r\n               startDevelopPhase()\r\n          end\r\n     else\r\n          -- end of round\r\n     end\r\n\r\n     return 1\r\nend\r\n\r\nfunction phaseTilesHighlightOff()\r\n     for i=1, #phaseTilePlacement do\r\n          local tile = getObjectFromGUID(phaseTilePlacement[i][1])\r\n          tile.UI.setXml(\"\")\r\n     end\r\nend\r\n\r\nfunction resetPhaseTiles()\r\n     for i=1, #phaseTilePlacement do\r\n          local tile = getObjectFromGUID(phaseTilePlacement[i][1])\r\n          tile.setRotationSmooth({0, 180, 180})\r\n     end\r\nend\r\n\r\nfunction startExplorePhase()\r\n     local players = getSeatedPlayersWithHands()\r\n     local cardData = componentsBag.getVar(\"cardData\")\r\n\r\n     for _, player in pairs(players) do\r\n          local i = playerColorIndexMap[player]\r\n          local drawN = 2\r\n          local keepN = 1\r\n\r\n          for card in allCardsInTableau(player) do\r\n               local info = cardData[card.getName()]\r\n\r\n               if not info and card.hasTag(\"Action Card\") then\r\n                    -- action card powers here\r\n                    info = actionCardPowers[card.getName()]\r\n               end\r\n\r\n               local power = info.powers[\"1\"]\r\n               if power and power[\"DRAW\"] then\r\n                    drawN = drawN + power[\"DRAW\"].strength\r\n               end\r\n               if power and power[\"KEEP\"] then\r\n                    keepN = keepN + power[\"KEEP\"].strength\r\n               end\r\n          end\r\n\r\n          handCountSnapshot[i] = countCardsInHand(player) + drawN\r\n\r\n          for j=1,drawN do\r\n               local card = drawCard()\r\n               card.deal(1, player)\r\n               card.addTag(\"Explore Highlight\")\r\n               card.highlightOn(\"Orange\")\r\n          end\r\n\r\n          phasePowerSnapshot[player] = {draw = drawN, keep = keepN}\r\n          updateHelpText(player)\r\n     end\r\nend\r\n\r\nfunction startDevelopPhase()\r\n     local players = getSeatedPlayersWithHands()\r\n     local cardData = componentsBag.getVar(\"cardData\")\r\n\r\n     for player, i in pairs(playerColorIndexMap) do\r\n          for card in allCardsInTableau(player) do\r\n               local info = cardData[card.getName()]\r\n\r\n               if not info and card.hasTag(\"Action Card\") then\r\n                    info = actionCardPowers[card.getName()]\r\n               end\r\n\r\n               if info.powers[\"2\"] then\r\n                    local powers = {}\r\n                    for code, power in pair(info.powers[\"2\"]) do\r\n                         if not powers[code] then\r\n                              powers[code] = 0\r\n                         end\r\n\r\n                         powers[code] = powers[code] + power.strength\r\n                    end\r\n\r\n                    log(powers)\r\n               end\r\n          end\r\n     end\r\nend\r\n\r\nfunction updateHelpText(player)\r\n     local i = playerColorIndexMap[player]\r\n     local values = phasePowerSnapshot[player]\r\n     local cardsInHand = countCardsInHand(player, false)\r\n\r\n     -- end of round\r\n     if currentPhase > #selectedPhases then\r\n\r\n     -- explore\r\n     elseif selectedPhases[currentPhase] == 1 and values.draw and values.keep then\r\n          local discardTarget = math.max(0, values.draw - values.keep)\r\n          local discarded = handCountSnapshot[i] - cardsInHand\r\n\r\n          setHelpText(player, \"Explore: draw \" .. values.draw .. \", keep \" .. values.keep .. \". (discard \" .. discarded .. \"/\" .. discardTarget .. \")\")\r\n     end\r\nend\r\n\r\n-- iterator to go through all face-up cards in tableau plus the selection action card(s)\r\nfunction allCardsInTableau(player)\r\n     local pi = playerColorIndexMap[player]\r\n     local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()\r\n     local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()\r\n\r\n     for _, item in pairs(actionCards) do\r\n          if item.hasTag(\"Action Card\") then\r\n               objs[#objs + 1] = item\r\n          end\r\n     end\r\n\r\n     local i = 0\r\n\r\n     return function()\r\n               i = i + 1\r\n\r\n               while objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do\r\n                    i = i + 1\r\n               end\r\n\r\n               return objs[i]\r\n          end\r\nend",
-  "LuaScriptState": "{\"currentPhase\":-1,\"drawDeck_GUID\":\"\",\"gameStarted\":false,\"handCountSnapshot\":[0,0,0,0],\"phasePowerSnapshot\":{\"Blue\":[],\"Green\":[],\"Red\":[],\"Yellow\":[]},\"selectedPhases\":[]}",
+  "LuaScript": "-- -1: starting hand, 0: select phase. Otherwise, index of selectedPhases\r\ncurrentPhase = -1\r\ngameStarted = false\r\nselectedPhases = {}\r\n-- holds information based on phase\r\nphasePowerSnapshot = {[\"Yellow\"] = {}, [\"Red\"] = {}, [\"Blue\"] = {}, [\"Green\"] = {}}\r\nhandCountSnapshot = {0,0,0,0}\r\n-- nil if no choice was made, otherwise GUID of selected object\r\nplayerChoiceState = {nil,nil,nil,nil}\r\n\r\ngameEndMessage = false\r\n\r\ndisableInteract_GUID = {\"082406\", \"3e3772\", \"a5737a\", \"2c39a5\",\"b44250\", \"7552ef\", \"5c95f7\", \"74c6f0\",\"63866b\", \"3a5272\", \"8dbdb4\", \"821f8e\",\r\n     \"3f1c4d\", \"bcf758\", \"a22fe5\", \"b4aab3\"}\r\n\r\nplayerColorIndexMap = {\r\n     [\"Yellow\"] = 1,\r\n     [\"Red\"] = 2,\r\n     [\"Blue\"] = 3,\r\n     [\"Green\"] = 4\r\n}\r\n\r\ngoodsHighlightColor = {\r\n     [\"NOVELTY\"] = color(0.345, 0.709, 0.974),\r\n     [\"RARE\"] = color(0.709, 0.407, 0.129),\r\n     [\"GENE\"] = color(0.278, 0.760, 0.141),\r\n     [\"ALIEN\"] = color(0.933, 0.909, 0.105),\r\n}\r\n\r\nhandZone_GUID = {\"7556a6\", \"2a2c18\", \"0180e0\", \"84db02\"}\r\ntableauZone_GUID = {\"2f8337\", \"6a2b88\", \"6707c2\", \"970244\"}\r\nactionSelectorMenu_GUID = {\"b44250\", \"7552ef\", \"5c95f7\", \"74c6f0\"}\r\nactionZone_GUID = {\"98db35\", \"992223\", \"be1ba1\", \"dc1b97\"}\r\nselectedActionZone_GUID = {\"d507c0\", \"820d9e\", \"b1409d\", \"326786\"}\r\nphaseCardTable_GUID = {\"63866b\", \"3a5272\", \"8dbdb4\", \"821f8e\"}\r\npresentedPhaseCardTile_GUID = {\"082406\", \"3e3772\", \"a5737a\", \"2c39a5\"}\r\ntableau_GUID = {\"3f1c4d\", \"bcf758\", \"a22fe5\", \"b4aab3\"}\r\n\r\nhandZoneOwner = {\r\n     [\"7556a6\"] = \"Yellow\",\r\n     [\"2a2c18\"] = \"Red\",\r\n     [\"0180e0\"] = \"Blue\",\r\n     [\"84db02\"] = \"Green\"\r\n}\r\n\r\ntableauZoneOwner = {\r\n     [\"2f8337\"] = \"Yellow\",\r\n     [\"6a2b88\"] = \"Red\",\r\n     [\"6707c2\"] = \"Blue\",\r\n     [\"970244\"] = \"Green\",\r\n}\r\n\r\nphaseTilePlacement = {\r\n     {\"e536e3\", {-4.48, 1.68, -5.60}},\r\n     {\"34d2e8\", {-2.24, 1.68, -5.60}},\r\n     {\"8df356\", {0.00, 1.68, -5.60}},\r\n     {\"842722\", {2.24, 1.68, -5.60}},\r\n     {\"6c0780\", {4.48, 1.68, -5.60}},\r\n}\r\n\r\nphaseIndex = {\r\n     [\"Explore\"] = 1,\r\n     [\"Develop\"] = 2,\r\n     [\"Settle\"] = 3,\r\n     [\"Consume\"] = 4,\r\n     [\"Produce\"] = 5\r\n}\r\nphaseText = {\"Phase I: Explore\", \"Phase II: Develop\", \"Phase III: Settle\", \"Phase IV: Consume\", \"Phase V: Produce\"}\r\n\r\ndrawZone_GUID = \"32297e\"\r\ndiscardZone_GUID = \"fe5c37\"\r\n\r\nactivePhaseTiles_GUID = {\"e536e3\", \"34d2e8\", \"8df356\", \"842722\", \"6c0780\"}\r\n\r\nphaseCardNames = {\"Explore (+5)\", \"Explore (+1,+1)\", \"Develop\", \"Settle\", \"Consume ($)\", \"Consume (x2)\", \"Produce\"}\r\nreadyTokens_GUID = {\"8f6042\", \"6ed6bc\", \"169b57\", \"718265\"}\r\nsmallReadyTokens_GUID = {\"dd182c\", \"ab5795\", \"37d9aa\", \"476374\"}\r\ntwoPlayerAdvancedMode = false\r\n\r\nhelpDisplay_GUID = {\"f9c4ee\", \"5a39e2\", \"515d9a\", \"1dbea0\"}\r\n\r\ngoodsSnapPointOffset = {-0.6, 0.1, 0.4}\r\ndrawDeck_GUID = \"\"\r\n\r\nactionCardPowers = {\r\n     [\"Explore (+5)\"] = {\r\n          powers = {[\"1\"] = {\r\n               [\"DRAW\"] = {codes = {}, strength = 5, times = 0}\r\n          }}\r\n     },\r\n     [\"Explore (+1,+1)\"] = {\r\n          powers = {[\"1\"] = {\r\n               [\"DRAW\"] = {codes = {}, strength = 1, times = 0},\r\n               [\"KEEP\"] = {codes = {}, strength = 1, times = 0}\r\n          }}\r\n     },\r\n     [\"Develop\"] = {\r\n          powers = {[\"2\"] = {\r\n               [\"REDUCE\"] = {codes = {}, strength = 1, times = 0}\r\n          }}\r\n     }\r\n}\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.gameStarted = gameStarted\r\n    saved_data.currentPhase = currentPhase\r\n    saved_data.selectedPhases = selectedPhases\r\n    saved_data.drawDeck_GUID = drawDeck_GUID\r\n    saved_data.handCountSnapshot = handCountSnapshot\r\n    saved_data.phasePowerSnapshot = phasePowerSnapshot\r\n    saved_data.playerChoiceState = playerChoiceState\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          gameStarted = data.gameStarted\r\n          currentPhase = data.currentPhase\r\n          selectedPhases = data.selectedPhases\r\n          drawDeck_GUID = data.drawDeck_GUID\r\n          handCountSnapshot = data.handCountSnapshot\r\n          phasePowerSnapshot = data.phasePowerSnapshot\r\n          playerChoiceState = data.playerChoiceState\r\n     end\r\n\r\n     drawDeck = getObjectFromGUID(drawDeck_GUID)\r\n\r\n     for i=1, #disableInteract_GUID do\r\n          local obj = getObjectFromGUID(disableInteract_GUID[i])\r\n          --obj.interactable = false\r\n     end\r\n\r\n     handZoneMap = {}\r\n     for i=1, #handZone_GUID do\r\n          handZoneMap[handZone_GUID[i]] = true\r\n     end\r\n\r\n     tableauZoneMap = {}\r\n     for i=1, #tableauZone_GUID do\r\n          tableauZoneMap[tableauZone_GUID[i]] = true\r\n     end\r\n\r\n     for color, index in pairs(playerColorIndexMap) do\r\n          local o = getObjectFromGUID(readyTokens_GUID[index])\r\n          if o then\r\n               o.setVar(\"player\", color)\r\n          end\r\n\r\n          o = getObjectFromGUID(smallReadyTokens_GUID[index])\r\n          if o then\r\n               o.setVar(\"player\", color)\r\n          end\r\n     end\r\n\r\n     drawZone = getObjectFromGUID(drawZone_GUID)\r\n     discardZone = getObjectFromGUID(discardZone_GUID)\r\n\r\n     componentsBag = getObjectFromGUID(\"4c1650\")\r\n     --self.UI.setAttribute(\"title\", \"active\", false)\r\nend\r\n\r\n-- ======================\r\n-- Helper functions\r\n-- ======================\r\n\r\nfunction wait(time)\r\n    local start = os.time()\r\n    repeat\r\n        coroutine.yield(0)\r\n    until os.time() > start + time\r\nend\r\n\r\nfunction shuffle(tbl)\r\n     for i = #tbl, 2, -1 do\r\n          local j = math.random(i)\r\n          tbl[i], tbl[j] = tbl[j], tbl[i]\r\n     end\r\n     return tbl\r\nend\r\n\r\nfunction split(str, delimiter)\r\n     local fields = {}\r\n\r\n     local sep = delimiter or \" \"\r\n     local pattern = string.format(\"([^%s]+)\", delimiter)\r\n     string.gsub(str, pattern, function(c) fields[#fields + 1] = c end)\r\n\r\n     return fields\r\nend\r\n\r\nfunction getSeatedPlayersWithHands()\r\n     local results = {}\r\n     local players = getSeatedPlayers()\r\n\r\n     for i=1, #players do\r\n          if Player[players[i]].seated and Player[players[i]].getHandCount() > 0 then\r\n               results[#results + 1] = players[i]\r\n          end\r\n     end\r\n     return results\r\nend\r\n\r\n-- ======================\r\n-- Game specific helper functions\r\n-- ======================\r\n\r\n-- countMarked = whether or not to include face-down cards in the count (default is true)\r\nfunction countCardsInHand(player, countMarked)\r\n     if countMarked == nil then\r\n          countMarked = true\r\n     end\r\n\r\n     local objs = Player[player].getHandObjects(1)\r\n\r\n     if countMarked then\r\n          return #objs\r\n     else\r\n          local n = 0\r\n\r\n          for _, obj in pairs(objs) do\r\n               if not obj.hasTag(\"Discard\") and not obj.hasTag(\"Action Card\") then\r\n                    n = n + 1\r\n               end\r\n          end\r\n\r\n          return n\r\n     end\r\nend\r\n\r\nfunction setHelpTextAll(text)\r\n     for player, _ in pairs(playerColorIndexMap) do\r\n          setHelpText(player, text)\r\n     end\r\nend\r\n\r\nfunction setHelpText(player, text)\r\n     local i = playerColorIndexMap[player]\r\n     local obj = getObjectFromGUID(helpDisplay_GUID[i])\r\n     if obj then\r\n          obj.UI.setValue(\"label\", text)\r\n     end\r\nend\r\n\r\nfunction checkIfSelectedPhase(player)\r\n     local index = playerColorIndexMap[player]\r\n     local zone = getObjectFromGUID(selectedActionZone_GUID[index])\r\n\r\n     for _, obj in pairs(zone.getObjects()) do\r\n          if obj.hasTag(\"Action Card\") then\r\n               return true\r\n          end\r\n     end\r\n\r\n     return false\r\nend\r\n\r\nfunction discardMarkedCards()\r\n     local players = getSeatedPlayersWithHands()\r\n     local markedCards = {}\r\n\r\n     for _, player in pairs(players) do\r\n          for _, obj in pairs(Player[player].getHandObjects(1)) do\r\n               if obj.type == 'Card' and (obj.hasTag(\"Discard\") or obj.is_face_down) then\r\n                    markedCards[#markedCards + 1] = obj\r\n               end\r\n          end\r\n     end\r\n\r\n     local discardEmpty = true\r\n     for _, obj in pairs(discardZone.getObjects()) do\r\n          if obj.type == 'Card' or obj.type == 'Deck' then\r\n               discardEmpty = false\r\n               break\r\n          end\r\n     end\r\n\r\n     if discardEmpty and #markedCards > 0 then\r\n          markedCards[1].highlightOff()\r\n          markedCards[1].removeTag(\"Discard\")\r\n          markedCards[1].setPosition(discardZone.getPosition())\r\n          markedCards[1].setRotation({0, 0, 180})\r\n     end\r\n\r\n     wait(0.05)\r\n\r\n     for _, obj in pairs(discardZone.getObjects()) do\r\n          if obj.type == 'Card' then\r\n               local startIndex = 1\r\n               if discardEmpty then\r\n                    startIndex = 2\r\n               end\r\n               for i=startIndex, #markedCards do\r\n                    obj.highlightOff()\r\n                    obj.removeTag(\"Discard\")\r\n                    obj = obj.putObject(markedCards[i])\r\n               end\r\n               return\r\n          end\r\n     end\r\nend\r\n\r\n-- check zone for any 'Selected' cards and attempt to play them\r\nfunction attemptPlayCard(card, player)\r\n     if type(card) == \"table\" then\r\n          player = card[2]\r\n          card = card[1]\r\n     end\r\n\r\n     local tableau = getObjectFromGUID(tableau_GUID[playerColorIndexMap[player]])\r\n     local sp = tableau.getSnapPoints()\r\n\r\n     -- Find first empty spot on tableau\r\n     for i=1, #sp do\r\n          local hits = Physics.cast({\r\n               origin = tableau.positionToWorld({sp[i].position[1], sp[i].position[2] + 1, sp[i].position[3]}),\r\n               direction = {0, -1, 0},\r\n               max_direction = 2\r\n          })\r\n\r\n          -- found empty spot\r\n          if hits[1].hit_object == tableau then\r\n               local pos = tableau.positionToWorld(sp[i].position)\r\n               local rot = tableau.getRotation()\r\n               card.setPosition({pos[1], pos[2] + 0.02, pos[3]})\r\n               card.setRotation({rot[1], rot[2], 0})\r\n               card.removeTag(\"Selected\")\r\n               card.highlightOff()\r\n\r\n               -- if windfall, place a goods on top\r\n               local cardData = componentsBag.getVar(\"cardData\")\r\n               if cardData[card.getName()].flags[\"WINDFALL\"] then\r\n                    placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2])\r\n               end\r\n               return\r\n          end\r\n     end\r\nend\r\n\r\nfunction placeGoodsAt(position, yRotation)\r\n     local card = drawCard()\r\n\r\n     if card then\r\n          card.setPositionSmooth({position[1], position[2] + 1.5, position[3]})\r\n          card.setRotationSmooth({0, yRotation, 180})\r\n     else\r\n          -- shouldn't ever happen, but just in case\r\n          broadcastToAll(\"No cards detected in draw or discard pile\", \"Red\")\r\n     end\r\nend\r\n\r\nfunction reshuffleDiscardPile()\r\n     -- no deck or card found, reshuffle discard and return that\r\n     item = getDeckOrCardInZone(discardZone)\r\n     if item then\r\n          broadcastToAll(\"Reshuffling the discard pile.\", \"White\")\r\n          item.setRotationSmooth({0,180,180})\r\n          item.setPositionSmooth(drawZone.getPosition())\r\n          item.shuffle()\r\n     end\r\n\r\n     return item\r\nend\r\n\r\nfunction getDeckOrCardInZone(zone)\r\n     for _, obj in pairs(zone.getObjects()) do\r\n          if obj.type == 'Deck' or obj.type == 'Card' then\r\n               return obj\r\n          end\r\n     end\r\n\r\n     return nil\r\nend\r\n\r\nfunction drawCard()\r\n     local card = nil\r\n     if drawDeck == nil then\r\n          drawDeck = getDeckOrCardInZone(drawZone)\r\n          if not drawDeck then\r\n               drawDeck = reshuffleDiscardPile()\r\n          end\r\n     end\r\n\r\n     if drawDeck.type == 'Deck' then\r\n          card = drawDeck.takeObject()\r\n\r\n          if drawDeck.remainder then\r\n               drawDeck = drawDeck.remainder\r\n          end\r\n     elseif drawDeck.type == 'Card' then\r\n          card = drawDeck\r\n          drawDeck = reshuffleDiscardPile()\r\n     end\r\n\r\n     drawDeck_GUID = drawDeck.getGUID()\r\n\r\n     return card\r\nend\r\n\r\n-- ======================\r\n-- Event functions\r\n-- ======================\r\n\r\nfunction onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)\r\n     if object.hasTag(\"Action Card\") then\r\n          return\r\n     end\r\n\r\n     local playerIndex = playerColorIndexMap[player_color]\r\n     local inHandZone = false\r\n\r\n     local zones = object.getZones()\r\n     for i=1, #zones do\r\n          if handZoneMap[zones[i].getGUID()] then\r\n               inHandZone = true\r\n               break\r\n          end\r\n     end\r\n\r\n     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag(\"Selected\") then\r\n          if flip == 180 then\r\n               object.addTag(\"Discard\")\r\n          elseif flip == 0 then\r\n               object.removeTag(\"Discard\")\r\n          end\r\n\r\n          updateHelpText(player_color)\r\n     end\r\n\r\n     -- check to see if the object is in the player's hand zone to prevent mark for deletion\r\n     if object.hasTag(\"Selected\") and inHandZone and flip == 180 then\r\n          local rot = object.getRotation()\r\n          object.setRotation({rot[1], rot[2], 0})\r\n          return\r\n     end\r\nend\r\n\r\nfunction onObjectLeaveZone(zone, leave_object)\r\n     if leave_object.isDestroyed() then\r\n          return\r\n     end\r\n\r\n     local isHandZone = handZoneMap[zone.getGUID()]\r\n     local isTableauZone = tableauZoneMap[zone.getGUID()]\r\n\r\n     if isHandZone then\r\n          if leave_object.hasTag(\"Selected\") then\r\n               leave_object.highlightOff()\r\n          end\r\n\r\n          leave_object.removeTag(\"Discard\")\r\n          leave_object.clearButtons()\r\n          updateHelpText(handZoneOwner[zone.getGUID()])\r\n     elseif isTableauZone then\r\n          if leave_object.type == 'Card' then\r\n               leave_object.setSnapPoints({})\r\n\r\n               if leave_object.hasTag(\"Explore Highlight\") == false then\r\n                    leave_object.highlightOff()\r\n               end\r\n\r\n               if leave_object.getScale()[1] < 1 then\r\n                    leave_object.setScale({1, 1, 1})\r\n               end\r\n\r\n               updateHelpText(tableauZoneOwner[zone.getGUID()])\r\n          end\r\n     end\r\nend\r\n\r\nfunction onObjectEnterZone(zone, enter_object)\r\n     if enter_object.isDestroyed() then\r\n          return\r\n     end\r\n\r\n     local isHandZone = handZoneMap[zone.getGUID()]\r\n     local isTableauZone = tableauZoneMap[zone.getGUID()]\r\n\r\n     if isHandZone then\r\n          if enter_object.hasTag(\"Explore Highlight\") then\r\n               enter_object.removeTag(\"Explore Highlight\")\r\n          end\r\n          if enter_object.hasTag(\"Selected\") then\r\n               enter_object.highlightOn(\"Yellow\")\r\n          end\r\n\r\n          if enter_object.is_face_down then\r\n               enter_object.addTag(\"Discard\")\r\n          end\r\n\r\n          updateHandCardState(handZoneOwner[zone.getGUID()])\r\n          updateHelpText(handZoneOwner[zone.getGUID()])\r\n     elseif isTableauZone and enter_object.type == 'Card' then\r\n          if enter_object.is_face_down then\r\n               -- Check to see if card is below it to decide if this card is a goods card\r\n               local hits = Physics.cast({\r\n                    origin = enter_object.getPosition(),\r\n                    direction = {0, -1, 0},\r\n                    max_distance = 2\r\n               })\r\n\r\n               for _, hit in pairs(hits) do\r\n                    local o = hit.hit_object\r\n                    if o.type == 'Card' and not o.is_face_down then\r\n                         local cardData = componentsBag.getVar(\"cardData\")\r\n                         local data = cardData[o.getName()]\r\n                         if data and data.goods then\r\n                              enter_object.setScale({0.6, 1, 0.6})\r\n                              enter_object.highlightOn(goodsHighlightColor[data.goods])\r\n                         end\r\n                    end\r\n               end\r\n          -- face up card, check if need to place snap point for goods placement\r\n          else\r\n               local cardData = componentsBag.getVar(\"cardData\")\r\n               local data = cardData[enter_object.getName()]\r\n               if data and data.goods then\r\n                    enter_object.setSnapPoints({{\r\n                         position = goodsSnapPointOffset,\r\n                         rotation = {0, 0, 0},\r\n                         rotation_snap = true\r\n                    }})\r\n               end\r\n          end\r\n\r\n          updateHelpText(tableauZoneOwner[zone.getGUID()])\r\n     end\r\nend\r\n\r\n-- ======================\r\n-- UI\r\n-- ======================\r\n\r\n-- function uiSetVisibilityToPlayer(id, playerColor, visible)\r\n--      local attr = UI.getAttribute(id, \"visibility\")\r\n--      if visible then\r\n--           attr = attr .. \"|\" .. playerColor\r\n--      else\r\n--           local newAttr = \"\"\r\n--           tokens = split(attr, \"|\")\r\n--\r\n--           for i=1, #tokens do\r\n--                if tokens[i] ~= playerColor then\r\n--                     newAttr = newAttr .. tokens[i] .. \"|\"\r\n--                end\r\n--           end\r\n--\r\n--           if newAttr == \"\" then\r\n--                attr = \"Brown\"\r\n--           else\r\n--                attr = newAttr:sub(1, newAttr:len() - 1)\r\n--           end\r\n--      end\r\n--\r\n--      UI.setAttribute(id, \"visibility\", attr)\r\n-- end\r\n--\r\n-- function closeHelpClick(player, button)\r\n--      if button == \"-1\" then\r\n--           uiSetVisibilityToPlayer(\"helpWindow\", player.color, false)\r\n--      end\r\n-- end\r\n--\r\n-- function showHelpClick(player, button)\r\n--      if button == \"-1\" then\r\n--           uiSetVisibilityToPlayer(\"helpWindow\", player.color, true)\r\n--      end\r\n-- end\r\n\r\n-- ======================\r\n-- Game functions\r\n-- ======================\r\n\r\nfunction gameStart()\r\n     gameStarted = true\r\n     currentPhase = -1\r\n\r\n     for _, data in pairs(phaseTilePlacement) do\r\n          local tile = componentsBag.takeObject({\r\n               guid = data[1],\r\n               position = data[2],\r\n               rotation = {0, 180, 180},\r\n               smooth = false\r\n          })\r\n\r\n          tile.setLock(true)\r\n          tile.interactable = false\r\n     end\r\n\r\n     broadcastToAll(\"Determine your starting hand.\", \"White\")\r\nend\r\n\r\nfunction playerReadyClicked(player)\r\n     local i = playerColorIndexMap[player]\r\n\r\n     -- perform some necessary checks first\r\n     if currentPhase == -1 then\r\n     elseif currentPhase == 0 and not checkIfSelectedPhase(player) then\r\n          broadcastToColor(\"You must select an action card!\", player, \"White\")\r\n          getObjectFromGUID(readyTokens_GUID[i]).call(\"setToggleState\", false)\r\n          getObjectFromGUID(smallReadyTokens_GUID[i]).call(\"setToggleState\", false)\r\n          return\r\n     end\r\n\r\n     startLuaCoroutine(Global, \"checkAllReadyCo\")\r\nend\r\n\r\n-- Makes all the ready buttons belonging to player the same toggle state\r\n-- [1] = owner, [2] = state\r\nfunction updateReadyButtons(params)\r\n     local ind = playerColorIndexMap[params[1]]\r\n     local btn1 = getObjectFromGUID(readyTokens_GUID[ind])\r\n     btn1.call(\"setToggleState\", params[2])\r\n     local btn2 = getObjectFromGUID(smallReadyTokens_GUID[ind])\r\n     btn2.call(\"setToggleState\", params[2])\r\nend\r\n\r\nfunction checkAllReadyCo()\r\n     -- Check if all players are ready to move on to next step of game\r\n     local players = getSeatedPlayersWithHands()\r\n\r\n     for i=1, #players do\r\n          local readyToken = getObjectFromGUID(readyTokens_GUID[playerColorIndexMap[players[i]]])\r\n          if readyToken.getVar(\"isReady\") == false then\r\n               return 1\r\n          end\r\n     end\r\n\r\n     -- play selected cards in hand\r\n     for i=1, #players do\r\n          for _, obj in pairs(Player[players[i]].getHandObjects(1)) do\r\n               if obj.type == 'Card' and obj.hasTag(\"Selected\") then\r\n                    attemptPlayCard(obj, players[i])\r\n               end\r\n          end\r\n     end\r\n\r\n     wait(0.1)\r\n\r\n     for i=1, #readyTokens_GUID do\r\n          local token = getObjectFromGUID(readyTokens_GUID[i])\r\n          if token then\r\n               token.call(\"setToggleState\", false)\r\n          end\r\n     end\r\n\r\n     for i=1, #smallReadyTokens_GUID do\r\n          local token = getObjectFromGUID(smallReadyTokens_GUID[i])\r\n          if token then\r\n               token.call(\"setToggleState\", false)\r\n          end\r\n     end\r\n\r\n     discardMarkedCards()\r\n\r\n     if gameStarted and currentPhase == -1 then\r\n          currentPhase = 0\r\n          for i=1, #players do\r\n               local menu = getObjectFromGUID(actionSelectorMenu_GUID[playerColorIndexMap[players[i]]])\r\n               menu.call(\"rearrangePhaseCards\")\r\n          end\r\n\r\n          startNewRound()\r\n          return 1\r\n     end\r\n\r\n     if currentPhase == 0 then\r\n          local phases = {}\r\n\r\n          setHelpTextAll(\"\")\r\n\r\n          -- flip over all selected phase cards and phase tiles\r\n          for _, guid in pairs(selectedActionZone_GUID) do\r\n               local zone = getObjectFromGUID(guid)\r\n               for _, obj in pairs(zone.getObjects()) do\r\n                    if obj.hasTag(\"Action Card\") and obj.is_face_down then\r\n                         obj.flip()\r\n                         phases[split(obj.getName(), \" \")[1]] = true\r\n                    end\r\n               end\r\n          end\r\n\r\n          for phase, _ in pairs(phases) do\r\n               local index = phaseIndex[phase]\r\n               local tile = getObjectFromGUID(phaseTilePlacement[index][1])\r\n               tile.setRotationSmooth({0, 180, 0})\r\n               selectedPhases[#selectedPhases + 1] = phaseIndex[phase]\r\n          end\r\n\r\n          table.sort(selectedPhases)\r\n\r\n          currentPhase = -1000\r\n\r\n          wait(1.2)\r\n\r\n          startLuaCoroutine(self, \"beginNextPhase\")\r\n          return 1\r\n     elseif currentPhase >= 1 then\r\n          setHelpTextAll(\"\")\r\n          if currentPhase > #selectedPhases then\r\n               -- round end check\r\n\r\n          else\r\n               startLuaCoroutine(self, \"beginNextPhase\")\r\n          end\r\n     end\r\n     return 1\r\nend\r\n\r\nfunction startNewRound()\r\n     currentPhase = 0\r\n     selectedPhases = {}\r\n     resetPhaseTiles()\r\n\r\n     broadcastToAll(\"Starting new round.\", \"White\")\r\n     setHelpTextAll(\"↑ Select an action card.\")\r\nend\r\n\r\nfunction beginNextPhase()\r\n     -- This shouldn't happen at all, but if it did...\r\n     if not selectedPhases or #selectedPhases <= 0  then\r\n          broadcastToAll(\"Error: No phases selected.\", \"Red\")\r\n          startNewRound()\r\n          return 1\r\n     end\r\n\r\n     if currentPhase <= 0 then\r\n          currentPhase = 0\r\n     end\r\n\r\n     currentPhase = currentPhase + 1\r\n\r\n     -- Remove highlights if they exists\r\n     for _, guid in pairs(handZone_GUID) do\r\n          local zone = getObjectFromGUID(guid)\r\n          for _, obj in pairs(zone.getObjects()) do\r\n               obj.highlightOff()\r\n          end\r\n     end\r\n\r\n     if currentPhase <= #selectedPhases then\r\n          local phase = selectedPhases[currentPhase]\r\n          broadcastToAll(phaseText[phase], \"White\")\r\n\r\n          phaseTilesHighlightOff()\r\n\r\n          -- hilight current phase tile\r\n          local tile = getObjectFromGUID(phaseTilePlacement[phase][1])\r\n          tile.UI.setXml('<Panel color=\"rgb(0.8,0.2,1)\" width=\"240\" height=\"240\" position=\"0 0 0\"></Panel>')\r\n\r\n          if phase == 1 then\r\n               startExplorePhase()\r\n          elseif phase == 2 then\r\n               startDevelopPhase()\r\n          end\r\n     else\r\n          -- end of round\r\n     end\r\n\r\n     return 1\r\nend\r\n\r\nfunction phaseTilesHighlightOff()\r\n     for i=1, #phaseTilePlacement do\r\n          local tile = getObjectFromGUID(phaseTilePlacement[i][1])\r\n          tile.UI.setXml(\"\")\r\n     end\r\nend\r\n\r\nfunction resetPhaseTiles()\r\n     for i=1, #phaseTilePlacement do\r\n          local tile = getObjectFromGUID(phaseTilePlacement[i][1])\r\n          tile.setRotationSmooth({0, 180, 180})\r\n     end\r\nend\r\n\r\nfunction startExplorePhase()\r\n     local players = getSeatedPlayersWithHands()\r\n     local cardData = componentsBag.getVar(\"cardData\")\r\n\r\n     for _, player in pairs(players) do\r\n          local i = playerColorIndexMap[player]\r\n          local drawN = 2\r\n          local keepN = 1\r\n\r\n          for card in allCardsInTableau(player) do\r\n               local info = cardData[card.getName()]\r\n\r\n               if not info and card.hasTag(\"Action Card\") then\r\n                    -- action card powers here\r\n                    info = actionCardPowers[card.getName()]\r\n               end\r\n\r\n               local power = info.powers[\"1\"]\r\n               if power and power[\"DRAW\"] then\r\n                    drawN = drawN + power[\"DRAW\"].strength\r\n               end\r\n               if power and power[\"KEEP\"] then\r\n                    keepN = keepN + power[\"KEEP\"].strength\r\n               end\r\n          end\r\n\r\n          handCountSnapshot[i] = countCardsInHand(player) + drawN\r\n\r\n          for j=1,drawN do\r\n               local card = drawCard()\r\n               card.deal(1, player)\r\n               card.addTag(\"Explore Highlight\")\r\n               card.highlightOn(\"Orange\")\r\n          end\r\n\r\n          phasePowerSnapshot[player] = {draw = drawN, keep = keepN}\r\n          updateHelpText(player)\r\n     end\r\nend\r\n\r\nfunction startDevelopPhase()\r\n     local players = getSeatedPlayersWithHands()\r\n     local cardData = componentsBag.getVar(\"cardData\")\r\n\r\n     for player, i in pairs(playerColorIndexMap) do\r\n          local powers = {}\r\n\r\n          for card in allCardsInTableau(player) do\r\n               local info = cardData[card.getName()]\r\n\r\n               if not info and card.hasTag(\"Action Card\") then\r\n                    info = actionCardPowers[card.getName()]\r\n               end\r\n\r\n               if info.powers[\"2\"] then\r\n                    for code, power in pairs(info.powers[\"2\"]) do\r\n                         if not powers[code] then\r\n                              powers[code] = 0\r\n                         end\r\n\r\n                         powers[code] = powers[code] + power.strength\r\n                    end\r\n               end\r\n          end\r\n\r\n          phasePowerSnapshot[player] = powers\r\n\r\n          if powers[\"DRAW\"] then\r\n               for j=1, powers[\"DRAW\"] do\r\n                    drawCard().deal(1, player)\r\n               end\r\n          end\r\n\r\n          updateHandCardState(player)\r\n          updateHelpText(player)\r\n     end\r\nend\r\n\r\nfunction updateHandCardState(player)\r\n     local index = playerColorIndexMap[player]\r\n     local cardData = componentsBag.getVar(\"cardData\")\r\n\r\n     if currentPhase >= 1 and currentPhase <= #selectedPhases then\r\n          local phase = selectedPhases[currentPhase]\r\n          for _, obj in pairs(Player[player].getHandObjects(1)) do\r\n               obj.clearButtons()\r\n\r\n               local info = cardData[obj.getName()]\r\n\r\n               if phase == 2 and info and info.type == 2 then\r\n                    if playerChoiceState[index] == nil then\r\n                         createSelectButtonOnCard(obj)\r\n                    elseif playerChoiceState[index] == obj.getGUID() then\r\n                         createCancelButtonOnCard(obj)\r\n                    end\r\n               end\r\n          end\r\n     end\r\nend\r\n\r\nfunction createSelectButtonOnCard(card)\r\n     card.clearButtons()\r\n     card.createButton({\r\n          click_function = \"cardSelectClick\",\r\n          function_owner = self,\r\n          position = {0, 0.5, -1.75},\r\n          width = 600,\r\n          height = 200,\r\n          font_size = 150,\r\n          label = \"Select\"\r\n     })\r\nend\r\n\r\nfunction createCancelButtonOnCard(card)\r\n     card.clearButtons()\r\n     card.createButton({\r\n          click_function = \"cardCancelClick\",\r\n          function_owner = self,\r\n          position = {0, 0.5, -1.75},\r\n          width = 600,\r\n          height = 200,\r\n          font_size = 150,\r\n          label = \"Cancel\"\r\n     })\r\nend\r\n\r\nfunction cardSelectClick(object, player, button)\r\n     if button then\r\n          return\r\n     end\r\n\r\n     local i = playerColorIndexMap[player]\r\n     playerChoiceState[i] = object.getGUID()\r\n     object.addTag(\"Selected\")\r\n     object.highlightOn(\"Yellow\")\r\n\r\n     handCountSnapshot[i] = countCardsInHand(player, true)\r\n     updateHandCardState(player)\r\n     updateHelpText(player)\r\nend\r\n\r\nfunction cardCancelClick(object, player, button)\r\n     if button then\r\n          return\r\n     end\r\n\r\n     local i = playerColorIndexMap[player]\r\n     playerChoiceState[i] = nil\r\n     object.removeTag(\"Selected\")\r\n     object.highlightOff()\r\n\r\n     updateHandCardState(player)\r\n     updateHelpText(player)\r\nend\r\n\r\nfunction updateHelpText(player)\r\n     local i = playerColorIndexMap[player]\r\n     local values = phasePowerSnapshot[player]\r\n     local cardsInHand = countCardsInHand(player, false)\r\n\r\n     -- end of round\r\n     if currentPhase > #selectedPhases then\r\n\r\n     -- explore\r\n     elseif selectedPhases[currentPhase] == 1 then\r\n          local discardTarget = math.max(0, values.draw - values.keep)\r\n          local discarded = handCountSnapshot[i] - cardsInHand\r\n\r\n          setHelpText(player, \"Explore: draw \" .. values.draw .. \", keep \" .. values.keep .. \". (discard \" .. discarded .. \"/\" .. discardTarget .. \")\")\r\n     elseif selectedPhases[currentPhase] == 2 then\r\n          if playerChoiceState[i] then\r\n               local cardData = componentsBag.getVar(\"cardData\")\r\n               local card = getObjectFromGUID(playerChoiceState[i])\r\n               local info = cardData[card.getName()]\r\n               local discardTarget = info.cost - values[\"REDUCE\"]\r\n               local discarded = handCountSnapshot[i] - cardsInHand\r\n               setHelpText(player, \"Develop: cost \" .. discardTarget .. \". (discard \" .. discarded .. \"/\" .. discardTarget .. \")\")\r\n          else\r\n               setHelpText(player, \"Develop\")\r\n          end\r\n     end\r\nend\r\n\r\n-- iterator to go through all face-up cards in tableau plus the selection action card(s)\r\nfunction allCardsInTableau(player)\r\n     local pi = playerColorIndexMap[player]\r\n     local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()\r\n     local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()\r\n\r\n     for _, item in pairs(actionCards) do\r\n          if item.hasTag(\"Action Card\") then\r\n               objs[#objs + 1] = item\r\n          end\r\n     end\r\n\r\n     local i = 0\r\n\r\n     return function()\r\n               i = i + 1\r\n\r\n               while objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do\r\n                    i = i + 1\r\n               end\r\n\r\n               return objs[i]\r\n          end\r\nend\r\n",
+  "LuaScriptState": "{\"currentPhase\":-1,\"drawDeck_GUID\":\"\",\"gameStarted\":false,\"handCountSnapshot\":[0,0,0,0],\"phasePowerSnapshot\":{\"Blue\":[],\"Green\":[],\"Red\":[],\"Yellow\":[]},\"playerChoiceState\":[],\"selectedPhases\":[]}",
   "XmlUI": "<!-- Xml UI. See documentation: https://api.tabletopsimulator.com/ui/introUI/ -->\r\n<!-- <Panel id=\"title\" width=\"1000\" height=\"1000\">\r\n     <Image image=\"title splash\" preserveAspect=\"true\"/>\r\n     <Text color=\"White\" offsetXY=\"0 -200\" fontSize=\"30\">Loading, please wait...</Text>\r\n</Panel> -->\r\n\r\n<Defaults>\r\n     <Text class=\"desc\" color=\"White\" fontSize=\"16\"/>\r\n     <Text class=\"btnLabel\" fontStyle=\"Bold\" fontSize=\"16\"/>\r\n     <Text class=\"label\" fontSize=\"20\" color=\"White\"/>\r\n     <Text class=\"header\" fontSize=\"26\" fontStyle=\"BoldAndItalic\" color=\"#60b1eb\" alignment=\"MiddleLeft\"/>\r\n     <Toggle toggleWidth=\"25\" toggleHeight=\"25\" fontSize=\"18\"/>\r\n     <Toggle class=\"newFront\" toggleWidth=\"20\" toggleHeight=\"20\" fontSize=\"16\" textColor=\"Grey\"/>\r\n     <Toggle class=\"toggleWhite\" textColor=\"White\"/>\r\n     <Toggle class=\"toggleYellow\" textColor=\"Yellow\"/>\r\n     <Toggle class=\"toggleRed\" textColor=\"Red\"/>\r\n</Defaults>\r\n\r\n<Panel id=\"helpWindow\" width=\"300\" height=\"400\" color=\"rgba(0,0,0,0.6)\" allowDragging=\"True\" visibility=\"Brown\"\r\n     returnToOriginalPositionWhenReleased=\"False\" outline=\"Black\" rectAlignment=\"UpperLeft\" offsetXY=\"100 -70\">\r\n          <Panel rectAlignment=\"UpperCenter\" color=\"#0e4db3\" height=\"40\">\r\n               <Text id=\"windowTitle\" fontSize=\"20\" color=\"White\" fontStyle=\"Bold\" shadow=\"#000000\" shadowDistance=\"2 -2\">Help</Text>\r\n               <Button rectAlignment=\"MiddleRight\" width=\"30\" height=\"30\" offsetXY=\"-5 0\" onClick=\"closeHelpClick\">\r\n                    <Text class=\"btnLabel\">X</Text>\r\n               </Button>\r\n          </Panel>\r\n          <Panel padding=\"10\">\r\n               <Text class=\"label\" id=\"helpText\" alignment=\"MiddleLeft\">\r\n                    Welcome!\r\n\r\n                    This help window will display instructions on how to use the script and what to do once the game starts.\r\n               </Text>\r\n          </Panel>\r\n</Panel>\r\n\r\n<Button width=\"120\" height=\"50\" rectAlignment=\"UpperLeft\" offsetXY=\"100 -8\" onClick=\"showHelpClick\"\r\n     visibility=\"Yellow|Red|Blue|Green\" active=\"false\">\r\n     <Text class=\"btnLabel\">Show Help</Text>\r\n</Button>",
   "CustomUIAssets": [
     {
@@ -393,7 +393,7 @@
         "z": 10.08
       },
       "Rotation": {
-        "x": -5.92630265E-08,
+        "x": -5.92630336E-08,
         "y": 359.9879,
         "z": 180.0
       }
@@ -1025,7 +1025,7 @@
       "Name": "Bag",
       "Transform": {
         "posX": -32.47262,
-        "posY": 1.814997,
+        "posY": 1.81499743,
         "posZ": 33.2264442,
         "rotX": -2.79844553E-05,
         "rotY": 0.000125678169,
@@ -1038,9 +1038,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.231201828,
-        "g": 0.230681747,
-        "b": 0.2351889
+        "r": 0.2312018,
+        "g": 0.230681717,
+        "b": 0.235188872
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -9486,9 +9486,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.04399243,
-        "g": 0.06690265,
-        "b": 0.113237821
+        "r": 0.0439924076,
+        "g": 0.06690263,
+        "b": 0.113237791
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -9708,9 +9708,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.04399243,
-        "g": 0.06690265,
-        "b": 0.113237821
+        "r": 0.0439924076,
+        "g": 0.06690263,
+        "b": 0.113237791
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -9929,9 +9929,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.04399243,
-        "g": 0.06690265,
-        "b": 0.113237821
+        "r": 0.0439924076,
+        "g": 0.06690263,
+        "b": 0.113237791
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -10150,9 +10150,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.04399243,
-        "g": 0.06690265,
-        "b": 0.113237821
+        "r": 0.0439924076,
+        "g": 0.06690263,
+        "b": 0.113237791
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -10400,8 +10400,7 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "169b57",
@@ -10450,8 +10449,7 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "8f6042",
@@ -10549,8 +10547,7 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "adc17a",
@@ -10559,9 +10556,9 @@
         "posX": 21.375,
         "posY": 1.49510384,
         "posZ": 14.625,
-        "rotX": -3.2311263E-08,
+        "rotX": -6.67606841E-08,
         "rotY": 89.99668,
-        "rotZ": 3.65304622E-08,
+        "rotZ": 1.15057176E-07,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10615,9 +10612,9 @@
         "posX": 21.375,
         "posY": 1.49510384,
         "posZ": 12.375001,
-        "rotX": 1.61628453E-08,
+        "rotX": -1.25700739E-08,
         "rotY": 90.00145,
-        "rotZ": -3.62985553E-08,
+        "rotZ": 9.772125E-08,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10669,11 +10666,11 @@
       "Name": "Card",
       "Transform": {
         "posX": -21.8918552,
-        "posY": 1.49510384,
+        "posY": 1.495104,
         "posZ": -12.0948381,
-        "rotX": -1.82627455E-10,
+        "rotX": 8.09518E-09,
         "rotY": 269.998871,
-        "rotZ": -2.73737044E-07,
+        "rotZ": -1.25584563E-07,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10727,9 +10724,9 @@
         "posX": -21.8918552,
         "posY": 1.49510384,
         "posZ": -14.3857288,
-        "rotX": -9.749737E-10,
+        "rotX": -1.39840655E-08,
         "rotY": 269.9987,
-        "rotZ": -5.534347E-08,
+        "rotZ": -6.07095245E-08,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10783,9 +10780,9 @@
         "posX": -11.823143,
         "posY": 1.49510384,
         "posZ": 21.8440666,
-        "rotX": -8.027643E-08,
+        "rotX": -1.00131004E-07,
         "rotY": 359.976868,
-        "rotZ": 1.08170134E-07,
+        "rotZ": 9.148622E-08,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10839,9 +10836,9 @@
         "posX": -14.1138487,
         "posY": 1.49510384,
         "posZ": 21.8442364,
-        "rotX": -5.413266E-08,
+        "rotX": -2.70963039E-08,
         "rotY": 0.0226347074,
-        "rotZ": -5.9455612E-08,
+        "rotZ": -3.91019839E-08,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -10906,9 +10903,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.230664164,
-        "g": 0.344966531,
-        "b": 0.402436823,
+        "r": 0.230664134,
+        "g": 0.3449665,
+        "b": 0.4024368,
         "a": 0.317843884
       },
       "LayoutGroupSortIndex": 0,
@@ -11008,7 +11005,7 @@
             "z": -0.0004362781
           },
           "Rotation": {
-            "x": -2.92106446E-08,
+            "x": -2.92106463E-08,
             "y": 180.024734,
             "z": -3.481831E-08
           }
@@ -11034,7 +11031,7 @@
           "Rotation": {
             "x": -6.491592E-08,
             "y": 180.0206,
-            "z": 4.82836562E-08
+            "z": 4.828366E-08
           }
         }
       ]
@@ -11105,7 +11102,7 @@
         "r": 0.905,
         "g": 0.898,
         "b": 0.171999961,
-        "a": 0.75
+        "a": 0.1025641
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -11150,7 +11147,7 @@
         "r": 0.191999972,
         "g": 0.701,
         "b": 0.167999953,
-        "a": 0.1025641
+        "a": 0.75
       },
       "LayoutGroupSortIndex": 0,
       "Value": 0,
@@ -11226,9 +11223,9 @@
         "posX": -26.94731,
         "posY": 1.48149931,
         "posZ": 25.0256023,
-        "rotX": -4.815101E-09,
+        "rotX": 3.1545504E-08,
         "rotY": 180.00029,
-        "rotZ": -1.06241007E-08,
+        "rotZ": 8.739602E-09,
         "scaleX": 2.67430973,
         "scaleY": 1.0,
         "scaleZ": 2.67430973
@@ -11283,9 +11280,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.230664134,
-        "g": 0.3449665,
-        "b": 0.4024368,
+        "r": 0.2306641,
+        "g": 0.344966471,
+        "b": 0.402436763,
         "a": 0.317843884
       },
       "LayoutGroupSortIndex": 0,
@@ -11385,7 +11382,7 @@
             "z": -0.0004362781
           },
           "Rotation": {
-            "x": -2.92106463E-08,
+            "x": -2.921065E-08,
             "y": 180.024734,
             "z": -3.481831E-08
           }
@@ -11411,7 +11408,7 @@
           "Rotation": {
             "x": -6.491592E-08,
             "y": 180.0206,
-            "z": 4.828366E-08
+            "z": 4.82836633E-08
           }
         }
       ]
@@ -11434,9 +11431,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.230664134,
-        "g": 0.3449665,
-        "b": 0.4024368,
+        "r": 0.2306641,
+        "g": 0.344966471,
+        "b": 0.402436763,
         "a": 0.317843884
       },
       "LayoutGroupSortIndex": 0,
@@ -11536,7 +11533,7 @@
             "z": -0.0004362781
           },
           "Rotation": {
-            "x": -2.92106463E-08,
+            "x": -2.921065E-08,
             "y": 180.024734,
             "z": -3.481831E-08
           }
@@ -11562,7 +11559,7 @@
           "Rotation": {
             "x": -6.491592E-08,
             "y": 180.0206,
-            "z": 4.828366E-08
+            "z": 4.82836633E-08
           }
         }
       ]
@@ -11585,9 +11582,9 @@
       "Description": "",
       "GMNotes": "",
       "ColorDiffuse": {
-        "r": 0.230664134,
-        "g": 0.3449665,
-        "b": 0.4024368,
+        "r": 0.2306641,
+        "g": 0.344966471,
+        "b": 0.402436763,
         "a": 0.317843884
       },
       "LayoutGroupSortIndex": 0,
@@ -11687,7 +11684,7 @@
             "z": -0.0004362781
           },
           "Rotation": {
-            "x": -2.92106463E-08,
+            "x": -2.921065E-08,
             "y": 180.024734,
             "z": -3.481831E-08
           }
@@ -11713,7 +11710,7 @@
           "Rotation": {
             "x": -6.491592E-08,
             "y": 180.0206,
-            "z": 4.828366E-08
+            "z": 4.82836633E-08
           }
         }
       ]
@@ -11725,9 +11722,9 @@
         "posX": 14.625,
         "posY": 1.49510384,
         "posZ": -21.375,
-        "rotX": 3.05165E-08,
+        "rotX": -2.19743281E-08,
         "rotY": 180.0,
-        "rotZ": -2.3180003E-07,
+        "rotZ": -1.09938213E-07,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -11781,9 +11778,9 @@
         "posX": 12.375,
         "posY": 1.49510384,
         "posZ": -21.375,
-        "rotX": 1.48547457E-07,
+        "rotX": 1.01444591E-07,
         "rotY": 180.002136,
-        "rotZ": -1.20340459E-07,
+        "rotZ": -7.611652E-08,
         "scaleX": 1.0,
         "scaleY": 1.0,
         "scaleZ": 1.0
@@ -12131,9 +12128,9 @@
         "posX": -9.99505,
         "posY": 1.48955035,
         "posZ": 0.00267567975,
-        "rotX": 7.29399E-08,
+        "rotX": 7.29399261E-08,
         "rotY": 270.0,
-        "rotZ": -2.9078727E-08,
+        "rotZ": -2.907873E-08,
         "scaleX": 5.370696,
         "scaleY": 0.0161025524,
         "scaleZ": 3.160494
@@ -12819,9 +12816,9 @@
         "posX": 24.9160652,
         "posY": 1.4814992,
         "posZ": 26.798666,
-        "rotX": 1.50326174E-09,
-        "rotY": 2.54070862E-11,
-        "rotZ": 7.514637E-09,
+        "rotX": -1.55040025E-09,
+        "rotY": 2.49565438E-11,
+        "rotZ": 3.714042E-09,
         "scaleX": 3.77104521,
         "scaleY": 1.0,
         "scaleZ": 3.77104521
@@ -12869,11 +12866,11 @@
       "Name": "Custom_Tile",
       "Transform": {
         "posX": -25.0282326,
-        "posY": 1.49074912,
+        "posY": 1.49074841,
         "posZ": -26.8264179,
         "rotX": 359.859467,
         "rotY": 180.028687,
-        "rotZ": -1.78121427E-05,
+        "rotZ": -4.199304E-06,
         "scaleX": 3.77104521,
         "scaleY": 1.0,
         "scaleZ": 3.77104521
@@ -13012,8 +13009,7 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "37d9aa",
@@ -13062,8 +13058,7 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "476374",
@@ -13112,17 +13107,16 @@
         "CastShadows": true
       },
       "LuaScript": "isReady = false\r\n\r\nfunction onSave()\r\n    local saved_data = {}\r\n    saved_data.isReady = isReady\r\n    return JSON.encode(saved_data)\r\nend\r\n\r\nfunction onload(saved_data)\r\n     if saved_data ~= \"\" then\r\n          local data = JSON.decode(saved_data)\r\n          isReady = data.isReady\r\n     end\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          color = color(0, 0, 0, 0)\r\n     })\r\n\r\n     self.createButton({\r\n          click_function = \"toggleState\",\r\n          function_owner = self,\r\n          width = 800,\r\n          height = 800,\r\n          rotation = {0, 0, 180},\r\n          color = color(0, 0, 0, 0)\r\n     })\r\nend\r\n\r\nfunction toggleState(obj, _, rightClick)\r\n     if rightClick or Global.getVar(\"gameStarted\") == false then\r\n          return\r\n     end\r\n\r\n     isReady = not isReady\r\n     Global.call(\"updateReadyButtons\", {player, isReady})\r\n\r\n     if isReady then\r\n          Global.call(\"playerReadyClicked\", player)\r\n     end\r\nend\r\n\r\nfunction setToggleState(ready)\r\n     local rot = self.getRotation()\r\n     isReady = ready\r\n\r\n     if isReady then\r\n          self.setRotation({rot[1], rot[2], 0})\r\n     else\r\n          self.setRotation({rot[1], rot[2], 180})\r\n     end\r\nend",
-      "LuaScriptState": "{\"isReady\":false}",
-      "XmlUI": ""
+      "LuaScriptState": "{\"isReady\":false}"
     },
     {
       "GUID": "baba9c",
       "Name": "Deck",
       "Transform": {
-        "posX": 0.00585601432,
+        "posX": 0.00585595472,
         "posY": 1.64285326,
         "posZ": -26.9999161,
-        "rotX": -2.4267938E-05,
+        "rotX": -2.42528877E-05,
         "rotY": 180.000214,
         "rotZ": 180.000015,
         "scaleX": 1.0,
@@ -13578,9 +13572,9 @@
       "Name": "Deck",
       "Transform": {
         "posX": 26.9987,
-        "posY": 1.64285576,
-        "posZ": 0.185030371,
-        "rotX": -1.61230375E-07,
+        "posY": 1.64285564,
+        "posZ": 0.185030431,
+        "rotX": -2.58929475E-07,
         "rotY": 89.96668,
         "rotZ": 180.0,
         "scaleX": 1.0,
@@ -14035,10 +14029,10 @@
       "GUID": "58d953",
       "Name": "Deck",
       "Transform": {
-        "posX": -0.181618825,
+        "posX": -0.18161881,
         "posY": 1.64285147,
         "posZ": 26.99786,
-        "rotX": -3.6894482E-05,
+        "rotX": -3.696878E-05,
         "rotY": 359.9524,
         "rotZ": 180.000031,
         "scaleX": 1.0,
@@ -14495,8 +14489,8 @@
       "Transform": {
         "posX": -27.0002575,
         "posY": 1.642849,
-        "posZ": 7.641958E-05,
-        "rotX": -6.047566E-05,
+        "posZ": 7.637877E-05,
+        "rotX": -6.04832057E-05,
         "rotY": 270.010376,
         "rotZ": 180.000046,
         "scaleX": 1.0,
@@ -14954,8 +14948,8 @@
         "posX": 5.67327563E-09,
         "posY": 1.49502516,
         "posZ": -29.85,
-        "rotX": -1.85093938E-07,
-        "rotY": 0.0308294427,
+        "rotX": -1.85093967E-07,
+        "rotY": 0.03082945,
         "rotZ": -9.05223942E-07,
         "scaleX": 0.8750001,
         "scaleY": 0.0270524025,
@@ -15077,9 +15071,9 @@
         "posX": 29.85,
         "posY": 1.49502516,
         "posZ": 1.701461E-08,
-        "rotX": -1.46409874E-07,
+        "rotX": -1.46409931E-07,
         "rotY": 269.987457,
-        "rotZ": 2.09297141E-07,
+        "rotZ": 2.09297156E-07,
         "scaleX": 0.8750001,
         "scaleY": 0.0270524025,
         "scaleZ": 0.88
