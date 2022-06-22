@@ -1,3 +1,4 @@
+require("util")
 
 targetActionCardName = ""
 selectedActions = {}
@@ -5,8 +6,7 @@ btnIndexOffset = 7
 adv2pBtnIndexOffset = 9
 
 function onload()
-     actionZone = self.getZones()[1]
-     phaseTable = getObjectFromGUID(actionTable_GUID)
+     actionZone = getObjectFromGUID(actionZone_GUID)
      selectedActionCardTile = getObjectFromGUID(selectedActionCardTile_GUID)
      selectedActionCardZone = getObjectFromGUID(selectedActionCardZone_GUID)
 
@@ -27,13 +27,6 @@ function onload()
      createButtons()
 
      refreshButtonHighlights()
-end
-
-function wait(time)
-    local start = os.time()
-    repeat
-        coroutine.yield(0)
-    until os.time() > start + time
 end
 
 function createButtons()
@@ -200,7 +193,7 @@ function selectPhaseCo()
           if checkIfSelected(targetName) then
                returnSelectedActionCard(targetName)
                wait(0.01)
-               rearrangeActionCards()
+               --rearrangeActionCards()
                return 1
           end
      else
@@ -209,7 +202,7 @@ function selectPhaseCo()
 
      wait(0.01)
 
-     rearrangeActionCards()
+     --rearrangeActionCards()
 
      local sp = selectedActionCardTile.getSnapPoints()
      local rot = self.getRotation()
@@ -257,39 +250,40 @@ function returnSelectedActionCard(name)
           if obj.hasTag("Action Card") then
                if not name or name == getName(obj) then
                     obj.setPosition(actionZone.getPosition())
+                    obj.setRotationSmooth({obj.getRotation()[1],obj.getRotation()[2], 0})
                     if name then return end
                end
           end
      end
 end
 
-function rearrangeActionCards()
-     local adv2p = Global.getVar("advanced2p")
-     local spStartIndex = adv2p and 1 or 2
+-- function rearrangeActionCards()
+--      local adv2p = Global.getVar("advanced2p")
+--      local spStartIndex = adv2p and 1 or 2
 
-     local phaseCardNames = adv2p and Global.getVar("phaseCardNamesAdv2p") or Global.getVar("phaseCardNames")
-     local phaseCardSpIndex = {}
+--      local phaseCardNames = adv2p and Global.getVar("phaseCardNamesAdv2p") or Global.getVar("phaseCardNames")
+--      local phaseCardSpIndex = {}
 
-     for i=1, #phaseCardNames do
-          phaseCardSpIndex[phaseCardNames[i]] = spStartIndex + (i-1)
-     end
+--      for i=1, #phaseCardNames do
+--           phaseCardSpIndex[phaseCardNames[i]] = spStartIndex + (i-1)
+--      end
 
-     local sp = phaseTable.getSnapPoints()
+--      local sp = phaseTable.getSnapPoints()
 
-     for _, obj in pairs(actionZone.getObjects()) do
-          if obj.type == "Deck" then
-               local n = #obj.getObjects()
-               for i=1, n do
-                    local card = obj.takeObject()
-                    local spIndex = phaseCardSpIndex[getName(card)]
-                    placeCardAtSnapPoint(card, phaseTable, sp[spIndex], false)
-               end
-          elseif obj.type == "Card" then
-               local spIndex = phaseCardSpIndex[getName(obj)]
-               placeCardAtSnapPoint(obj, phaseTable, sp[spIndex], false)
-          end
-     end
-end
+--      for _, obj in pairs(actionZone.getObjects()) do
+--           if obj.type == "Deck" then
+--                local n = #obj.getObjects()
+--                for i=1, n do
+--                     local card = obj.takeObject()
+--                     local spIndex = phaseCardSpIndex[getName(card)]
+--                     placeCardAtSnapPoint(card, phaseTable, sp[spIndex], false)
+--                end
+--           elseif obj.type == "Card" then
+--                local spIndex = phaseCardSpIndex[getName(obj)]
+--                placeCardAtSnapPoint(obj, phaseTable, sp[spIndex], false)
+--           end
+--      end
+-- end
 
 function placeCardAtSnapPoint(card, spOwner, sp, faceDown)
      local rot = spOwner.getRotation()
