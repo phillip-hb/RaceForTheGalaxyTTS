@@ -2407,3 +2407,95 @@ V:2:ANTI_XENO_WORLD:N/A
 V:1:WORLD:N/A
 V:1:ANTI_XENO_DEVEL:N/A
 ]]
+
+function loadData(data)
+    local tbl = {}
+    local cardInfo = {}
+
+    for line in magiclines(data) do
+
+         -- skip comments
+         if line:sub(1, 1) == "#" or line:len() <= 0 then
+              goto endloop
+         end
+
+         do
+              local code = line:sub(1,1)
+
+              -- new card
+              if code == "N" then
+                   cardInfo = {}
+                   cardInfo.name = line:sub(3, line:len())
+                   cardInfo.powers = {}
+                   cardInfo.flags = {}
+                   tbl[cardInfo.name] = cardInfo
+              -- card type (world or development), cost, and vp
+              elseif code == "T" then
+                   local tokens = split(line, ":")
+                   cardInfo.type = tonumber(tokens[2])
+                   cardInfo.cost = tonumber(tokens[3])
+                   cardInfo.vp = tonumber(tokens[4])
+              -- expansion (need only the first value)
+              elseif code == "E" then
+                   cardInfo.expansion = line:sub(3,3)
+              -- flags
+              elseif code == "F" then
+                   local tokens = split(all_trim(line:sub(3, line:len())),"|")
+                   local flags = {}
+                   for i=1, #tokens do
+                        flags[tokens[i]] = true
+                   end
+                   cardInfo.flags = flags
+              -- goodtype
+              elseif code == "G" then
+                   cardInfo.goods = line:sub(3, line:len())
+              -- powers
+              elseif code == "P" then
+                   local tokens = split(line,":")
+                   local power = {}
+                   power.codes = split(all_trim(tokens[3]),"|")
+                   power.strength = tonumber(tokens[4])
+                   power.times = tonumber(tokens[5])
+
+                   if cardInfo.powers[tokens[2]] == nil then
+                        cardInfo.powers[tokens[2]] = {}
+                   end
+
+                   local newCodes = {}
+                   for i=2, #power.codes do
+                        newCodes[power.codes[i]] = true
+                   end
+
+                   local name = power.codes[1]
+                   power.codes = newCodes
+
+                   cardInfo.powers[tokens[2]][name] = power
+              -- vp flags
+              elseif code == "V" then
+                   local tokens = split(line,":")
+                   local vpFlags = {}
+                   local type = tokens[3]
+                   local value = tonumber(tokens[2])
+                   local matchName = tokens[4]
+
+                   if cardInfo.vpFlags == nil then
+                        cardInfo.vpFlags = {}
+                   end
+
+                   if type == "NAME" then
+                        if not cardInfo.vpFlags[type] then
+                             cardInfo.vpFlags[type] = {}
+                        end
+
+                        cardInfo.vpFlags[type][#cardInfo.vpFlags[type] + 1] = {name = matchName, vp = value}
+                   else
+                        cardInfo.vpFlags[type] = value
+                   end
+              end
+         end
+
+         ::endloop::
+    end
+
+    return tbl
+end
