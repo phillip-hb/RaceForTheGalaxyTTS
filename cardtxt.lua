@@ -2454,6 +2454,7 @@ function loadData(data)
                    local tokens = split(line,":")
                    local power = {}
                    power.codes = split(all_trim(tokens[3]),"|")
+                   power.name = power.codes[1]
                    power.strength = tonumber(tokens[4])
                    power.times = tonumber(tokens[5])
 
@@ -2466,10 +2467,8 @@ function loadData(data)
                         newCodes[power.codes[i]] = true
                    end
 
-                   local name = power.codes[1]
                    power.codes = newCodes
-
-                   cardInfo.powers[tokens[2]][name] = power
+                   cardInfo.powers[tokens[2]][#cardInfo.powers[tokens[2]] + 1] = power
               -- vp flags
               elseif code == "V" then
                    local tokens = split(line,":")

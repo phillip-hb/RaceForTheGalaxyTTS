@@ -58,7 +58,7 @@ function getCardSlot(card)
     local hits = Physics.cast({
          origin = add(card.getPosition(), {0,1,0}),
          direction = {0,-1,0},
-         max_distance = 2
+         max_distance = 5
     })
 
     for _, hit in pairs(hits) do
@@ -84,4 +84,23 @@ function getCard(slot)
     end
 
     return nil
+end
+
+function deleteLinkedListNode(list, value)
+    local node = list
+
+    while node and node.value do
+         if node.value == value then   -- head of list
+              list = {}
+              break
+         elseif node.next and node.next.value == value then
+              node.next = nil
+              break
+         else
+              break
+         end
+         node = node.next
+    end
+
+    return list
 end
