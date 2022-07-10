@@ -2480,7 +2480,9 @@ function loadData(expansions)
                if code == "N" then
                     cardInfo = {}
                     cardInfo.name = line:sub(3, line:len())
+                    cardInfo.passiveCount = {}
                     cardInfo.passivePowers = {}
+                    cardInfo.activeCount = {}
                     cardInfo.activePowers = {}
                     cardInfo.flags = {}
                     tbl[cardInfo.name] = cardInfo
@@ -2512,9 +2514,11 @@ function loadData(expansions)
 
                     if not cardInfo.activePowers[phase] then
                          cardInfo.activePowers[phase] = {}
+                         cardInfo.activeCount[phase] = 0
                     end
                     if not cardInfo.passivePowers[phase] then
                          cardInfo.passivePowers[phase] = {}
+                         cardInfo.passiveCount[phase] = 0
                     end
 
                     power.codes = split(all_trim(tokens[3]),"|")
@@ -2531,8 +2535,12 @@ function loadData(expansions)
 
                     if activePowers[phase][power.name] then
                          cardInfo.activePowers[tokens[2]][power.name] = power
+                         cardInfo.activeCount[phase] = cardInfo.activeCount[phase] + 1
+                         power.index = cardInfo.activeCount[phase]
                     else
                          cardInfo.passivePowers[tokens[2]][power.name] = power
+                         cardInfo.passiveCount[phase] = cardInfo.passiveCount[phase] + 1
+                         power.index = cardInfo.passiveCount[phase]
                     end
                -- vp flags
                elseif code == "V" then
