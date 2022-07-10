@@ -2419,93 +2419,147 @@ V:1:WORLD:N/A
 V:1:ANTI_XENO_DEVEL:N/A
 ]]
 
-function loadData(data)
-    local tbl = {}
-    local cardInfo = {}
+-- key: name, value: tooltip
+activePowers = {
+     ["1"] = {
 
-    for line in magiclines(data) do
+     },
+     ["2"] = {
 
-         -- skip comments
-         if line:sub(1, 1) == "#" or line:len() <= 0 then
-              goto endloop
-         end
+     },
+     ["3"] = {
+          DISCARD = "Discard from hand.",
+          PAY_MILITARY = "Place military world as normal world.",
+          MILITARY_HAND = "Discard from hand.",
+          REDUCE_ZERO = "Reduce settle cost."
+     },
+     ["4"] = {
+          TRADE_ACTION = "Sell good.",
+          CONSUME_ANY = "Consume any good.",
+          CONSUME_NOVELTY = "Consume Novelty good.",
+          CONSUME_RARE = "Consume Rare good.",
+          CONSUME_GENE = "Consume Genes good.",
+          CONSUME_ALIEN = "Consume Alien good.",
+          CONSUME_3_DIFF = "Consume 3 different goods.",
+          CONSUME_ALL = "Consume all goods.",
+          DISCARD_HAND = "Discard from hand.",
+          DRAW = "Draw card(s).",
+          ANTE_CARD = "Gamble draw.",
+          DRAW_LUCKY = "Gamble draw."
+     },
+     ["5"] = {
+          DRAW = "Draw card(s)",
+          WINDFALL_ANY = "Produce good on any windfall world.",
+          WINDFALL_NOVELTY = "Produce good on Novelty windfall world.",
+          WINDFALL_RARE = "Produce good on Rare windfall world.",
+          WINDFALL_GENE = "Produce good on Genes windfall world.",
+          WINDFALL_ALIEN = "Produce good on Alien windfall world.",
+          DRAW_WORLD_GENE = "Draw 1 card for each Genes world in tableau.",
+          DRAW_EACH_NOVELTY = "Draw 1 card for each Novelty good you produced.",
+          DRAW_EACH_ALIEN = "Draw 1 card for each Alien good you produced.",
+          DRAW_DIFFERENT = "Draw 1 card for each kind of good you produced.",
+          DISCARD = "Discard from hand."
+     }
+}
 
-         do
-              local code = line:sub(1,1)
+function loadData(expansions)
+     local tbl = {}
+     local cardInfo = {}
 
-              -- new card
-              if code == "N" then
-                   cardInfo = {}
-                   cardInfo.name = line:sub(3, line:len())
-                   cardInfo.powers = {}
-                   cardInfo.flags = {}
-                   tbl[cardInfo.name] = cardInfo
-              -- card type (world or development), cost, and vp
-              elseif code == "T" then
-                   local tokens = split(line, ":")
-                   cardInfo.type = tonumber(tokens[2])
-                   cardInfo.cost = tonumber(tokens[3])
-                   cardInfo.vp = tonumber(tokens[4])
-              -- expansion (need only the first value)
-              elseif code == "E" then
-                   cardInfo.expansion = line:sub(3,3)
-              -- flags
-              elseif code == "F" then
-                   local tokens = split(all_trim(line:sub(3, line:len())),"|")
-                   local flags = {}
-                   for i=1, #tokens do
-                        flags[tokens[i]] = true
-                   end
-                   cardInfo.flags = flags
-              -- goodtype
-              elseif code == "G" then
-                   cardInfo.goods = line:sub(3, line:len())
-              -- powers
-              elseif code == "P" then
-                   local tokens = split(line,":")
-                   local power = {}
-                   power.codes = split(all_trim(tokens[3]),"|")
-                   power.name = power.codes[1]
-                   power.strength = tonumber(tokens[4])
-                   power.times = tonumber(tokens[5])
+     for line in magiclines(cardtxt) do
 
-                   if cardInfo.powers[tokens[2]] == nil then
-                        cardInfo.powers[tokens[2]] = {}
-                   end
+          -- skip comments
+          if line:sub(1, 1) == "#" or line:len() <= 0 then
+               goto endloop
+          end
 
-                   local newCodes = {}
-                   for i=2, #power.codes do
-                        newCodes[power.codes[i]] = true
-                   end
+          do
+               local code = line:sub(1,1)
 
-                   power.codes = newCodes
-                   cardInfo.powers[tokens[2]][#cardInfo.powers[tokens[2]] + 1] = power
-              -- vp flags
-              elseif code == "V" then
-                   local tokens = split(line,":")
-                   local vpFlags = {}
-                   local type = tokens[3]
-                   local value = tonumber(tokens[2])
-                   local matchName = tokens[4]
+               -- new card
+               if code == "N" then
+                    cardInfo = {}
+                    cardInfo.name = line:sub(3, line:len())
+                    cardInfo.passivePowers = {}
+                    cardInfo.activePowers = {}
+                    cardInfo.flags = {}
+                    tbl[cardInfo.name] = cardInfo
+               -- card type (world or development), cost, and vp
+               elseif code == "T" then
+                    local tokens = split(line, ":")
+                    cardInfo.type = tonumber(tokens[2])
+                    cardInfo.cost = tonumber(tokens[3])
+                    cardInfo.vp = tonumber(tokens[4])
+               -- expansion (need only the first value)
+               elseif code == "E" then
+                    cardInfo.expansion = line:sub(3,3)
+               -- flags
+               elseif code == "F" then
+                    local tokens = split(all_trim(line:sub(3, line:len())),"|")
+                    local flags = {}
+                    for i=1, #tokens do
+                         flags[tokens[i]] = true
+                    end
+                    cardInfo.flags = flags
+               -- goodtype
+               elseif code == "G" then
+                    cardInfo.goods = line:sub(3, line:len())
+               -- powers
+               elseif code == "P" then
+                    local tokens = split(line,":")
+                    local power = {}
+                    local phase = tokens[2]
 
-                   if cardInfo.vpFlags == nil then
-                        cardInfo.vpFlags = {}
-                   end
+                    if not cardInfo.activePowers[phase] then
+                         cardInfo.activePowers[phase] = {}
+                    end
+                    if not cardInfo.passivePowers[phase] then
+                         cardInfo.passivePowers[phase] = {}
+                    end
 
-                   if type == "NAME" then
-                        if not cardInfo.vpFlags[type] then
-                             cardInfo.vpFlags[type] = {}
-                        end
+                    power.codes = split(all_trim(tokens[3]),"|")
+                    power.name = power.codes[1]
+                    power.strength = tonumber(tokens[4])
+                    power.times = tonumber(tokens[5])
 
-                        cardInfo.vpFlags[type][#cardInfo.vpFlags[type] + 1] = {name = matchName, vp = value}
-                   else
-                        cardInfo.vpFlags[type] = value
-                   end
-              end
-         end
+                    local newCodes = {}
+                    for i=2, #power.codes do
+                         newCodes[power.codes[i]] = true
+                    end
 
-         ::endloop::
-    end
+                    power.codes = newCodes
 
-    return tbl
+                    if activePowers[phase][power.name] then
+                         cardInfo.activePowers[tokens[2]][power.name] = power
+                    else
+                         cardInfo.passivePowers[tokens[2]][power.name] = power
+                    end
+               -- vp flags
+               elseif code == "V" then
+                    local tokens = split(line,":")
+                    local vpFlags = {}
+                    local type = tokens[3]
+                    local value = tonumber(tokens[2])
+                    local matchName = tokens[4]
+
+                    if cardInfo.vpFlags == nil then
+                         cardInfo.vpFlags = {}
+                    end
+
+                    if type == "NAME" then
+                         if not cardInfo.vpFlags[type] then
+                              cardInfo.vpFlags[type] = {}
+                         end
+
+                         cardInfo.vpFlags[type][#cardInfo.vpFlags[type] + 1] = {name = matchName, vp = value}
+                    else
+                         cardInfo.vpFlags[type] = value
+                    end
+               end
+          end
+
+          ::endloop::
+     end
+
+     return tbl
 end
