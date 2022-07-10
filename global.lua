@@ -2,7 +2,7 @@ require("util")
 require("cardtxt")
 require("gameUi")
 
----1: starting hand, 0: select phase. Otherwise, index of selectedPhases
+---1: starting hand, 0: select action. Otherwise, index of selectedPhases
 currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
@@ -10,21 +10,21 @@ selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
 function player(i)
-     return {
-          index = i,
-          selectedGoods = {},
-          handCountSnapshot = 0,
-          powersSnapshot = {},
-          selectedCard = nil,
-          selectedCardPower = "",
-          cardsAlreadyUsed = {},
-          miscSelectedCards = {},
-          produceCount = {},
-          paidCost = {},
-          tempMilitary = 0,
-          incomingGood = false,
-          forcedReady = false
-     }
+    return {
+        index = i,
+        selectedGoods = {},
+        handCountSnapshot = 0,
+        powersSnapshot = {},
+        selectedCard = nil,
+        selectedCardPower = "",
+        cardsAlreadyUsed = {},
+        miscSelectedCards = {},
+        produceCount = {},
+        paidCost = {},
+        tempMilitary = 0,
+        incomingGood = false,
+        forcedReady = false
+    }
 end
 
 playerData = {Yellow=player(1),Red=player(2),Blue=player(3),Green=player(4)}
@@ -230,20 +230,20 @@ function getName(obj)
      return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
 end
 
--- converts the raw phase value into corresponding actual phase if 2p advanced variant is on. Use selectedPhases[currentPhaseIndex] to get the raw value instead.
+-- converts the raw phase value into corresponding actual phase. Use selectedPhases[currentPhaseIndex] to get the raw value instead.
 function getCurrentPhase()
-     local phase = selectedPhases[currentPhaseIndex]
-     if advanced2p and phase then
-          if phase == 3 then
-               phase = 2
-          elseif phase == 4 or phase == 5 then
-               phase = 3
-          elseif phase >= 6 then
-               phase = phase - 2
-          end
-     end
+    local phase = selectedPhases[currentPhaseIndex]
+    if advanced2p and phase then
+        if phase == 3 then
+            phase = 2
+        elseif phase == 4 or phase == 5 then
+            phase = 3
+        elseif phase >= 6 then
+            phase = phase - 2
+        end
+    end
 
-     return phase
+    return phase
 end
 
 function trySetAdvanced2pMode()
@@ -878,17 +878,6 @@ function gameStart(params)
                for _, card in pairs(cards) do
                     componentsBag.putObject(card)
                end
-               -- local zone = getObjectFromGUID(actionCardTable_GUID[i])
-               -- local pos = zone.getPosition()
-               -- local rot = zone.getRotation()
-               -- componentsBag.takeObject({
-               --      guid = advanced2pCards_GUID[i],
-               --      position = {pos[1], pos[2] + 1, pos[3]},
-               --      rotation = {rot[1], rot[2] + 180, rot[3] + 180},
-               --      smooth = false
-
-               -- })
-               -- getObjectFromGUID(actionSelectorMenu_GUID[i]).rotate({0, 0, 180})
           else
                getObjectFromGUID(actionSelectorMenu_GUID[i]).rotate({0, 0, 180})
           end
@@ -898,22 +887,21 @@ function gameStart(params)
 end
 
 function playerReadyClicked(playerColor)
-     local i = playerData[playerColor]
-     local count = getSelectedActionsCount(playerColor)
+    local i = playerData[playerColor]
+    local count = getSelectedActionsCount(playerColor)
 
-     if currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
-          if advanced2p then
-               broadcastToColor("You must select 2 action cards!", player, "White")
-          else
-               broadcastToColor("You must select an action card!", player, "White")
-          end
+    if currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
+        if advanced2p then
+            broadcastToColor("You must select 2 action cards!", playerColor, "White")
+        else
+            broadcastToColor("You must select an action card!", playerColor, "White")
+        end
 
-          getObjectFromGUID(readyTokens_GUID[i]).call("setToggleState", false)
-          getObjectFromGUID(smallReadyTokens_GUID[i]).call("setToggleState", false)
-          return
-     end
+        updateReadyButtons({playerColor, false})
+        return
+    end
 
-     startLuaCoroutine(Global, "checkAllReadyCo")
+    startLuaCoroutine(Global, "checkAllReadyCo")
 end
 
 -- Makes all the ready buttons belonging to player the same toggle state
@@ -987,22 +975,23 @@ function checkAllReadyCo()
         return 1
     end
 
-    --  if currentPhaseIndex == 0 then
-    --       local phases = {}
+    if currentPhaseIndex == 0 then  -- All players have selected an action
+        local phases = {}
 
-    --       -- flip over all selected phase cards and phase tiles
-    --       for _, guid in pairs(selectedActionZone_GUID) do
-    --            local zone = getObjectFromGUID(guid)
-    --            local playerSelectedPhases = {}
+        -- flip over all selected phase cards and phase tiles
+        for _, guid in pairs(selectedActionZone_GUID) do
+            local zone = getObjectFromGUID(guid)
+            local selectedActions = {}
 
-    --            for _, obj in pairs(zone.getObjects()) do
-    --                 if obj.hasTag("Action Card") and obj.is_face_down then
-    --                      obj.flip()
-    --                      local name = split(getName(obj), " ")[1]
-    --                      playerSelectedPhases[name] = true
-    --                 end
-    --            end
+            for _, obj in pairs(zone.getObjects()) do
+                if obj.hasTag("Action Card") and obj.is_face_down then
+                    obj.flip()
+                    local name = split(getName(obj), " ")[1]
+                    selectedActions[name] = true
+                end
+            end
 
+            -- Doing some checks for double selection of phase cards for 2p advanced variant
     --            if playerSelectedPhases["DevelopAdv2p"] and not playerSelectedPhases["Develop"] then
     --                 playerSelectedPhases["DevelopAdv2p"] = nil
     --                 playerSelectedPhases["Develop"] = true
@@ -1013,34 +1002,33 @@ function checkAllReadyCo()
     --                 playerSelectedPhases["Settle"] = true
     --            end
 
-    --            for phaseName, value in pairs(playerSelectedPhases) do
-    --                 if value then phases[phaseName] = true end
-    --            end
-    --       end
+            for name, value in pairs(selectedActions) do
+                if value then phases[name] = true end
+            end
+        end
 
-    --       for phase, n in pairs(phases) do
-    --            local index = phaseIndex[phase]
-    --            local tile = getObjectFromGUID(phaseTilePlacement[index][1])
-    --            tile.setRotationSmooth({0, 180, 0})
-    --            selectedPhases[#selectedPhases + 1] = phaseIndex[phase]
-    --       end
+        for phase, _ in pairs(phases) do
+            local index = phaseIndex[phase]
+            local tile = getObjectFromGUID(phaseTilePlacement[index][1])
+            tile.setRotationSmooth({0, 180, 0})
+            selectedPhases[#selectedPhases + 1] = phaseIndex[phase]
+        end
 
-    --       table.sort(selectedPhases)
+        table.sort(selectedPhases)
 
-    --       currentPhaseIndex = -1000
+        currentPhaseIndex = -1000
 
-    --       wait(1.2)
+        wait(1.2)
 
-    --       startLuaCoroutine(self, "beginNextPhase")
-    --       return 1
-    --  elseif currentPhaseIndex >= 1 then
-    --       if currentPhaseIndex > #selectedPhases then
-    --            -- round end check
-    --       else
-    --            startLuaCoroutine(self, "beginNextPhase")
-    --       end
-    --  end
-     return 1
+        startLuaCoroutine(self, "beginNextPhase")
+    elseif currentPhaseIndex >= 1 then
+        if currentPhaseIndex > #selectedPhases then
+            -- round end check
+        else
+            startLuaCoroutine(self, "beginNextPhase")
+        end
+    end
+    return 1
 end
 
 function startNewRound()
@@ -1070,98 +1058,94 @@ end
 
 function beginNextPhase()
      -- This shouldn't happen at all, but if it did...
-     if not selectedPhases or #selectedPhases <= 0  then
-          broadcastToAll("Error: No phases selected.", "Red")
-          startNewRound()
-          return 1
-     end
+    if not selectedPhases or #selectedPhases <= 0  then
+        broadcastToAll("Error: No phases selected.", "Red")
+        startNewRound()
+        return 1
+    end
 
-     if currentPhaseIndex <= 0 then
-          currentPhaseIndex = 0
-     end
+    if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
-     forcedReady = {false, false, false, false}
+    -- Apply end of phase powers here
+    -- if getCurrentPhase() == 5 then
+    --     local tie = false
+    --     local most = {["RARE"]=nil}
+    --     for player, i in pairs(playerColorIndex) do
+    --         if not most["RARE"] or playerData[player].produceCount["RARE"] > playerData[most["RARE"]].produceCount["RARE"]  then
+    --             tie = false
+    --             most["RARE"] = player
+    --         elseif playerData[player].produceCount["RARE"] == playerData[most["RARE"]].produceCount["RARE"] then
+    --             tie = true
+    --         end
+    --     end
 
-     -- Apply end of phase powers here
-     if getCurrentPhase() == 5 then
-          local tie = false
-          local most = {["RARE"]=nil}
-          for player, i in pairs(playerColorIndex) do
-               if not most["RARE"] or playerData[player].produceCount["RARE"] > playerData[most["RARE"]].produceCount["RARE"]  then
-                    tie = false
-                    most["RARE"] = player
-               elseif playerData[player].produceCount["RARE"] == playerData[most["RARE"]].produceCount["RARE"] then
-                    tie = true
-               end
-          end
+    --     for player, data in pairs(playerData) do
+    --         if data.phasePowersSnapshot["DRAW_MOST_RARE"] then
+    --             if tie or most["RARE"] ~= player then
+    --                     broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Black")
+    --             elseif most["RARE"] == player then
+    --                     broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
+    --                     dealTo(data.phasePowersSnapshot["DRAW_MOST_RARE"], player)
+    --             end
+    --         end
+    --     end
+    -- end
 
-          for player, data in pairs(playerData) do
-               if data.phasePowersSnapshot["DRAW_MOST_RARE"] then
-                    if tie or most["RARE"] ~= player then
-                         broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Black")
-                    elseif most["RARE"] == player then
-                         broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
-                         dealTo(data.phasePowersSnapshot["DRAW_MOST_RARE"], player)
-                    end
-               end
-          end
-     end
-
-     currentPhaseIndex = currentPhaseIndex + 1
-
-     for player, data in pairs(playerData) do
-          data.miscSelectedCards = {}
-          data.paidCost = {}
-          updateHandState(player)
-     end
+    currentPhaseIndex = currentPhaseIndex + 1
+    
+    -- Init player data at start of phase
+    for player, data in pairs(playerData) do
+        data.miscSelectedCards = {}
+        data.paidCost = {}
+        data.forcedReady = false
+        data.incomingGood = false
+    end
 
      updatePhaseTilesHighlight()
 
-     if currentPhaseIndex <= #selectedPhases then
-          local phase = getCurrentPhase()
-          broadcastToAll(phaseText[selectedPhases[currentPhaseIndex]], "White")
+    if currentPhaseIndex <= #selectedPhases then
+        local phase = getCurrentPhase()
+        broadcastToAll(phaseText[selectedPhases[currentPhaseIndex]], "White")
 
-          if phase == 1 then
-               startExplorePhase()
-          elseif phase == 2 then
-               startDevelopPhase()
-          elseif phase == 3 then
-               startSettlePhase()
-          elseif phase == 4 then
-               startConsumePhase()
-          elseif phase == 5 then
-               startProducePhase()
-          end
+        if phase == 1 then
+            startExplorePhase()
+        elseif phase == 2 then
+            startDevelopPhase()
+        elseif phase == 3 then
+            startSettlePhase()
+        elseif phase == 4 then
+            startConsumePhase()
+        elseif phase == 5 then
+            startProducePhase()
+        end
+    else
+        -- end of round
+        startNewRound()
+    end
 
-          if phase ~= 4 then
-               incomingGood = {false,false,false,false}
-          end
-     else
-          -- end of round
-          startNewRound()
-     end
+    for player, data in pairs(playerData) do
+        queueUpdate(player, true)
+    end
 
-     return 1
+    return 1
 end
 
 function updatePhaseTilesHighlight()
-     local phase = selectedPhases[currentPhaseIndex]
-     phaseTilesHighlightOff()
+    phaseTilesHighlightOff()
 
-     if phase then
-          -- hilight current phase tile
-          local tile = getObjectFromGUID(phaseTilePlacement[phase][1])
-          tile.UI.setAttribute("highlight", "active", true)
-     end
+    local phase = selectedPhases[currentPhaseIndex]
+    if phase then
+        -- hilight current phase tile
+        local tile = getObjectFromGUID(phaseTilePlacement[phase][1])
+        tile.UI.setAttribute("highlight", "active", true)
+    end
 end
 
 function phaseTilesHighlightOff()
-     for i=1, #phaseTilePlacement do
-          local tile = getObjectFromGUID(phaseTilePlacement[i][1])
-          if tile then
-               tile.UI.setAttribute("highlight", "active", false)
-          end
-     end
+    for i=1, #phaseTilePlacement do
+        local tile = getObjectFromGUID(phaseTilePlacement[i][1])
+        if tile then tile.UI.setAttribute("highlight", "active", false) end
+    end
 end
 
 function resetPhaseTiles()
@@ -1172,20 +1156,20 @@ function resetPhaseTiles()
 end
 
 function startExplorePhase()
-     -- local players = getSeatedPlayersWithHands()
+    local players = getSeatedPlayersWithHands()
 
-     -- for _, player in pairs(players) do
-     --      local data = playerData[player]
-     --      savePowersSnapshot(player, "1")
+    for _, player in pairs(players) do
+        local p = playerData[player]
+        capturePowersSnapshot(player, "1")
 
-     --      data.handCountSnapshot = countCardsInHand(player) + data.phasePowersSnapshot["DRAW"]
+        p.handCountSnapshot = countCardsInHand(player) + p.powersSnapshot["DRAW"]
 
-     --      for j=1, data.phasePowersSnapshot["DRAW"] do
-     --           local card = drawCard()
-     --           card.deal(1, player)
-     --           card.addTag("Explore Highlight")
-     --      end
-     -- end
+        for j=1, p.powersSnapshot["DRAW"] do
+            local card = drawCard()
+            card.deal(1, player)
+            card.addTag("Explore Highlight")
+        end
+    end
 end
 
 function startDevelopPhase()
@@ -1262,50 +1246,50 @@ end
 
 -- phase = (string) current phase
 function capturePowersSnapshot(player, phase)
-     local p = playerData[player]
-     local selectedCard = getObjectFromGUID(p.selectedCard)
+    local p = playerData[player]
+    local selectedCard = getObjectFromGUID(p.selectedCard)
 
-     if phase == "nil" then
-          -- special case if start of game
-          if currentPhaseIndex == -1 then
-               local targetDiscard = 2
-               
-               if selectedCard and card_db[selectedCard.getName()].flags["STARTHAND_#"] then
-                    targetDiscard = 3
+    if phase == "nil" then
+        -- special case if start of game
+        if currentPhaseIndex == -1 then
+            local targetDiscard = 2
+            
+            if selectedCard and card_db[selectedCard.getName()].flags["STARTHAND_3"] then
+                targetDiscard = 3
+            end
+
+            p.powersSnapshot["DISCARD"] = targetDiscard
+        end
+        return
+    end
+
+    local results = {}
+
+    -- -- Default values for certain phases
+    if phase == "1" then
+        results["DRAW"] = 2
+        results["KEEP"] = 1
+    elseif phase == "3" then
+        results["EXTRA_MILITARY"] = 0
+    end
+
+    local ignore2ndDevelop = false
+    local ignore2ndSettle = false
+    local chromoCount = 0
+    local tradeChromoBonus = false
+
+    for card in allCardsInTableau(player) do
+        local info = card_db[card.getName()]
+
+        if info.passivePowers[phase] then
+            local powers = info.passivePowers[phase]
+            for i, power in pairs(powers) do
+                if not results[power.name] then
+                    results[power.name] = 0
                 end
 
-                p.powersSnapshot["DISCARD"] = targetDiscard
-          end
-          return
-     end
-
---      local values = {}
-
---      -- -- Default values for certain phases
---      if phase == "1" then
---           values["DRAW"] = 2
---           values["KEEP"] = 1
---      elseif phase == "3" then
---           values["EXTRA_MILITARY"] = 0
---      end
-
---      local ignore2ndDevelop = false
---      local ignore2ndSettle = false
---      local chromoCount = 0
---      local tradeChromoBonus = false
-
---      for card in allCardsInTableau(player) do
---           local info = cardData[card.getName()]
-
---           if info.powers[phase] then
---                local powers = info.powers[phase]
---                for i, power in pairs(powers) do
---                     if values[power.name] == nil then
---                          values[power.name] = 0
---                     end
-
---                     -- count certain powers only in specific cases
---                     if phase == "2" then
+                -- count certain powers only in specific cases
+                if phase == "2" then
 --                          if advanced2p and card.getName() == "Develop" then
 --                               if ignore2ndDevelop then 
 --                                    goto skip_add
@@ -1338,77 +1322,77 @@ function capturePowersSnapshot(player, phase)
 --                                    goto skip_add
 --                               end
 --                          end
---                     end
+                end
 
---                     values[power.name] = values[power.name] + power.strength
+                results[power.name] = results[power.name] + power.strength
 
---                     if power.name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
---                          tradeChromoBonus = true
---                     end
+                if power.name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
+                    tradeChromoBonus = true
+                end
 
---                ::skip_add::
---                end
---           end
+                ::skip_add::
+            end
+        end
 
---           if info.flags["CHROMO"] then
---                chromoCount = chromoCount + 1
---           end
---      end
+        if info.flags["CHROMO"] then
+            chromoCount = chromoCount + 1
+        end
+    end
 
---      if tradeChromoBonus then
---           values["TRADE_GENE"] = values["TRADE_GENE"] + chromoCount
---      end
+    if tradeChromoBonus then
+        results["TRADE_GENE"] = results["TRADE_GENE"] + chromoCount
+    end
 
---      playerData[player].phasePowersSnapshot = values
+    playerData[player].powersSnapshot = results
 end
 
 function updateHandState(playerColor)
-     local p = playerData[playerColor]
-     local phase = getCurrentPhase()
+    local p = playerData[playerColor]
+    local phase = getCurrentPhase()
 
-     for _, obj in pairs(Player[playerColor].getHandObjects(1)) do
-          local info = card_db[obj.getName()]
+    for _, obj in pairs(Player[playerColor].getHandObjects(1)) do
+        local info = card_db[obj.getName()]
 
-          obj.clearButtons()
+        obj.clearButtons()
 
-          if not phase then   -- Opening hand
-               if obj.hasTag("Explore Highlight") then
-                    if p.selectedCard then
-                         obj.highlightOff()
-                         if p.selectedCard ~= obj.getGUID() then
-                              highlightOn(obj, "Brown", playerColor)
-                         else
-                              createCancelButtonOnCard(obj)
-                         end
+        if not phase and currentPhaseIndex < 0 then   -- Opening hand
+            if obj.hasTag("Explore Highlight") then
+                if p.selectedCard then
+                    obj.highlightOff()
+                    if p.selectedCard ~= obj.getGUID() then
+                        highlightOn(obj, "Brown", playerColor)
                     else
-                         createSelectButtonOnCard(obj)
-                         obj.highlightOn("Orange")
-                         highlightOff(obj)
+                        createCancelButtonOnCard(obj)
                     end
-               end
-          elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
-             (phase == 3 and info and info.type == 1) then
-               if not p.selectedCard then
+                else
                     createSelectButtonOnCard(obj)
-               elseif p.selectedCard == obj.getGUID() then
-                    createCancelButtonOnCard(obj)
-               end
-          end
+                    obj.highlightOn("Orange")
+                    highlightOff(obj)
+                end
+            end
+        elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
+            (phase == 3 and info and info.type == 1) then
+            if not p.selectedCard then
+                createSelectButtonOnCard(obj)
+            elseif p.selectedCard == obj.getGUID() then
+                createCancelButtonOnCard(obj)
+            end
+        end
 
-          -- Explore orange highlight
-          if phase == 1 and obj.hasTag("Explore Highlight") then
-               obj.highlightOn("Orange")
-          elseif phase and phase ~= 1 and obj.hasTag("Explore Highlight") then
-               obj.highlightOff()
-               obj.removeTag("Explore Highlight")
-          end
+        -- Explore orange highlight
+        if phase == 1 and obj.hasTag("Explore Highlight") then
+            obj.highlightOn("Orange")
+        elseif currentPhaseIndex == 0 or phase and phase ~= 1 and obj.hasTag("Explore Highlight") then
+            obj.highlightOff()
+            obj.removeTag("Explore Highlight")
+        end
 
-          if obj.hasTag("Selected") then
-               highlightOn(obj, "rgb(0,1,0,1)", playerColor)
-          end
-     end
+        if obj.hasTag("Selected") then
+            highlightOn(obj, "rgb(0,1,0,1)", playerColor)
+        end
+    end
 
-     updateHandCount(playerColor)
+    updateHandCount(playerColor)
 end
 
 -- Make sure to call powersSnapshot before calling this, otherwise may update with wrong modifiers
@@ -2157,11 +2141,11 @@ function updateHelpText(playerColor)
     elseif currentPhaseIndex == 0 then
         setHelpText(playerColor, "▲ Select an action.")
     -- explore
-     -- elseif currentPhase == 1 then
-     --      local discardTarget = math.max(0, values["DRAW"] - values["KEEP"])
-     --      local discarded = handCount - cardsInHand
+    elseif currentPhase == 1 then
+        local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
+        local discarded = handCount - cardsInHand
 
-     --      setHelpText(player, "Explore: draw " .. values["DRAW"] .. ", keep " .. values["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+        setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
      -- elseif currentPhase == 2 then
      --      if playerData[player].selectedCard then
      --           local card = getObjectFromGUID(playerData[player].selectedCard)
