@@ -1547,9 +1547,12 @@ function updateTableauState(player)
                 if selectedCard and ap then
                     local powerName = ""
                     if ap["DISCARD"] and ap["DISCARD"].codes["REDUCE_ZERO"] and
-                        not selectedInfo.flags["ALIEN"] and not selectedInfo.flags["MILITARY"] then
-                            powerName = "DISCARD"
-                        end
+                        selectedInfo.goods ~= "ALIEN" and (not selectedInfo.flags["MILITARY"] or miscPowerSnapshot["PAY_MILITARY"]) then
+                        powerName = "DISCARD"
+                    elseif ap["PAY_MILITARY"] and
+                        selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
+                        powerName = "PAY_MILITARY"
+                    end
 
                     if powerName ~= "" and not miscSelected then
                         createdButton = true
@@ -2167,6 +2170,8 @@ function updateHelpText(playerColor)
                     if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
                         reduceZero = true
                         reduceZeroName = miscCard.getName()
+                    elseif miscPowers["PAY_MILITARY"] then
+                        payMilitary = true
                     end
                 end
      --                local actions = getCardActions("3", miscCard)
