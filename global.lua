@@ -1293,18 +1293,16 @@ function capturePowersSnapshot(player, phase)
     --                     --       end
     --                     --       ignore2ndSettle = true
     --                     --  end
-
-                    if name == "EXTRA_MILITARY" and selectedCard then
-                        if power.codes["AGAINST_REBEL"] and card_db[selectedCard.getName()].flags["REBEL"] or
-                           power.codes[card_db[selectedCard.getName()].goods or ""] then
-                            -- match
-                        else
-                            goto skip
-                        end
-                    elseif name == "REDUCE" and selectedCard then
-                        if power.codes[card_db[selectedCard.getName()].goods or ""] then
-                            -- match
-                        else
+                    if selectedCard then
+                        local selectedInfo = card_db[selectedCard.getName()]
+                        local matchMilitaryType = name == "EXTRA_MILITARY" and
+                            power.codes["AGAINST_REBEL"] and selectedInfo.flags["REBEL"] or
+                            power.codes[selectedInfo.goods or ""]
+                        local matchReduceType = name == "REDUCE" and
+                            power.codes[selectedInfo.goods or ""]
+                        
+                        -- Do not count the stats if selected card doesn't match the bonus types
+                        if not matchMilitaryType and not matchReduceType then
                             goto skip
                         end
                     end
@@ -1389,6 +1387,7 @@ function updateTableauState(player)
     local powersSnapshot = p.powersSnapshot
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
+    local currentPhase = tostring(getCurrentPhase())
     -- local selectedGoods = playerData[player].selectedGoods
     -- local selectedPowerIndex = playerData[player].selectedCardPowerIndex
     -- local cardsAlreadyUsed = playerData[player].cardsAlreadyUsed
@@ -1414,24 +1413,21 @@ function updateTableauState(player)
      --      end
      -- end
 
-     -- local miscPowerSnapshot = {}
-     -- local miscCodeSnapshot = {}
+    local miscPowerSnapshot = {}
     local miscSelectedCardsTable = {}
-    local list = playerData[player].miscSelectedCards
+    local list = p.miscSelectedCards
 
-     -- while list and list.value do
-     --      miscSelectedCardsTable[list.value] = true
-     --      local card = getObjectFromGUID(list.value)
-     --      local info = cardData[card.getName()]
-     --      for name, powerInfo in pairs(info.powers[tostring(getCurrentPhase())]) do
-     --           miscPowerSnapshot[name] = true
-     --           for codeName, _ in pairs(powerInfo.codes) do
-     --                miscCodeSnapshot[codeName] = true
-     --           end
-     --      end
+    while list and list.value do
+        local card = getObjectFromGUID(list.value)
+        miscSelectedCardsTable[list.value] = card
 
-     --      list = list.next
-     -- end
+        local info = card_db[card.getName()]
+        for name, power in pairs(info.activePowers[currentPhase]) do
+            miscPowerSnapshot[name] = true
+        end
+
+        list = list.next
+    end
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
@@ -1541,14 +1537,27 @@ function updateTableauState(player)
                 end
             end
 
-            -- if miscSelectedCardsTable[card.getGUID()] then
-            --     highlightOn(card, "rgb(0,1,0)", player)
-            -- end
+            local miscSelected = miscSelectedCardsTable[card.getGUID()]
+            if miscSelected then
+                highlightOn(card, "rgb(0,1,0)", player)
+            end
 
-            if getCurrentPhase() == 3 then
-                local activePowers = info.activePowers["3"]
+            if currentPhase == "3" then
+                local ap = info.activePowers[currentPhase]
                 -- Create buttons for active powers
-                if selectedCard then
+                if selectedCard and ap then
+                    local powerName = ""
+                    if ap["DISCARD"] and ap["DISCARD"].codes["REDUCE_ZERO"] and
+                        not selectedInfo.flags["ALIEN"] and not selectedInfo.flags["MILITARY"] then
+                            powerName = "DISCARD"
+                        end
+
+                    if powerName ~= "" and not miscSelected then
+                        createdButton = true
+                        createUsePowerButton(card, ap[powerName].index, info.activeCount[currentPhase], activePowers[currentPhase][powerName])
+                    elseif miscSelected then
+                        createCancelButton(card)
+                    end
                     -- for _, action in pairs(activePowers) do
                     --     if action.codes["REDUCE_ZERO"] and not selectedInfo.flags["ALIEN"] and not (selectedInfo.flags["MILITARY"]) then
                     --         createUsePowerButton(selectedCard, selectedInfo, action)
@@ -1752,11 +1761,47 @@ function updateTableauState(player)
      -- calculateVp(player)
 end
 
-function cancelPowerClick(card, player, rightClick)
-     -- if rightClick then return end
+function usePowerClick1(obj, player, button) usePowerClick(obj, player, button, 1) end
+function usePowerClick2(obj, player, button) usePowerClick(obj, player, button, 2) end
+function usePowerClick3(obj, player, button) usePowerClick(obj, player, button, 3) end
 
-     -- playerData[player].selectedCard = nil
-     -- updateTableauState(player)
+function usePowerClick(obj, player, rightClick, powerIndex)
+    if rightClick then return end
+
+    if obj.hasTag("Slot") then obj = getCard(obj) end
+
+    local p = playerData[player]
+    local selectedCard = getObjectFromGUID(p.selectedCard)
+    local selectedInfo = card_db[selectedCard.getName()]
+    local node = p.miscSelectedCards
+
+    while node and node.next do
+         node = node.next
+    end
+
+    if not p.miscSelectedCards then p.miscSelectedCards = {} end
+
+    if not p.miscSelectedCards.value then
+         p.miscSelectedCards = {value = obj.getGUID(), next = nil}
+         p.miscSelectedCard = obj.getGUID()
+    else
+         node.next = {value = obj.getGUID(), next = nil}
+    end
+
+    queueUpdate(player, true)
+end
+
+function cancelPowerClick(obj, player, rightClick)
+    if rightClick then return end
+
+    if obj.hasTag("Slot") then obj = getCard(obj) end
+
+    if getCurrentPhase() == 3 then
+        playerData[player].miscSelectedCards = deleteLinkedListNode(playerData[player].miscSelectedCards, obj.getGUID())
+    else
+        playerData[player].selectedCard = nil
+    end
+    queueUpdate(player, true)
 end
 
 function confirmSettlePowerClick(card, player, rightClick)
@@ -1965,46 +2010,6 @@ function selectGoodsClick(parentCard, player, rightClick)
      --      pd.cardsAlreadyUsed[selectedCard.getGUID()][powerIndex] = true
      --      pd.selectedCard = nil
      -- end
-
-     -- updateTableauState(player)
-end
-
-function useSettlePowerClick(card, player, button)
-     -- if button then
-     --      return
-     -- end
-
-     -- if card.hasTag("Slot") then
-     --      card = getCard(card)
-     -- end
-
-     -- local selectedCard = getObjectFromGUID(playerData[player].selectedCard)
-     -- local selectedInfo = cardData[selectedCard.getName()]
-     -- local node = playerData[player].miscSelectedCards
-
-     -- while node and node.next do
-     --      node = node.next
-     -- end
-
-     -- if not playerData[player].miscSelectedCards.value then
-     --      playerData[player].miscSelectedCards = {value = card.getGUID(), next = nil}
-     -- else
-     --      node.next = {value = card.getGUID(), next = nil}
-     -- end
-
-     -- updateTableauState(player)
-end
-
-function cancelSettlePowerClick(card, player, btn)
-     -- if btn then
-     --      return
-     -- end
-
-     -- if card.hasTag("Slot") then
-     --      card = getCard(card)
-     -- end
-
-     -- playerData[player].miscSelectedCards = deleteLinkedListNode(playerData[player].miscSelectedCards, card.getGUID())
 
      -- updateTableauState(player)
 end

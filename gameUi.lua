@@ -83,9 +83,39 @@ function createCardBottomButton(card, text, func)
     })
 end
 
-function createUsePowerButton(card, cardInfo, powerInfo)
+function createUsePowerButton(card, powerIndex, powersCount, tooltip)
     local slot = getCardSlot(card)
-    local powerIndex = powerInfo.index
+    local w = 900 / powersCount
+    local xW = 1
+    local offx = xW / powersCount
+
+    slot.createButton({
+        click_function = "usePowerClick" .. powerIndex,
+        function_owner = Global,
+        label = powersCount == 1 and "Use Power" or "Pow " .. powerIndex,
+        font_size = 150,
+        height = 220,
+        width = w,
+        scale = {0.5, 1, 0.4},
+        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.61},
+        tooltip = tooltip
+    })
+end
+
+function createCancelButton(card)
+    local slot = getCardSlot(card)
+
+    slot.createButton({
+        click_function = "cancelPowerClick",
+        function_owner = Global,
+        label = "Cancel",
+        font_size = 150,
+        width = 900,
+        height = 220,
+        position = {0, 0, -.61},
+        scale = {0.5, 1, 0.4},
+        tooltip = "Cancel power.",
+    })
 end
 
 function highlightOn(o, color, player)
