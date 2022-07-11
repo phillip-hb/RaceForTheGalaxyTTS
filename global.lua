@@ -18,6 +18,7 @@ function player(i)
         selectedCard = nil,
         selectedCardPower = "",
         cardsAlreadyUsed = {},
+        miscSelectedCard = nil,
         miscSelectedCards = {},
         produceCount = {},
         paidCost = {},
@@ -1274,52 +1275,48 @@ function capturePowersSnapshot(player, phase)
 
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
-            for i, power in pairs(powers) do
-                if not results[power.name] then
-                    results[power.name] = 0
+            for name, power in pairs(powers) do
+                if not results[name] then
+                    results[name] = 0
                 end
 
                 -- count certain powers only in specific cases
                 if phase == "2" then
-                    if advanced2p and card.getName() == "Develop" then
-                        if ignore2ndDevelop then goto skip_add end
-                        ignore2ndDevelop = true
+    --                 if advanced2p and card.getName() == "Develop" then
+    --                     if ignore2ndDevelop then goto skip_add end
+    --                     ignore2ndDevelop = true
+    --                 end
+                elseif phase == "3" then
+    --                     --  if advanced2p and card.getName() == "Settle" then
+    --                     --       if ignore2ndSettle then
+    --                     --            goto skip_add
+    --                     --       end
+    --                     --       ignore2ndSettle = true
+    --                     --  end
+
+                    if name == "EXTRA_MILITARY" and selectedCard then
+                        if power.codes["AGAINST_REBEL"] and card_db[selectedCard.getName()].flags["REBEL"] or
+                           power.codes[card_db[selectedCard.getName()].goods or ""] then
+                            -- match
+                        else
+                            goto skip
+                        end
+                    elseif name == "REDUCE" and selectedCard then
+                        if power.codes[card_db[selectedCard.getName()].goods or ""] then
+                            -- match
+                        else
+                            goto skip
+                        end
                     end
---                     elseif phase == "3" then
---                          if advanced2p and card.getName() == "Settle" then
---                               if ignore2ndSettle then
---                                    goto skip_add
---                               end
---                               ignore2ndSettle = true
---                          end
-
---                          if power.name == "EXTRA_MILITARY" then
---                               local powerCodes = power.codes
-
---                               if powerCodes["AGAINST_REBEL"] and (selected and cardData[selected.getName()].flags["REBEL"]) or
---                                  selected and powerCodes[cardData[selected.getName()].goods or ""] then
---                                    -- match
---                               elseif tableLength(powerCodes) > 0 then
---                                    goto skip_add
---                               end
---                          elseif power.name == "REDUCE" then
---                               local powerCodes = power.codes
-
---                               if selected and powerCodes[cardData[selected.getName()].goods or ""] then
---                                    -- match
---                               elseif tableLength(powerCodes) > 0 then
---                                    goto skip_add
---                               end
---                          end
                 end
 
-                results[power.name] = results[power.name] + power.strength
+                results[name] = results[name] + power.strength
 
-                if power.name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
+                if name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
                     tradeChromoBonus = true
                 end
 
-                ::skip_add::
+                ::skip::
             end
         end
 
@@ -1332,7 +1329,7 @@ function capturePowersSnapshot(player, phase)
         results["TRADE_GENE"] = results["TRADE_GENE"] + chromoCount
     end
 
-    playerData[player].powersSnapshot = results
+    p.powersSnapshot = results
 end
 
 function updateHandState(playerColor)
@@ -1419,8 +1416,8 @@ function updateTableauState(player)
 
      -- local miscPowerSnapshot = {}
      -- local miscCodeSnapshot = {}
-     -- local miscSelectedCardsTable = {}
-     -- local list = playerData[player].miscSelectedCards
+    local miscSelectedCardsTable = {}
+    local list = playerData[player].miscSelectedCards
 
      -- while list and list.value do
      --      miscSelectedCardsTable[list.value] = true
@@ -1529,12 +1526,14 @@ function updateTableauState(player)
      -- end
 
     local baseMilitary = 0
-     -- local createdButton = false
+    local createdButton = false
 
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
         if not card.hasTag("Action Card") then
+
+            -- Add normal military strength
             if info.passivePowers["3"] then
                 local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
                 if mil and not mil.codes["NOVELTY"] and next(mil.codes) == nil then
@@ -1542,31 +1541,36 @@ function updateTableauState(player)
                 end
             end
 
-     --           if getCurrentPhase() == 3 then
-     --                if miscSelectedCardsTable[card.getGUID()] then
-     --                     highlightOn(card, "rgb(0,1,0)", player)
-     --                end
+            -- if miscSelectedCardsTable[card.getGUID()] then
+            --     highlightOn(card, "rgb(0,1,0)", player)
+            -- end
 
-     --                local actions = getCardActions("3", card)
-     --                if actions and selectedCard then
-     --                     for _, action in pairs(actions) do
-     --                          if miscSelectedCardsTable[card.getGUID()] then
-     --                               createCardTopButton(card, "Cancel", "cancelSettlePowerClick", "Cancel power.")
-     --                               if action.name == "MILITARY_HAND" then
-     --                                    createCardBottomButton(card, "Confirm", "confirmSettlePowerClick")
-     --                               end
-     --                               break
-     --                          elseif action.data.codes["REDUCE_ZERO"] and not selectedInfo.flags["ALIEN"] and (not selectedInfo.flags["MILITARY"] or miscPowerSnapshot["PAY_MILITARY"])    -- colony ship
-     --                               or action.data.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] and not miscPowerSnapshot["PAY_MILITARY"]     -- new military tactics
-     --                               or action.name == "PAY_MILITARY" and selectedInfo.flags["MILITARY"] and not selectedInfo.flags["ALIEN"] and not miscCodeSnapshot["EXTRA_MILITARY"]
-     --                               or action.name == "MILITARY_HAND" and selectedInfo.flags["MILITARY"] -- space mercenaries
-     --                               then
-     --                               createCardTopButton(card, "Use Power", "useSettlePowerClick", settleActions[action.name] or "")
-     --                               createdButton = true
-     --                               break
-     --                          end
-     --                     end
-     --                end
+            if getCurrentPhase() == 3 then
+                local activePowers = info.activePowers["3"]
+                -- Create buttons for active powers
+                if selectedCard then
+                    -- for _, action in pairs(activePowers) do
+                    --     if action.codes["REDUCE_ZERO"] and not selectedInfo.flags["ALIEN"] and not (selectedInfo.flags["MILITARY"]) then
+                    --         createUsePowerButton(selectedCard, selectedInfo, action)
+                    --         createdButton = true                        
+                    --     end
+                    -- end
+--                          if miscSelectedCardsTable[card.getGUID()] then
+--                               createCardTopButton(card, "Cancel", "cancelSettlePowerClick", "Cancel power.")
+--                               if action.name == "MILITARY_HAND" then
+--                                    createCardBottomButton(card, "Confirm", "confirmSettlePowerClick")
+--                               end
+--                               break
+--                          elseif action.data.codes["REDUCE_ZERO"] and not selectedInfo.flags["ALIEN"] and (not selectedInfo.flags["MILITARY"] or miscPowerSnapshot["PAY_MILITARY"])    -- colony ship
+--                               or action.data.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] and not miscPowerSnapshot["PAY_MILITARY"]     -- new military tactics
+--                               or action.name == "PAY_MILITARY" and selectedInfo.flags["MILITARY"] and not selectedInfo.flags["ALIEN"] and not miscCodeSnapshot["EXTRA_MILITARY"]
+--                               or action.name == "MILITARY_HAND" and selectedInfo.flags["MILITARY"] -- space mercenaries
+--                               then
+--                               createCardTopButton(card, "Use Power", "useSettlePowerClick", settleActions[action.name] or "")
+--                               createdButton = true
+--                               break
+--                          end
+                end
      --           elseif getCurrentPhase() == 4 and info.powers["4"] then
      --                local baseAmount = 1
      --                local goodslimit = 1
@@ -1722,7 +1726,7 @@ function updateTableauState(player)
      --                          createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
      --                     end
      --                end
-     --           end
+            end
         end
     end
 
@@ -2150,7 +2154,7 @@ function updateHelpText(playerColor)
             local reduceZeroName = ""
             local bonusMilitary = 0
             local payMilitary = false
-            local node = p.miscSelectedCards
+            --local node = p.miscSelectedCards
 
      --           while node and node.value do
      --                local miscCard = getObjectFromGUID(node.value)
@@ -2171,17 +2175,17 @@ function updateHelpText(playerColor)
      --                node = node.next
      --           end
 
-     --           if info.flags["MILITARY"] and not payMilitary then
-     --                setHelpText(player, "Settle: " .. info.cost .. " defense. (Military " .. playerData[player].phasePowersSnapshot["EXTRA_MILITARY"] + bonusMilitary .. "/" .. info.cost .. ")")
-     --           else
-     --                if reduceZero then
-     --                     setHelpText(player, "Settle: paid w/ " .. reduceZeroName .. ".")
-     --                else
-     --                     local discardTarget = math.max(0, info.cost - (values["REDUCE"] or 0) - (payMilitary and 1 or 0))
-     --                     local discarded = handCount - cardsInHand
-     --                     setHelpText(player, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
-     --                end
-     --           end
+            if info.flags["MILITARY"] and not payMilitary then
+                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + bonusMilitary .. "/" .. info.cost .. ")")
+            else
+                if reduceZero then
+                    setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
+                else
+                    local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - (payMilitary and 1 or 0))
+                    local discarded = handCount - cardsInHand
+                    setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+                end
+            end
         else
             setHelpText(playerColor, "▼ Settle: may select a world.")
         end

@@ -83,6 +83,11 @@ function createCardBottomButton(card, text, func)
     })
 end
 
+function createUsePowerButton(card, cardInfo, powerInfo)
+    local slot = getCardSlot(card)
+    local powerIndex = powerInfo.index
+end
+
 function highlightOn(o, color, player)
     if o.UI.getXml() == '' then
         o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="' .. player .. '"/>' ..
