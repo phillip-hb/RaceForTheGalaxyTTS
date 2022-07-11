@@ -794,7 +794,7 @@ function onUpdate()
                queueUpdateState[player] = false
                capturePowersSnapshot(player, tostring(getCurrentPhase()))
                updateHandState(player)
-               --updateTableauState(player)
+               updateTableauState(player)
                updateHelpText(player)
           end
      end
@@ -1173,29 +1173,29 @@ function startExplorePhase()
 end
 
 function startDevelopPhase()
-     -- for player, data in pairs(playerData) do
-     --      data.cardsAlreadyUsed = {}
-     --      savePowersSnapshot(player, "2")
+    for player, data in pairs(playerData) do
+        data.cardsAlreadyUsed = {}
+        capturePowersSnapshot(player, "2")
 
-     --      if data.phasePowersSnapshot["DRAW"] then
-     --           dealTo(data.phasePowersSnapshot["DRAW"], player)
-     --      end
+        if data.powersSnapshot["DRAW"] then
+            dealTo(data.powersSnapshot["DRAW"], player)
+        end
 
-     --      updateHandState(player)
-     --      updateHelpText(player)
-     -- end
+        updateHandState(player)
+        updateHelpText(player)
+    end
 end
 
 function startSettlePhase()
-     -- for player, data in pairs(playerData) do
-     --      data.cardsAlreadyUsed = {}
-     --      data.miscSelectedCards = {}
+    for player, data in pairs(playerData) do
+        --data.cardsAlreadyUsed = {}
+        --data.miscSelectedCards = {}
 
-     --      savePowersSnapshot(player, "3")
+        capturePowersSnapshot(player, "3")
 
-     --      updateHandState(player)
-     --      updateHelpText(player)
-     -- end
+        updateHandState(player)
+        updateHelpText(player)
+    end
 end
 
 function startConsumePhase()
@@ -1290,12 +1290,10 @@ function capturePowersSnapshot(player, phase)
 
                 -- count certain powers only in specific cases
                 if phase == "2" then
---                          if advanced2p and card.getName() == "Develop" then
---                               if ignore2ndDevelop then 
---                                    goto skip_add
---                               end
---                               ignore2ndDevelop = true
---                          end
+                    if advanced2p and card.getName() == "Develop" then
+                        if ignore2ndDevelop then goto skip_add end
+                        ignore2ndDevelop = true
+                    end
 --                     elseif phase == "3" then
 --                          if advanced2p and card.getName() == "Settle" then
 --                               if ignore2ndSettle then
@@ -1395,33 +1393,29 @@ function updateHandState(playerColor)
     updateHandCount(playerColor)
 end
 
--- Make sure to call powersSnapshot before calling this, otherwise may update with wrong modifiers
+-- Make sure to call capturePowersSnapshot before calling this, otherwise may update with wrong modifiers
 function updateTableauState(player)
-     -- local i = playerData[player].index
-     -- local zone = getObjectFromGUID(tableauZone_GUID[i])
-     -- local tableau = getObjectFromGUID(tableau_GUID[i])
-     -- local phasePowersSnapshot = playerData[player].phasePowersSnapshot
-     -- local selectedCard = getObjectFromGUID(playerData[player].selectedCard)
-     -- local selectedInfo = nil
-     -- local selectedGoods = playerData[player].selectedGoods
-     -- local selectedPowerIndex = playerData[player].selectedCardPowerIndex
-     -- local cardsAlreadyUsed = playerData[player].cardsAlreadyUsed
+    local p = playerData[player]
+    local i = playerData[player].index
+    local zone = getObjectFromGUID(tableauZone_GUID[i])
+    local powersSnapshot = p.powersSnapshot
+    local selectedCard = getObjectFromGUID(p.selectedCard)
+    local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
+    -- local selectedGoods = playerData[player].selectedGoods
+    -- local selectedPowerIndex = playerData[player].selectedCardPowerIndex
+    -- local cardsAlreadyUsed = playerData[player].cardsAlreadyUsed
 
-     -- if selectedCard then
-     --      selectedInfo = cardData[selectedCard.getName()]
-     -- end
-
-     -- local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
-     -- local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
-     -- local uniques = {}
+    -- local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
+    -- local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
+    -- local uniques = {}
 
      -- local selectedUniqueGoods = {}
 
-     -- for card in allCardsInTableau(player) do
-     --      card.clearButtons()
-     --      card.highlightOff()
-     --      highlightOff(card)
-     -- end
+    for card in allCardsInTableau(player) do
+        card.clearButtons()
+        card.highlightOff()
+        highlightOff(card)
+    end
 
      -- for guid, selected in pairs(selectedGoods) do
      --      if selected then
@@ -1451,85 +1445,85 @@ function updateTableauState(player)
      --      list = list.next
      -- end
 
-     -- -- count certain cards, highlight goods, etc
-     -- for _, obj in pairs(zone.getObjects()) do
-     --      if obj.hasTag("Slot") then obj.clearButtons() end
+    -- count certain cards, highlight goods, etc
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.hasTag("Slot") then obj.clearButtons() end
 
-     --      if obj.type == 'Card' and obj.is_face_down == false then
-     --           local parentData = cardData[obj.getName()]
+        if obj.type == 'Card' and not obj.is_face_down then
+            local parentData = card_db[obj.getName()]
 
-     --           if parentData.flags["WINDFALL"] and not getGoods(obj) then
-     --                windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
-     --                windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
-     --           end
-     --      elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then
-     --           local parentCard = getObjectFromGUID(obj.getDescription())
-     --           local parentData = cardData[parentCard.getName()]
+            -- if parentData.flags["WINDFALL"] and not getGoods(obj) then
+            --     windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
+            --     windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
+            -- end
+        elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then  -- facedown goods on tableau
+            local parentCard = getObjectFromGUID(obj.getDescription())
+            local parentData = card_db[parentCard.getName()]
 
-     --           if #parentCard.getZones() <= 0 then
-     --                obj.setDescription("")
-     --           elseif parentData.goods then
-     --                obj.highlightOn(goodsHighlightColor[parentData.goods])
+            if #parentCard.getZones() <= 0 then
+                obj.setDescription("")
+            elseif parentData.goods then
+                obj.highlightOn(goodsHighlightColor[parentData.goods])
 
-     --                goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
-     --                uniques[parentData.goods] = 1
-     --                goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
+                -- goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
+                -- uniques[parentData.goods] = 1
+                -- goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
 
-     --                -- create buttons on cards based on action
-     --                if getCurrentPhase() == 4 and selectedCard and selectedInfo.powers["4"] then
-     --                     if selectedInfo.powers["4"][selectedPowerIndex].name == "TRADE_ACTION" then
-     --                          -- calculating cost to sell card
-     --                          local price = 0
-     --                          local bonus = true
+    --                -- create buttons on cards based on action
+    --                if getCurrentPhase() == 4 and selectedCard and selectedInfo.powers["4"] then
+    --                     if selectedInfo.powers["4"][selectedPowerIndex].name == "TRADE_ACTION" then
+    --                          -- calculating cost to sell card
+    --                          local price = 0
+    --                          local bonus = true
 
-     --                          if selectedInfo.powers["4"][selectedPowerIndex].codes["TRADE_NO_BONUS"] then
-     --                               bonus = false
-     --                          end
+    --                          if selectedInfo.powers["4"][selectedPowerIndex].codes["TRADE_NO_BONUS"] then
+    --                               bonus = false
+    --                          end
 
-     --                          if parentData.goods == "NOVELTY" then
-     --                               price = 2 + (bonus and phasePowersSnapshot["TRADE_NOVELTY"] or 0)
-     --                          elseif parentData.goods == "RARE" then
-     --                               price = 3 + (bonus and phasePowersSnapshot["TRADE_RARE"] or 0)
-     --                          elseif parentData.goods == "GENE" then
-     --                               price = 4 + (bonus and phasePowersSnapshot["TRADE_GENE"] or 0)
-     --                          elseif parentData.goods == "ALIEN" then
-     --                               price = 5 + (bonus and phasePowersSnapshot["TRADE_ALIEN"] or 0)
-     --                          end
+    --                          if parentData.goods == "NOVELTY" then
+    --                               price = 2 + (bonus and phasePowersSnapshot["TRADE_NOVELTY"] or 0)
+    --                          elseif parentData.goods == "RARE" then
+    --                               price = 3 + (bonus and phasePowersSnapshot["TRADE_RARE"] or 0)
+    --                          elseif parentData.goods == "GENE" then
+    --                               price = 4 + (bonus and phasePowersSnapshot["TRADE_GENE"] or 0)
+    --                          elseif parentData.goods == "ALIEN" then
+    --                               price = 5 + (bonus and phasePowersSnapshot["TRADE_ALIEN"] or 0)
+    --                          end
 
-     --                          if bonus and parentData.powers["4"] and parentData.powers["4"]["TRADE_THIS"] then
-     --                               price = price + parentData.powers["4"]["TRADE_THIS"].strength
-     --                          end
+    --                          if bonus and parentData.powers["4"] and parentData.powers["4"]["TRADE_THIS"] then
+    --                               price = price + parentData.powers["4"]["TRADE_THIS"].strength
+    --                          end
 
-     --                          price = price + (bonus and phasePowersSnapshot["TRADE_ANY"] or 0)
-     --                          createGoodsButton(parentCard, "$➧" .. price)
+    --                          price = price + (bonus and phasePowersSnapshot["TRADE_ANY"] or 0)
+    --                          createGoodsButton(parentCard, "$➧" .. price)
 
-     --                          obj.memo = price
-     --                     else -- using normal consume powers
-     --                          local makeButton = false
-     --                          local power = selectedInfo.powers["4"][selectedPowerIndex]
+    --                          obj.memo = price
+    --                     else -- using normal consume powers
+    --                          local makeButton = false
+    --                          local power = selectedInfo.powers["4"][selectedPowerIndex]
 
-     --                          if power.name == "CONSUME_ANY" or power.name == "CONSUME_ALL" or "CONSUME_" .. parentData.goods == power.name or
-     --                             ((power.name == "CONSUME_3_DIFF" and not selectedUniqueGoods[parentData.goods]) or (selectedGoods[i] and selectedGoods[i][obj.getGUID()])) then
-     --                               makeButton = true
-     --                          end
+    --                          if power.name == "CONSUME_ANY" or power.name == "CONSUME_ALL" or "CONSUME_" .. parentData.goods == power.name or
+    --                             ((power.name == "CONSUME_3_DIFF" and not selectedUniqueGoods[parentData.goods]) or (selectedGoods[i] and selectedGoods[i][obj.getGUID()])) then
+    --                               makeButton = true
+    --                          end
 
-     --                          if power.codes["CONSUME_THIS"] and selectedCard ~= parentCard then
-     --                               makeButton = false
-     --                          end
+    --                          if power.codes["CONSUME_THIS"] and selectedCard ~= parentCard then
+    --                               makeButton = false
+    --                          end
 
-     --                          if makeButton then
-     --                               local check = "✔"
-     --                               if not selectedGoods[obj.getGUID()] then
-     --                                    check = ""
-     --                               end
+    --                          if makeButton then
+    --                               local check = "✔"
+    --                               if not selectedGoods[obj.getGUID()] then
+    --                                    check = ""
+    --                               end
 
-     --                               createGoodsButton(parentCard, check)
-     --                          end
-     --                     end
-     --                end
-     --           end
-     --      end
-     -- end
+    --                               createGoodsButton(parentCard, check)
+    --                          end
+    --                     end
+    --                end
+            end
+        end
+    end
 
      -- local uniqueCount = tableLength(uniques)
      -- mustConsumeGoodsCount[i] = 0
@@ -2146,27 +2140,27 @@ function updateHelpText(playerColor)
         local discarded = handCount - cardsInHand
 
         setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
-     -- elseif currentPhase == 2 then
-     --      if playerData[player].selectedCard then
-     --           local card = getObjectFromGUID(playerData[player].selectedCard)
-     --           local info = cardData[card.getName()]
-     --           local discardTarget = math.max(0, info.cost - (values["REDUCE"] or 0))
-     --           local discarded = handCount - cardsInHand
-     --           setHelpText(player, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
-     --      else
-     --           setHelpText(player, "▼ Develop: may select a development.")
-     --      end
-     -- elseif currentPhase == 3 then
-     --      if playerData[player].selectedCard then
-     --           local card = getObjectFromGUID(playerData[player].selectedCard)
-     --           local info = cardData[card.getName()]
+    elseif currentPhase == 2 then
+        if p.selectedCard then
+            local card = getObjectFromGUID(p.selectedCard)
+            local info = card_db[card.getName()]
+            local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
+            local discarded = handCount - cardsInHand
+            setHelpText(playerColor, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+        else
+            setHelpText(playerColor, "▼ Develop: may select a development.")
+        end
+    elseif currentPhase == 3 then
+        if p.selectedCard then
+            local card = getObjectFromGUID(p.selectedCard)
+            local info = card_db[card.getName()]
 
-     --           -- Check for special settle power modifiers
-     --           local reduceZero = false
-     --           local reduceZeroName = ""
-     --           local bonusMilitary = 0
-     --           local payMilitary = false
-     --           local node = playerData[player].miscSelectedCards
+            -- Check for special settle power modifiers
+            local reduceZero = false
+            local reduceZeroName = ""
+            local bonusMilitary = 0
+            local payMilitary = false
+            local node = p.miscSelectedCards
 
      --           while node and node.value do
      --                local miscCard = getObjectFromGUID(node.value)
@@ -2198,9 +2192,9 @@ function updateHelpText(playerColor)
      --                     setHelpText(player, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
      --                end
      --           end
-     --      else
-     --           setHelpText(player, "▼ Settle: may select a world.")
-     --      end
+        else
+            setHelpText(playerColor, "▼ Settle: may select a world.")
+        end
      -- elseif currentPhase == 4 then
      --      if playerData[player].selectedCard then
      --           local card = getObjectFromGUID(playerData[player].selectedCard)
