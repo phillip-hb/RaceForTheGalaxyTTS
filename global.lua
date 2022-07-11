@@ -686,7 +686,7 @@ function onObjectLeaveZone(zone, object)
                 if slot then slot.clearButtons() end
             end
 
-     --           playerData[player].miscSelectedCards = deleteLinkedListNode(playerData[player].miscSelectedCards, leave_object.getGUID())
+            p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, object.getGUID())
             queueUpdate(player)
         end
     end
@@ -918,26 +918,25 @@ function checkAllReadyCo()
     local discardHappened = false
     local phase = getCurrentPhase()
 
-    --  for i=1, #players do
-    --       local node = playerData[players[i]].miscSelectedCards
-    --       while node and node.value do
-    --            local card = getObjectFromGUID(node.value)
-    --            if phase == 3 then
-    --                 local actions = getCardActions("3", card)
-    --                 local power = getPower(actions, "DISCARD")
-    --                 if power then
-    --                      discardCard(card)
-    --                      discardHappened = true
-    --                 end
-    --            end
+    for _, player in pairs(players) do
+        local p = playerData[player]
+        local node = p.miscSelectedCards
+        while node and node.value do
+            local card = getObjectFromGUID(node.value)
+            local info = card_db[card.getName()]
+            local powers = info.activePowers[tostring(phase)]
+            if powers and powers["DISCARD"] then
+                discardCard(card)
+                discardHappened = true
+                log('in here?')
+            end
+            node = node.next
+        end
 
-    --            node = node.next
-    --       end
+        p.miscSelectedCards = {}
+    end
 
-    --       playerData[players[i]].miscSelectedCards = {}
-    --  end
-
-    --  if discardHappened then wait(0.05) end
+    if discardHappened then wait(0.1) end
 
      -- play selected cards in hand
     for _, player in pairs(players) do
@@ -2097,7 +2096,7 @@ function cardCancelClick(object, player, rightClick)
      local p = playerData[player]
 
      p.selectedCard = nil
-     --p.miscSelectedCards = {}
+     p.miscSelectedCards = {}
      object.removeTag("Selected")
      highlightOff(object)
 
@@ -2159,10 +2158,17 @@ function updateHelpText(playerColor)
             local reduceZeroName = ""
             local bonusMilitary = 0
             local payMilitary = false
-            --local node = p.miscSelectedCards
+            local node = p.miscSelectedCards
 
-     --           while node and node.value do
-     --                local miscCard = getObjectFromGUID(node.value)
+            while node and node.value do
+                local miscCard = getObjectFromGUID(node.value)
+                local miscPowers = card_db[miscCard.getName()].activePowers["3"]
+                if miscPowers then
+                    if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
+                        reduceZero = true
+                        reduceZeroName = miscCard.getName()
+                    end
+                end
      --                local actions = getCardActions("3", miscCard)
      --                if actions then
      --                     for _, action in pairs(actions) do
@@ -2177,8 +2183,8 @@ function updateHelpText(playerColor)
      --                     end
      --                end
 
-     --                node = node.next
-     --           end
+                node = node.next
+            end
 
             if info.flags["MILITARY"] and not payMilitary then
                 setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + bonusMilitary .. "/" .. info.cost .. ")")
