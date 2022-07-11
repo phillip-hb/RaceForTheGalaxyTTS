@@ -35,39 +35,6 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 gameEndMessage = false
 
 tradePowers = {["TRADE_ANY"]=1,["TRADE_THIS"]=1,["TRADE_NOVELTY"]=1,["TRADE_RARE"]=1,["TRADE_GENE"]=1,["TRADE_ALIEN"]=1}
-settleActions = {
-     ["DISCARD"]="Discard from hand.",
-     ["PAY_MILITARY"]="Place military world as normal world.",
-     ["MILITARY_HAND"]="Discard from hand.",
-     ["REDUCE_ZERO"]="Reduce settle cost."
-}
-consumeActions = {
-     ["TRADE_ACTION"]="Sell good.",
-     ["CONSUME_ANY"]="Consume any good.",
-     ["CONSUME_NOVELTY"]="Consume Novelty good.",
-     ["CONSUME_RARE"]="Consume Rare good.",
-     ["CONSUME_GENE"]="Consume Genes good.",
-     ["CONSUME_ALIEN"]="Consume Alien good.",
-     ["CONSUME_3_DIFF"]="Consume 3 different goods.",
-     ["CONSUME_ALL"]="Consume all goods.",
-     ["DISCARD_HAND"]="Discard from hand.",
-     ["DRAW"]="Draw card(s).",
-     ["ANTE_CARD"]="Gamble draw.",
-     ["DRAW_LUCKY"]="Gamble draw."
-}
-produceActions = {
-     ["DRAW"]="Draw card(s)",
-     ["WINDFALL_ANY"]="Produce good on any windfall world.",
-     ["WINDFALL_NOVELTY"]="Produce good on Novelty windfall world.",
-     ["WINDFALL_RARE"]="Produce good on Rare windfall world.",
-     ["WINDFALL_GENE"]="Produce good on Genes windfall world.",
-     ["WINDFALL_ALIEN"]="Produce good on Alien windfall world.",
-     ["DRAW_WORLD_GENE"]="Draw 1 card for each Genes world in tableau.",
-     ["DRAW_EACH_NOVELTY"]="Draw 1 card for each Novelty good you produced.",
-     ["DRAW_EACH_ALIEN"]="Draw 1 card for each Alien good you produced.",
-     ["DRAW_DIFFERENT"]="Draw 1 card for each kind of good you produced.",
-     ["DISCARD"]="Discard from hand.",
-}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
@@ -928,7 +895,6 @@ function checkAllReadyCo()
             if powers and powers["DISCARD"] then
                 discardCard(card)
                 discardHappened = true
-                log('in here?')
             end
             node = node.next
         end
@@ -1240,7 +1206,7 @@ function capturePowersSnapshot(player, phase)
     local p = playerData[player]
     local selectedCard = getObjectFromGUID(p.selectedCard)
 
-    if phase == "nil" then
+    if phase == "nil" and currentPhaseIndex < 0 then
         -- special case if start of game
         if currentPhaseIndex == -1 then
             local targetDiscard = 2
@@ -1260,11 +1226,11 @@ function capturePowersSnapshot(player, phase)
     if phase == "1" then
         results["DRAW"] = 2
         results["KEEP"] = 1
-    elseif phase == "3" then
-        results["EXTRA_MILITARY"] = 0
-        results["BONUS_MILITARY"] = 0
-        results["TEMP_MILITARY"] = 0
     end
+
+    results["EXTRA_MILITARY"] = 0
+    results["BONUS_MILITARY"] = 0
+    results["TEMP_MILITARY"] = 0
 
     local ignore2ndDevelop = false
     local ignore2ndSettle = false
@@ -1313,14 +1279,6 @@ function capturePowersSnapshot(player, phase)
                     end
                 end
 
-                            -- Add normal military strength
-                -- if info.passivePowers["3"] then
-                --     local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
-                --     if mil and not mil.codes["NOVELTY"] and next(mil.codes) == nil then
-                --         baseMilitary = baseMilitary + mil.strength
-                --     end
-                -- end
-
                 results[name] = results[name] + power.strength
 
                 if name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
@@ -1328,6 +1286,12 @@ function capturePowersSnapshot(player, phase)
                 end
 
                 ::skip::
+            end
+        -- Count base military for stat display purposes
+        elseif phase ~= "3" and info.passivePowers["3"] then               
+            local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
+            if mil and next(mil.codes) == nil then
+                results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
             end
         end
 
@@ -1349,7 +1313,7 @@ function capturePowersSnapshot(player, phase)
 
             for name, power in pairs(info.activePowers[phase]) do
                 if name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
-                    results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + power.strength
+                    results["BONUS_MILITARY"] = results["BONUS_MILITARY"] + power.strength
                 end
             end
 
