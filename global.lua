@@ -1262,6 +1262,8 @@ function capturePowersSnapshot(player, phase)
         results["KEEP"] = 1
     elseif phase == "3" then
         results["EXTRA_MILITARY"] = 0
+        results["BONUS_MILITARY"] = 0
+        results["TEMP_MILITARY"] = 0
     end
 
     local ignore2ndDevelop = false
@@ -1292,20 +1294,32 @@ function capturePowersSnapshot(player, phase)
     --                     --       end
     --                     --       ignore2ndSettle = true
     --                     --  end
+                    -- Do some manipulations for special cases
                     if selectedCard then
                         local selectedInfo = card_db[selectedCard.getName()]
-                        local matchMilitaryType = name == "EXTRA_MILITARY" and
-                            power.codes["AGAINST_REBEL"] and selectedInfo.flags["REBEL"] or
-                            power.codes[selectedInfo.goods or ""]
-                        local matchReduceType = name == "REDUCE" and
-                            power.codes[selectedInfo.goods or ""]
-                        
-                        -- Do not count the stats if selected card doesn't match the bonus types
-                        if not matchMilitaryType and not matchReduceType then
+
+                        -- Reduce powers with non matching types
+                        if name == "REDUCE" and next(power.codes) ~= nil and not power.codes[selectedInfo.goods or ""] then
                             goto skip
+                        -- Specialized military
+                        elseif name == "EXTRA_MILITARY" and next(power.codes) ~= nil and
+                            (power.codes["AGAINST_REBEL"] and selectedInfo.flags["REBEL"] or power.codes[selectedInfo.goods or ""]) then
+                            name = "BONUS_MILITARY"
                         end
                     end
+
+                    if name == "EXTRA_MILITARY" and next(power.codes) ~= nil then
+                        goto skip
+                    end
                 end
+
+                            -- Add normal military strength
+                -- if info.passivePowers["3"] then
+                --     local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
+                --     if mil and not mil.codes["NOVELTY"] and next(mil.codes) == nil then
+                --         baseMilitary = baseMilitary + mil.strength
+                --     end
+                -- end
 
                 results[name] = results[name] + power.strength
 
@@ -1325,8 +1339,30 @@ function capturePowersSnapshot(player, phase)
     if tradeChromoBonus then
         results["TRADE_GENE"] = results["TRADE_GENE"] + chromoCount
     end
+    
+    -- Track special cases
+    if phase then
+        local list = p.miscSelectedCards
+        while list and list.value do
+            local card = getObjectFromGUID(list.value)
+            local info = card_db[card.getName()]
+
+            for name, power in pairs(info.activePowers[phase]) do
+                if name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+                    results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + power.strength
+                end
+            end
+
+            list = list.next
+        end
+    end
 
     p.powersSnapshot = results
+
+    local statTracker = getObjectFromGUID(statTracker_GUID[p.index])
+    if statTracker then
+        statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
+    end
 end
 
 function updateHandState(playerColor)
@@ -1520,22 +1556,12 @@ function updateTableauState(player)
      --      playerData[player].selectedCard = nil
      -- end
 
-    local baseMilitary = 0
     local createdButton = false
 
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
         if not card.hasTag("Action Card") then
-
-            -- Add normal military strength
-            if info.passivePowers["3"] then
-                local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
-                if mil and not mil.codes["NOVELTY"] and next(mil.codes) == nil then
-                    baseMilitary = baseMilitary + mil.strength
-                end
-            end
-
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
             if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
@@ -1548,6 +1574,9 @@ function updateTableauState(player)
                     local powerName = ""
                     if ap["DISCARD"] and ap["DISCARD"].codes["REDUCE_ZERO"] and
                         selectedInfo.goods ~= "ALIEN" and (not selectedInfo.flags["MILITARY"] or miscPowerSnapshot["PAY_MILITARY"]) then
+                        powerName = "DISCARD"
+                    elseif ap["DISCARD"] and ap["DISCARD"].codes["EXTRA_MILITARY"] and
+                        selectedInfo.flags["MILITARY"] then
                         powerName = "DISCARD"
                     elseif ap["PAY_MILITARY"] and
                         selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
@@ -1754,11 +1783,6 @@ function updateTableauState(player)
      --           token.call("setToggleState", true)
      --      end
      -- end
-
-    local statTracker = getObjectFromGUID(statTracker_GUID[i])
-    if statTracker then
-        statTracker.call("updateLabel", {"military", baseMilitary})
-    end
 
      -- calculateVp(player)
 end
@@ -2159,7 +2183,6 @@ function updateHelpText(playerColor)
             -- Check for special settle power modifiers
             local reduceZero = false
             local reduceZeroName = ""
-            local bonusMilitary = 0
             local payMilitary = false
             local node = p.miscSelectedCards
 
@@ -2192,7 +2215,7 @@ function updateHelpText(playerColor)
             end
 
             if info.flags["MILITARY"] and not payMilitary then
-                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + bonusMilitary .. "/" .. info.cost .. ")")
+                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] .. "/" .. info.cost .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
