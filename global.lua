@@ -297,15 +297,6 @@ function getGoods(card)
      return goods
 end
 
-function getPower(tbl, name)
-     if not tbl then return nil end
-     
-     for _, entry in pairs(tbl) do
-          if entry.name == name then return entry end
-     end
-     return nil
-end
-
 function tryProduceAt(player, card)
      local info = cardData[card.getName()]
      local powers = info.powers["5"]
@@ -1537,19 +1528,19 @@ function updateTableauState(player)
      --      playerData[player].selectedCard = nil
      -- end
 
-     -- local baseMilitary = 0
+    local baseMilitary = 0
      -- local createdButton = false
 
-     -- -- refresh state on all cards in tableau
-     -- for card in allCardsInTableau(player) do
-     --      local info = cardData[card.getName()]
-     --      if card.hasTag("Action Card") == false then
-     --           if info.powers["3"] then
-     --                local mil = getPower(info.powers["3"], "EXTRA_MILITARY")
-     --                if mil and tableLength(mil.codes) <= 0 then
-     --                     baseMilitary = baseMilitary + mil.strength
-     --                end
-     --           end
+    -- refresh state on all cards in tableau
+    for card in allCardsInTableau(player) do
+        local info = card_db[card.getName()]
+        if not card.hasTag("Action Card") then
+            if info.passivePowers["3"] then
+                local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
+                if mil and not mil.codes["NOVELTY"] and next(mil.codes) == nil then
+                    baseMilitary = baseMilitary + mil.strength
+                end
+            end
 
      --           if getCurrentPhase() == 3 then
      --                if miscSelectedCardsTable[card.getGUID()] then
@@ -1732,8 +1723,8 @@ function updateTableauState(player)
      --                     end
      --                end
      --           end
-     --      end
-     -- end
+        end
+    end
 
      -- -- Force the player ready when they have nothing left to do
      -- if (getCurrentPhase() == 4 or getCurrentPhase() == 5) and forcedReady[i] == false and createdButton == false and not selectedCard and incomingGood[i] == false then
@@ -1749,13 +1740,12 @@ function updateTableauState(player)
      --      end
      -- end
 
-     -- local statTracker = getObjectFromGUID(statTracker_GUID[i])
-     -- if statTracker then
-     --      statTracker.call("updateLabel", {"military", baseMilitary})
-     -- end
+    local statTracker = getObjectFromGUID(statTracker_GUID[i])
+    if statTracker then
+        statTracker.call("updateLabel", {"military", baseMilitary})
+    end
 
      -- calculateVp(player)
-     -- updateHelpText(player)
 end
 
 function cancelPowerClick(card, player, rightClick)
