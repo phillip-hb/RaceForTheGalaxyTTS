@@ -2480,9 +2480,9 @@ function loadData(expansions)
                if code == "N" then
                     cardInfo = {}
                     cardInfo.name = line:sub(3, line:len())
-                    cardInfo.passiveCount = {}
+                    cardInfo.passiveCount = {["1"]=0,["2"]=0,["3"]=0,["4"]=0,["5"]=0}
                     cardInfo.passivePowers = {}
-                    cardInfo.activeCount = {}
+                    cardInfo.activeCount = {["1"]=0,["2"]=0,["3"]=0,["4"]=0,["5"]=0}
                     cardInfo.activePowers = {}
                     cardInfo.flags = {}
                     tbl[cardInfo.name] = cardInfo
@@ -2514,11 +2514,9 @@ function loadData(expansions)
 
                     if not cardInfo.activePowers[phase] then
                          cardInfo.activePowers[phase] = {}
-                         cardInfo.activeCount[phase] = 0
                     end
                     if not cardInfo.passivePowers[phase] then
                          cardInfo.passivePowers[phase] = {}
-                         cardInfo.passiveCount[phase] = 0
                     end
 
                     power.codes = split(all_trim(tokens[3]),"|")

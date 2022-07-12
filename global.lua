@@ -716,25 +716,25 @@ end
 
 function onObjectEnterContainer(container, enter_object)
      if container.hasTag("VP") then
-          -- for _, zone in pairs(container.getZones()) do
-          --      local owner = tableauZoneOwner[zone.getGUID()]
-          --      if owner then
-          --           updateTableauState(owner)
-          --           return
-          --      end
-          -- end
+          for _, zone in pairs(container.getZones()) do
+               local owner = tableauZoneOwner[zone.getGUID()]
+               if owner then
+                    queueUpdate(owner)
+                    return
+               end
+          end
      end
 end
 
 function onObjectLeaveContainer(container, leave_object)
      if container.hasTag("VP") then
-          -- for _, zone in pairs(container.getZones()) do
-          --      local owner = tableauZoneOwner[zone.getGUID()]
-          --      if owner then
-          --           updateTableauState(owner)
-          --           return
-          --      end
-          -- end
+        for _, zone in pairs(container.getZones()) do
+            local owner = tableauZoneOwner[zone.getGUID()]
+            if owner then
+                queueUpdate(owner)
+                return
+            end
+        end
      end
 end
 
@@ -745,6 +745,7 @@ function onUpdate()
                capturePowersSnapshot(player, tostring(getCurrentPhase()))
                updateHandState(player)
                updateTableauState(player)
+               updateVp(player)
                updateHelpText(player)
           end
      end
@@ -1665,8 +1666,6 @@ function updateTableauState(player)
      --           token.call("setToggleState", true)
      --      end
      -- end
-
-     -- calculateVp(player)
 end
 
 function markUsed(player, card, power)
@@ -2024,169 +2023,167 @@ function updateHelpText(playerColor)
         else
             setHelpText(playerColor, "▲ Consume: use powers.")
         end
-     -- elseif currentPhase == 5 then
-     --      if playerData[player].selectedCard then
-     --           local card = getObjectFromGUID(playerData[player].selectedCard)
-     --           local info = cardData[card.getName()]
-     --           local power = info.powers["5"][playerData[player].selectedCardPowerIndex]
-     --           local paidCost = playerData[player].paidCost[card.getGUID()]
-     --           if power.name == "WINDFALL_ANY" or
-     --              (power.name == "DISCARD" and power.codes["WINDFALL_ANY"] and paidCost and paidCost[playerData[player].selectedCardPowerIndex]) then
-     --                setHelpText(player, "▲ Produce: produce on windfall world.")
-     --           elseif power.name == "DISCARD" then
-     --                setHelpText(player, "▼ Produce: discard card to use power.")
-     --           end
-     --      else
-     --           setHelpText(player, "▲ Produce: use powers.")
-     --      end
+    elseif currentPhase == 5 then
+        if p.selectedCard then
+            local card = getObjectFromGUID(p.selectedCard)
+            local info = card_db[card.getName()]
+            local power = info.activePowers["5"]
+            local paidCost = p.paidCost[card.getGUID()]
+
+            if p.selectedCardPower:sub(1,8) == "WINDFALL" or (p.selectedCardPower == "DISCARD_HAND" and power["DISCARD_HAND"].codes["WINDFALL_ANY"] and paidCost) then
+                setHelpText(playerColor, "▲ Produce: produce on windfall world.")
+            elseif p.selectedCardPower == "DISCARD_HAND" then
+                setHelpText(playerColor, "▼ Produce: discard card to use power.")
+            end
+        else
+            setHelpText(playerColor, "▲ Produce: use powers.")
+        end
      end
 end
 
-function calculateVp(player)
-     -- local i = playerColorIndex[player]
-     -- local zone = getObjectFromGUID(tableauZone_GUID[i])
+function updateVp(player)
+    local p = playerData[player]
+    local i = p.index
+    local zone = getObjectFromGUID(tableauZone_GUID[i])
 
-     -- local vpChipCount = 0
-     -- local flatVp = 0
-     -- local devVp = 0
-     -- local goodsCount = 0
-     -- local baseMilitary = 0
-     -- local sixCostDevs = {}
-     -- local cardNames = {}
+    local vpChipCount = 0
+    local flatVp = 0
+    local devVp = 0
+    local goodsCount = 0
+    local baseMilitary = p.powersSnapshot["EXTRA_MILITARY"]
+    local sixCostDevs = {}
+    local cardNames = {}
 
-     -- -- first pass to count certain items
-     -- for _, obj in pairs(zone.getObjects()) do
-     --      if obj.hasTag("Ignore Tableau") then goto skip end
+    -- first pass to count certain items
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.hasTag("Ignore Tableau") then goto skip end
 
-     --      if obj.hasTag("VP") then
-     --           if obj.hasTag("VP Chip") then
-     --                vpChipCount = vpChipCount + math.max(1, obj.getQuantity())
-     --           end
-     --      elseif obj.type == "Card" and obj.hasTag("Action Card") == false then
-     --           if obj.is_face_down and obj.getDescription() ~= "" then
-     --                goodsCount = goodsCount + 1
-     --           else
-     --                local info = cardData[obj.getName()]
+        if obj.hasTag("VP") then
+            if obj.hasTag("VP Chip") then
+                vpChipCount = vpChipCount + math.max(1, obj.getQuantity())
+            end
+        elseif obj.type == "Card" and not obj.hasTag("Action Card") then
+            if obj.is_face_down and obj.getDescription() ~= "" then -- the card is a good
+                goodsCount = goodsCount + 1
+            else
+                local info = card_db[obj.getName()]
 
-     --                cardNames[obj.getName()] = true
-     --                flatVp = flatVp + info.vp
+                cardNames[obj.getName()] = true
+                flatVp = flatVp + info.vp
 
-     --                if info.powers["3"] and info.powers["3"]["EXTRA_MILITARY"] and tableLength(info.powers["3"]["EXTRA_MILITARY"].codes) <= 0 then
-     --                     baseMilitary = baseMilitary + info.powers["3"]["EXTRA_MILITARY"].strength
-     --                end
+                if info.vpFlags then
+                    sixCostDevs[#sixCostDevs + 1] = {obj, info}
+                end
+            end
+        end
 
-     --                if info.vpFlags then
-     --                     sixCostDevs[#sixCostDevs + 1] = {obj, info}
-     --                end
-     --           end
-     --      end
+        ::skip::
+    end
 
-     --      ::skip::
-     -- end
+    local goodsPrefix = {"NOVELTY", "RARE", "GENE", "ALIEN"}
 
-     -- local goodsPrefix = {"NOVELTY", "RARE", "GENE", "ALIEN"}
+    -- Calculate score for all 6-cost devs in tableau
+    for _, item in pairs(sixCostDevs) do
+        local vp = 0
+        local dev = item[2]
 
-     -- for _, item in pairs(sixCostDevs) do
-     --      local vp = 0
-     --      local dev = item[2]
+        for card in allCardsInTableau(player) do
+            local info = card_db[card.getName()]
+            local otherAlien = true
 
-     --      for card in allCardsInTableau(player) do
-     --           local info = cardData[card.getName()]
-     --           local otherAlien = true
+            -- world types
+            local otherWorld = true
+            for _, prefix in pairs(goodsPrefix) do
+                if dev.vpFlags[prefix .. "_PRODUCTION"] and info.goods == prefix and not info.flags["WINDFALL"] then
+                    otherWorld = false
+                    vp = vp + dev.vpFlags[prefix .. "_PRODUCTION"]
+                    if prefix == "ALIEN" then
+                        otherAlien = false
+                    end
+                end
+                if dev.vpFlags[prefix .. "_WINDFALL"] and info.goods == prefix and info.flags["WINDFALL"] then
+                    otherWorld = false
+                    vp = vp + dev.vpFlags[prefix .. "_WINDFALL"]
+                    if prefix == "ALIEN" then
+                        otherAlien = false
+                    end
+                end
+            end
 
-     --           -- world types
-     --           local otherWorld = true
-     --           for _, prefix in pairs(goodsPrefix) do
-     --                if dev.vpFlags[prefix .. "_PRODUCTION"] and info.goods == prefix and not info.flags["WINDFALL"] then
-     --                     otherWorld = false
-     --                     vp = vp + dev.vpFlags[prefix .. "_PRODUCTION"]
-     --                     if prefix == "ALIEN" then
-     --                          otherAlien = false
-     --                     end
-     --                end
-     --                if dev.vpFlags[prefix .. "_WINDFALL"] and info.goods == prefix and info.flags["WINDFALL"] then
-     --                     otherWorld = false
-     --                     vp = vp + dev.vpFlags[prefix .. "_WINDFALL"]
-     --                     if prefix == "ALIEN" then
-     --                          otherAlien = false
-     --                     end
-     --                end
-     --           end
+            if dev.vpFlags["WORLD_TRADE"] and info.type == 1 and info.passiveCount["4"] > 0 then
+                vp = vp + dev.vpFlags["WORLD_TRADE"]
+            end
+            if dev.vpFlags["WORLD_CONSUME"] and info.type == 1 and info.activeCount["4"] > 0 then
+                vp = vp + dev.vpFlags["WORLD_CONSUME"]
+            end
+            if dev.vpFlags["WORLD_EXPLORE"] and info.type == 1 and info.passiveCount["1"] > 0 then
+                otherWorld = false
+                vp = vp + dev.vpFlags["WORLD_EXPLORE"]
+            end
+            if dev.vpFlags["REBEL_MILITARY"] and info.type == 1 and info.flags["REBEL"] then
+                otherWorld = false
+                vp = vp + dev.vpFlags["REBEL_MILITARY"]
+            end
 
-     --           if dev.vpFlags["WORLD_TRADE"] and info.type == 1 and getCardActions("5", card) then
-     --                vp = vp + dev.vpFlags["WORLD_TRADE"]
-     --           end
-     --           if dev.vpFlags["WORLD_CONSUME"] and info.type == 1 and getCardActions("4", card) then
-     --                vp = vp + dev.vpFlags["WORLD_CONSUME"]
-     --           end
-     --           if dev.vpFlags["WORLD_EXPLORE"] and info.type == 1 and info.powers["1"] then
-     --                otherWorld = false
-     --                vp = vp + dev.vpFlags["WORLD_EXPLORE"]
-     --           end
-     --           if dev.vpFlags["REBEL_MILITARY"] and info.type == 1 and info.flags["REBEL"] then
-     --                otherWorld = false
-     --                vp = vp + dev.vpFlags["REBEL_MILITARY"]
-     --           end
+            if otherWorld and dev.vpFlags["MILITARY"] and info.type == 1 and info.flags["MILITARY"] then
+                vp = vp + dev.vpFlags["MILITARY"]
+            end
+            if otherWorld and dev.vpFlags["WORLD"] and info.type == 1 then
+                vp = vp + dev.vpFlags["WORLD"]
+            end
 
-     --           if otherWorld and dev.vpFlags["MILITARY"] and info.type == 1 and info.flags["MILITARY"] then
-     --                vp = vp + dev.vpFlags["MILITARY"]
-     --           end
-     --           if otherWorld and dev.vpFlags["WORLD"] and info.type == 1 then
-     --                vp = vp + dev.vpFlags["WORLD"]
-     --           end
+            -- development types
+            local otherDev = true
 
-     --           -- development types
-     --           local otherDev = true
+            if dev.vpFlags["SIX_DEVEL"] and info.type == 2 and info.cost == 6 then
+                otherDev = false
+                vp = vp + dev.vpFlags["SIX_DEVEL"]
+            end
+            if dev.vpFlags["DEVEL_TRADE"] and info.type == 2 and info.passiveCount["4"] > 0 then
+                vp = vp + dev.vpFlags["DEVEL_TRADE"]
+            end
+            if dev.vpFlags["DEVEL_CONSUME"] and info.type == 2 and info.activeCount["4"] > 0 then
+                vp = vp + dev.vpFlags["DEVEL_CONSUME"]
+            end
+            if dev.vpFlags["DEVEL_EXPLORE"] and info.type == 2 and info.passiveCount["1"] > 0 then
+                vp = vp + dev.vpFlags["DEVEL_EXPLORE"]
+            end
 
-     --           if dev.vpFlags["SIX_DEVEL"] and info.type == 2 and info.cost == 6 then
-     --                otherDev = false
-     --                vp = vp + dev.vpFlags["SIX_DEVEL"]
-     --           end
-     --           if dev.vpFlags["DEVEL_TRADE"] and info.type == 2 and getCardActions("5", card) then
-     --                vp = vp + dev.vpFlags["DEVEL_TRADE"]
-     --           end
-     --           if dev.vpFlags["DEVEL_CONSUME"] and info.type == 2 and getCardActions("4", card) then
-     --                vp = vp + dev.vpFlags["DEVEL_CONSUME"]
-     --           end
-     --           if dev.vpFlags["DEVEL_EXPLORE"] and info.type == 2 and info.powers["1"] then
-     --                vp = vp + dev.vpFlags["DEVEL_EXPLORE"]
-     --           end
+            if otherDev and dev.vpFlags["DEVEL"] and info.type == 2 then
+                vp = vp + dev.vpFlags["DEVEL"]
+            end
 
-     --           if otherDev and dev.vpFlags["DEVEL"] and info.type == 2 then
-     --                vp = vp + dev.vpFlags["DEVEL"]
-     --           end
+            -- other card tag checks
+            if otherAlien and dev.vpFlags["ALIEN_FLAG"] and info.flags["ALIEN"] then
+                vp = vp + dev.vpFlags["ALIEN_FLAG"]
+            end
+        end
 
-     --           -- other card tag checks
-     --           if otherAlien and dev.vpFlags["ALIEN_FLAG"] and info.flags["ALIEN"] then
-     --                vp = vp + dev.vpFlags["ALIEN_FLAG"]
-     --           end
-     --      end
+        -- name checks
+        if dev.vpFlags["NAME"] then
+            for _, entry in pairs(dev.vpFlags["NAME"]) do
+                vp = vp + (cardNames[entry.name] and entry.vp or 0)
+            end
+        end
 
-     --      -- name checks
-     --      if dev.vpFlags["NAME"] then
-     --           for _, entry in pairs(dev.vpFlags["NAME"]) do
-     --                vp = vp + (cardNames[entry.name] and entry.vp or 0)
-     --           end
-     --      end
+        -- other
+        if dev.vpFlags["GOODS_REMAINING"] then
+            vp = vp + goodsCount * dev.vpFlags["GOODS_REMAINING"]
+        end
+        if dev.vpFlags["THREE_VP"] then
+            vp = vp + math.floor(vpChipCount / 3) * dev.vpFlags["THREE_VP"]
+        end
+        if dev.vpFlags["TOTAL_MILITARY"] then
+            vp = vp + baseMilitary * dev.vpFlags["TOTAL_MILITARY"]
+        end
 
-     --      -- other
-     --      if dev.vpFlags["GOODS_REMAINING"] then
-     --           vp = vp + goodsCount * dev.vpFlags["GOODS_REMAINING"]
-     --      end
-     --      if dev.vpFlags["THREE_VP"] then
-     --           vp = vp + math.floor(vpChipCount / 3) * dev.vpFlags["THREE_VP"]
-     --      end
-     --      if dev.vpFlags["TOTAL_MILITARY"] then
-     --           vp = vp + baseMilitary * dev.vpFlags["TOTAL_MILITARY"]
-     --      end
+        displayVpHexOn(item[1], vp)
 
-     --      displayVpHexOn(item[1], vp)
+        devVp = devVp + vp
+    end
 
-     --      devVp = devVp + vp
-     -- end
-
-     -- local statTracker = getObjectFromGUID(statTracker_GUID[i])
-     -- if statTracker then
-     --      statTracker.call("updateLabel", {"vp", flatVp + vpChipCount + devVp})
-     -- end
+    local statTracker = getObjectFromGUID(statTracker_GUID[i])
+    if statTracker then
+         statTracker.call("updateLabel", {"vp", flatVp + vpChipCount + devVp})
+    end
 end
