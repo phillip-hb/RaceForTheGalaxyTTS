@@ -35,7 +35,7 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 
-tradePowers = {["TRADE_ANY"]=1,["TRADE_THIS"]=1,["TRADE_NOVELTY"]=1,["TRADE_RARE"]=1,["TRADE_GENE"]=1,["TRADE_ALIEN"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
@@ -1604,9 +1604,9 @@ function updateTableauState(player)
                     createCancelButton(card)
                     local powerIndex = info.activePowers[currentPhase][p.selectedCardPower].index
 
-                    -- if actions[selectedPowerIndex].name == "DISCARD_HAND" then
-                    --     createCardBottomButton(selectedCard, "Confirm", "confirmConsumePowerClick")
-                    -- end
+                    if requiresConfirm[p.selectedCardPower] then
+                        createConfirmButton(selectedCard)
+                    end
 
                     p.mustConsumeCount = math.max(baseAmount[powerIndex], goodslimit)
                 end
@@ -1698,13 +1698,26 @@ function updateTableauState(player)
      -- calculateVp(player)
 end
 
+function markUsed(player, card, power)
+    local p = playerData[player]
+
+    if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
+
+    p.selectedGoods = {}
+    p.cardsAlreadyUsed[card.getGUID()][p.selectedCardPower .. power.index] = true
+    p.selectedCard = nil
+    p.selectedCardPower = ""
+    p.miscSelectedCards = {}
+
+    queueUpdate(player, true)
+end
+
 function usePowerClick1(obj, player, button) usePowerClick(obj, player, button, 1) end
 function usePowerClick2(obj, player, button) usePowerClick(obj, player, button, 2) end
 function usePowerClick3(obj, player, button) usePowerClick(obj, player, button, 3) end
 
 function usePowerClick(obj, player, rightClick, powerIndex)
     if rightClick then return end
-
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
@@ -1720,18 +1733,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                 -- Use power instantly
                 if p.selectedCardPower == "DRAW" then
                     dealTo(power.strength, player)
-
-                    if not p.cardsAlreadyUsed[obj.getGUID()] then
-                        p.cardsAlreadyUsed[obj.getGUID()] = {}
-                    end
-
-                    p.selectedGoods = {}
-                    p.cardsAlreadyUsed[obj.getGUID()][name .. powerIndex] = true
-                    p.selectedCard = nil
-                    p.selectedCardPower = ""
-                    p.miscSelectedCards = {}
-
-                    queueUpdate(player, true)
+                    markUsed(player, obj, power)
                     return
                 end
                 break
@@ -1761,47 +1763,37 @@ end
 
 function cancelPowerClick(obj, player, rightClick)
     if rightClick then return end
-
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
-    playerData[player].miscSelectedCards = deleteLinkedListNode(playerData[player].miscSelectedCards, obj.getGUID())
+    local p = playerData[player]
+
+    p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if getCurrentPhase() ~= 3 then
-        playerData[player].selectedCard = nil
+        p.selectedCard = nil
+        p.selectedCardPower = ""
+        p.selectedGoods = {}
     end
 
     queueUpdate(player, true)
 end
 
-function confirmSettlePowerClick(card, player, rightClick)
-     -- if rightClick then return end
+function confirmPowerClick(obj, player, rightClick)
+    if rightClick then return end
+    if obj.hasTag("Slot") then obj = getCard(obj) end
 
-     -- local pd = playerData[player]
+    local p = playerData[player]
+    local currentPhase = tostring(getCurrentPhase())
+    local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
 
-     -- if card.hasTag("Slot") then card = getCard(card) end
+    if p.selectedCardPower == "DISCARD_HAND" then
+        local times = math.min(power.times, discardMarkedCards(player))
+        if power.codes["GET_VP"] then
+            getVpChips(player, times)
+        end
+    end
 
-     -- local actions = getCardActions("3", card)
-     -- local action = actions[pd.selectedCardPowerIndex]
-
-     -- log(pd.selectedCardPowerIndex)
-     -- if action.name == "MILITARY_HAND" then
-     --      local times = math.min(action.data.strength, discardMarkedCards(player))
-
-     -- end
-
-     -- if not pd.cardsAlreadyUsed[pd.selectedCard] then
-     --      local emptyArr = {}
-     --      for i=1, #actions do
-     --           emptyArr[i] = false
-     --      end
-     --      pd.cardsAlreadyUsed[pd.selectedCard] = emptyArr
-     -- end
-
-     -- pd.cardsAlreadyUsed[pd.selectedCard][pd.selectedCardPowerIndex] = true
-     -- pd.selectedCard = nil
-     -- card.clearButtons()
-
-     -- updateTableauState(player)
+    markUsed(player, obj, power)
 end
 
 function confirmConsumePowerClick(card, player, rightClick)
@@ -1953,13 +1945,7 @@ function goodSelectClick(parentCard, player, rightClick)
     end
 
     if powerUsed then
-        if not p.cardsAlreadyUsed[selectedCard.getGUID()] then p.cardsAlreadyUsed[selectedCard.getGUID()] = {} end
-
-        p.selectedGoods = {}
-        p.cardsAlreadyUsed[selectedCard.getGUID()][p.selectedCardPower .. power.index] = true
-        p.selectedCard = nil
-        p.selectedCardPower = ""
-        p.miscSelectedCards = {}
+        markUsed(player, selectedCard, power)
     end
 
     queueUpdate(player, true)
@@ -2152,22 +2138,21 @@ function updateHelpText(playerColor)
         else
             setHelpText(playerColor, "▼ Settle: may select a world.")
         end
-     -- elseif currentPhase == 4 then
-     --      if playerData[player].selectedCard then
-     --           local card = getObjectFromGUID(playerData[player].selectedCard)
-     --           local info = cardData[card.getName()]
-     --           local power = info.powers["4"][playerData[player].selectedCardPowerIndex]
+    elseif currentPhase == 4 then
+        if p.selectedCard then
+            local card = getObjectFromGUID(p.selectedCard)
+            local info = card_db[card.getName()]
 
-     --           if power.name == "TRADE_ACTION" then
-     --                setHelpText(player, "▲ Consume: select a good to sell.")
-     --           elseif power.name == "DISCARD_HAND" then
-     --                setHelpText(player, "▼ Consume: discard cards for VP.")
-     --           else
-     --                setHelpText(player, "▲ Consume: select goods to consume.")
-     --           end
-     --      else
-     --           setHelpText(player, "▲ Consume: use powers.")
-     --      end
+            if p.selectedCardPower == "TRADE_ACTION" then
+                setHelpText(playerColor, "▲ Consume: select a good to sell.")
+            elseif p.selectedCardPower == "DISCARD_HAND" then
+                setHelpText(playerColor, "▼ Consume: discard cards for VP.")
+            else
+                setHelpText(playerColor, "▲ Consume: select goods to consume.")
+            end
+        else
+            setHelpText(playerColor, "▲ Consume: use powers.")
+        end
      -- elseif currentPhase == 5 then
      --      if playerData[player].selectedCard then
      --           local card = getObjectFromGUID(playerData[player].selectedCard)

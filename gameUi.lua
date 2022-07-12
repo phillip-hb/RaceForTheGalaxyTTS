@@ -42,6 +42,23 @@ function createCardBottomButton(card, text, func)
     })
 end
 
+function createConfirmButton(card)
+    local slot = getCardSlot(card)
+
+    if not slot then return end
+
+    slot.createButton({
+        click_function = "confirmPowerClick",
+        function_owner = Global,
+        label = "Confirm",
+        font_size = 150,
+        width = 900,
+        height = 220,
+        position = {0, 0, .63},
+        scale = {0.5, 1, 0.4}
+    })
+end
+
 function createUsePowerButton(card, powerIndex, powersCount, tooltip)
     local slot = getCardSlot(card)
 
