@@ -1473,8 +1473,8 @@ function updateTableauState(player)
                         local makeButton = false
                         local power = ap[p.selectedCardPower]
 
-                        if p.selectedCardPower == "CONSUME_ANY" or p.selectedCardPower == "CONSUME_ALL" or p.selectedCardPower == "CONSUME_" .. (parentData.goods or "")
-                        then
+                        if p.selectedCardPower == "CONSUME_ANY" or p.selectedCardPower == "CONSUME_ALL" or p.selectedCardPower == "CONSUME_" .. (parentData.goods or "") or
+                            ((p.selectedCardPower == "CONSUME_3_DIFF" and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
                             makeButton = true
                         end
 
@@ -1485,23 +1485,6 @@ function updateTableauState(player)
                         if makeButton then
                             createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
                         end
-    --                          if power.name == "CONSUME_ANY" or power.name == "CONSUME_ALL" or "CONSUME_" .. parentData.goods == power.name or
-    --                             ((power.name == "CONSUME_3_DIFF" and not selectedUniqueGoods[parentData.goods]) or (selectedGoods[i] and selectedGoods[i][obj.getGUID()])) then
-    --                               makeButton = true
-    --                          end
-
-    --                          if power.codes["CONSUME_THIS"] and selectedCard ~= parentCard then
-    --                               makeButton = false
-    --                          end
-
-    --                          if makeButton then
-    --                               local check = "✔"
-    --                               if not selectedGoods[obj.getGUID()] then
-    --                                    check = ""
-    --                               end
-
-    --                               createGoodsButton(parentCard, check)
-    --                          end
                     end
                 end
             end

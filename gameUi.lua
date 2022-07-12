@@ -44,6 +44,9 @@ end
 
 function createUsePowerButton(card, powerIndex, powersCount, tooltip)
     local slot = getCardSlot(card)
+
+    if not slot then return end
+
     local w = 900 / powersCount
     local xW = 1
     local offx = xW / powersCount
@@ -63,6 +66,8 @@ end
 
 function createCancelButton(card)
     local slot = getCardSlot(card)
+
+    if not slot then return end
 
     slot.createButton({
         click_function = "cancelPowerClick",
