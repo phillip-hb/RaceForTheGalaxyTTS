@@ -37,7 +37,7 @@ function createCardBottomButton(card, text, func)
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, .61},
+        position = {0, 0, .63},
         scale = {0.5, 1, 0.4}
     })
 end
@@ -56,7 +56,7 @@ function createUsePowerButton(card, powerIndex, powersCount, tooltip)
         height = 220,
         width = w,
         scale = {0.5, 1, 0.4},
-        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.61},
+        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.63},
         tooltip = tooltip
     })
 end
@@ -71,7 +71,7 @@ function createCancelButton(card)
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, -.61},
+        position = {0, 0, -.63},
         scale = {0.5, 1, 0.4},
         tooltip = "Cancel power.",
     })
@@ -81,10 +81,10 @@ function createGoodsButton(card, label, color)
     local offset = {0.6, 1, 0.4}
     card.clearButtons()
     card.createButton({
-        click_function = "selectGoodsClick",
+        click_function = "goodSelectClick",
         function_owner = Global,
         label = label or "",
-        font_size = 150,
+        font_size = 175,
         color = color or "White",
         width = 500,
         height = 750,

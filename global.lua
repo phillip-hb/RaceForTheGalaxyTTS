@@ -329,16 +329,15 @@ function getCardActions(phase, card)
 end
 
 function checkIfSelectedAction(player, actionName)
-     local i = playerColorIndex[player]
-     local zone = getObjectFromGUID(selectedActionZone_GUID[i])
+    local zone = getObjectFromGUID(selectedActionZone_GUID[playerData[player].index])
 
-     for _, obj in pairs(zone.getObjects()) do
-          if obj.hasTag("Action Card") and obj.getName() == actionName then
-               return obj
-          end
-     end
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.hasTag("Action Card") and obj.getName() == actionName then
+            return obj
+        end
+    end
 
-     return nil
+    return nil
 end
 
 -- countMarked = whether or not to include face-down cards in the count (default is true)
@@ -1163,10 +1162,11 @@ function startConsumePhase()
         capturePowersSnapshot(player, "4")
 
         -- Force first selection choice to be the consume trade card, otherwise it'll be nil
-        -- local card = checkIfSelectedAction(player, "Consume ($)")
-        -- if card then
-        --     data.selectedCard = card.getGUID()
-        -- end
+        local card = checkIfSelectedAction(player, "Consume ($)")
+        if card then
+            data.selectedCard = card.getGUID()
+            data.selectedCardPower = "TRADE_ACTION"
+        end
 
         queueUpdate(player, true)
     end
@@ -1456,32 +1456,22 @@ function updateTableauState(player)
                 if currentPhase == "4" and selectedCard then
                     local ap = selectedInfo.activePowers[currentPhase]
                     if p.selectedCardPower == "TRADE_ACTION" then
-    --                          -- calculating cost to sell card
-    --                          local price = 0
-    --                          local bonus = true
+                        -- calculating cost to sell card
+                        local power = ap[p.selectedCardPower]
+                        local price = 0
+                        local bonus = not power.codes["TRADE_NO_BONUS"]
+                        local basePrice = {NOVELTY = 2, RARE = 3, GENE = 4, ALIEN = 5}
 
-    --                          if selectedInfo.powers["4"][selectedPowerIndex].codes["TRADE_NO_BONUS"] then
-    --                               bonus = false
-    --                          end
+                        price = basePrice[parentData.goods] + (bonus and p.powersSnapshot["TRADE_" .. parentData.goods] or 0)
+                        price = price + (bonus and p.powersSnapshot["TRADE_ANY"] or 0)
 
-    --                          if parentData.goods == "NOVELTY" then
-    --                               price = 2 + (bonus and phasePowersSnapshot["TRADE_NOVELTY"] or 0)
-    --                          elseif parentData.goods == "RARE" then
-    --                               price = 3 + (bonus and phasePowersSnapshot["TRADE_RARE"] or 0)
-    --                          elseif parentData.goods == "GENE" then
-    --                               price = 4 + (bonus and phasePowersSnapshot["TRADE_GENE"] or 0)
-    --                          elseif parentData.goods == "ALIEN" then
-    --                               price = 5 + (bonus and phasePowersSnapshot["TRADE_ALIEN"] or 0)
-    --                          end
+                        local parentPassive = parentData.passivePowers[currentPhase]
+                        if bonus and parentPassive and parentPassive["TRADE_THIS"] then
+                            price = price + parentPassive["TRADE_THIS"].strength
+                        end
 
-    --                          if bonus and parentData.powers["4"] and parentData.powers["4"]["TRADE_THIS"] then
-    --                               price = price + parentData.powers["4"]["TRADE_THIS"].strength
-    --                          end
-
-    --                          price = price + (bonus and phasePowersSnapshot["TRADE_ANY"] or 0)
-    --                          createGoodsButton(parentCard, "$➧" .. price)
-
-    --                          obj.memo = price
+                        createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[parentData.goods])
+                        obj.memo = price
                     elseif ap then -- using normal consume powers
                         local makeButton = false
                         local power = ap[p.selectedCardPower]
@@ -1538,6 +1528,11 @@ function updateTableauState(player)
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
+
+        if p.selectedCard == card.getGUID() then
+            highlightOn(card, "rgb(0,1,0)", player)
+        end
+
         if not card.hasTag("Action Card") then
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
@@ -1931,7 +1926,7 @@ function confirmProducePowerClick(card, player, rightClick)
      -- updateTableauState(player)
 end
 
-function selectGoodsClick(parentCard, player, rightClick)
+function goodSelectClick(parentCard, player, rightClick)
     if rightClick then return end
 
     local p = playerData[player]
@@ -1962,8 +1957,8 @@ function selectGoodsClick(parentCard, player, rightClick)
 
             if p.selectedCardPower == "TRADE_ACTION" then
                 times = 0
-     --                local price = card.memo
-     --                dealTo(price, player)
+                local price = good.memo
+                dealTo(price, player)
             elseif p.selectedCardPower == "CONSUME_ALL" then
                 times = selectedGoodsCount - 1
             elseif selectedGoodsCount <= power.times then
