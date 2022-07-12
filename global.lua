@@ -1388,15 +1388,12 @@ function updateTableauState(player)
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
     local currentPhase = tostring(getCurrentPhase())
-    -- local selectedGoods = playerData[player].selectedGoods
-    -- local selectedPowerIndex = playerData[player].selectedCardPowerIndex
-    -- local cardsAlreadyUsed = playerData[player].cardsAlreadyUsed
 
     local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
 
-    --  local selectedUniqueGoods = {}
+    local selectedUniqueGoods = {}
 
     for card in allCardsInTableau(player) do
         card.clearButtons()
@@ -1404,14 +1401,14 @@ function updateTableauState(player)
         highlightOff(card)
     end
 
-     -- for guid, selected in pairs(selectedGoods) do
-     --      if selected then
-     --           local good = getObjectFromGUID(guid)
-     --           local parent = getObjectFromGUID(good.getDescription())
+    for guid, selected in pairs(p.selectedGoods) do
+        if selected then
+            local good = getObjectFromGUID(guid)
+            local parent = getObjectFromGUID(good.getDescription())
 
-     --           selectedUniqueGoods[cardData[parent.getName()].goods] = true
-     --      end
-     -- end
+            selectedUniqueGoods[card_db[parent.getName()].goods] = true
+        end
+    end
 
     local miscPowerSnapshot = {}
     local miscSelectedCardsTable = {}
@@ -1511,7 +1508,7 @@ function updateTableauState(player)
         end
     end
 
-     -- local uniqueCount = tableLength(uniques)
+    local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
      -- possibleTableauActions[player] = {}
 
@@ -1582,101 +1579,53 @@ function updateTableauState(player)
 --                          end
                 end
             elseif currentPhase == "4" and ap then
-                local ap = info.activePowers[currentPhase]
-
-                local baseAmount = 1
+                local baseAmount = {}
                 local goodslimit = 1
                 local enoughGoods = false
 
-                -- if selectedCard then
-                --     selectedCard.highlightOn(color(0,1,0))
-                -- end
+                for i=1, info.activeCount[currentPhase] do
+                    baseAmount[#baseAmount + 1] = 1
+                end
 
-                -- Based on powers, set certain flags or variables
-     --                local actions = getCardActions("4", card)
-     --                if actions then
-     --                     for _, action in pairs(actions) do
-     --                          if action.data.times > 0 then
-     --                               if action.name == "CONSUME_ANY" or action.name == "CONSUME_ALL" or action.name == "CONSUME_3_DIFF" then
-     --                                    goodslimit = goodsCount["TOTAL"]
-     --                               elseif action.name == "CONSUME_NOVELTY" then
-     --                                    goodslimit = goodsCount["NOVELTY"]
-     --                               elseif action.name == "CONSUME_RARE" then
-     --                                    goodslimit = goodsCount["RARE"]
-     --                               elseif action.name == "CONSUME_GENE" then
-     --                                    goodslimit = goodsCount["GENE"]
-     --                               elseif action.name == "CONSUME_ALIEN" then
-     --                                    goodslimit = goodsCount["ALIEN"]
-     --                               end
+                if #baseAmount > 0 then
+                    for name, power in pairs(info.activePowers[currentPhase]) do
+                        if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "TRADE_ACTION" then
+                            goodslimit = goodsCount["TOTAL"]
+                        elseif name:sub(1,7) == "CONSUME" then
+                            goodslimit = goodsCount[name:sub(9, name:len())]
+                        end
 
-     --                               if action.data.codes["CONSUME_TWO"] then
-     --                                    baseAmount = 2
-     --                               elseif action.name == "CONSUME_ALL" then
-     --                                    baseAmount = goodsCount["TOTAL"]
-     --                               elseif action.name == "CONSUME_3_DIFF" then
-     --                                    baseAmount = 3
-     --                               end
+                        if power.codes["CONSUME_TWO"] then
+                            baseAmount[power.index] = 2
+                        elseif name == "CONSUME_ALL" then
+                            baseAmount[power.index] = goodsCount["TOTAL"]
+                        elseif name == "CONSUME_3_DIFF" then
+                            baseAmount[power.index] = uniqueCount < 3 and 100 or 3
+                        elseif not requiresGoods[name] then
+                            baseAmount[power.index] = 0
+                        end
 
-     --                               goodslimit = math.min(action.data.times * baseAmount, goodslimit)
-
-     --                               -- set base amount to high value so button doesn't get created for this specific power
-     --                               if action.name == "CONSUME_3_DIFF" and uniqueCount < 3 then
-     --                                    baseAmount = 100
-     --                               end
-     --                               break
-     --                          else
-     --                               if action.name == "TRADE_ACTION" then
-     --                                    goodslimit = goodsCount["TOTAL"]
-     --                                    break
-     --                               end
-
-     --                               goodslimit = math.min(baseAmount, goodslimit)
-     --                          end
-     --                     end
-     --                end
+                        goodslimit = math.min(math.max(1, power.times * baseAmount[power.index]), goodslimit)
+                    end
+                end
 
                 if not selectedCard then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
-                        if not used or not used[name .. power.index] then
+                        if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
                             createdButton = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
                         end
                     end
-                    -- create buttons for cards with consume powers
-     --                     local powerCount = 0
-     --                     local actualIndex = {}
-     --                     for i, action in pairs(actions) do
-     --                          if consumeActions[action.name] then
-     --                               powerCount = powerCount + 1
-     --                               actualIndex[#actualIndex + 1] = i
-     --                          end
-     --                     end
-
-     --                     if actions and powerCount == 1 then
-     --                          local action = actions[actualIndex[1]]
-     --                          if (not playerData[player].cardsAlreadyUsed[card.getGUID()] or not playerData[player].cardsAlreadyUsed[card.getGUID()][actualIndex[1]]) and
-     --                             (not requiresGoods[action.name] or baseAmount <= goodslimit) then
-     --                               createCardTopButton(card, "Use Power", "cardSelectClick" .. actualIndex[1], consumeActions[action.name])
-     --                               createdButton = true
-     --                          end
-     --                     elseif actions and powerCount == 2 then
-     --                          local func = {"cardSelectClick" .. actualIndex[1], "cardSelectClick" .. actualIndex[2]}
-     --                          for i=1, #actions do
-     --                               if playerData[player].cardsAlreadyUsed[card.getGUID()] and playerData[player].cardsAlreadyUsed[card.getGUID()][actualIndex[2]] then
-     --                                    func[i] = "none"
-     --                               end
-     --                          end
-     --                          createCardTop2Buttons(card, "Pow", func, {consumeActions[actions[1].name], consumeActions[actions[2].name]})
-     --                     end
                 elseif selectedCard == card then
                     createCancelButton(card)
+                    local powerIndex = info.activePowers[currentPhase][p.selectedCardPower].index
 
                     -- if actions[selectedPowerIndex].name == "DISCARD_HAND" then
                     --     createCardBottomButton(selectedCard, "Confirm", "confirmConsumePowerClick")
                     -- end
 
-                    p.mustConsumeCount = math.max(baseAmount, goodslimit)
+                    p.mustConsumeCount = math.max(baseAmount[powerIndex], goodslimit)
                 end
             elseif currentPhase == "5" then
      --                local actions = getCardActions("5", card)
