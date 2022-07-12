@@ -28,47 +28,6 @@ function createCancelButtonOnCard(card)
     })
 end
 
-function createCardTopButton(card, text, func, tooltip)
-    local slot = getCardSlot(card)
-    slot.createButton({
-        click_function = func,
-        function_owner = Global,
-        label = text,
-        font_size = 150,
-        width = 900,
-        height = 220,
-        position = {0, 0, -.61},
-        scale = {0.5, 1, 0.4},
-        tooltip = tooltip or "",
-    })
-end
-
-function createCardTop2Buttons(card, text, funcs, tooltips)
-    local slot = getCardSlot(card)
-    for i=1, 2 do
-        local w = 500
-        local h = 220
-        local lbl =  text .. " " .. i
-        if funcs[i] == "none" then
-            w = 0
-            h = 0
-            lbl = ""
-        end
-
-        slot.createButton({
-            click_function = funcs[i],
-            function_owner = Global,
-            label = lbl,
-            font_size = 150,
-            width = w,
-            height = h,
-            position = {-0.25 + (i-1) * 0.5, 0, -.61},
-            scale = {0.5, 1, 0.4},
-            tooltip = tooltips[i] or "",
-        })
-    end
-end
-
 function createCardBottomButton(card, text, func)
     local slot = getCardSlot(card)
     slot.createButton({
@@ -115,6 +74,21 @@ function createCancelButton(card)
         position = {0, 0, -.61},
         scale = {0.5, 1, 0.4},
         tooltip = "Cancel power.",
+    })
+end
+
+function createGoodsButton(card, label, color)
+    local offset = {0.6, 1, 0.4}
+    card.clearButtons()
+    card.createButton({
+        click_function = "selectGoodsClick",
+        function_owner = Global,
+        label = label or "",
+        font_size = 150,
+        color = color or "White",
+        width = 500,
+        height = 750,
+        position = offset
     })
 end
 

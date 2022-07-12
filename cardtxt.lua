@@ -2434,7 +2434,7 @@ activePowers = {
           REDUCE_ZERO = "Reduce settle cost."
      },
      ["4"] = {
-          TRADE_ACTION = "Sell good.",
+          TRADE_ACTION = "Sell a good.",
           CONSUME_ANY = "Consume any good.",
           CONSUME_NOVELTY = "Consume Novelty good.",
           CONSUME_RARE = "Consume Rare good.",
