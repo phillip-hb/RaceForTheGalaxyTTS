@@ -1642,8 +1642,11 @@ function updateTableauState(player)
 
                 if not selectedCard then
                     for name, power in pairs(ap) do
-                        createdButton = true
-                        createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                        local used = p.cardsAlreadyUsed[card.getGUID()]
+                        if not used or not used[name .. power.index] then
+                            createdButton = true
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                        end
                     end
                     -- create buttons for cards with consume powers
      --                     local powerCount = 0
