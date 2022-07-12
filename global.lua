@@ -1733,6 +1733,24 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         for name, power in pairs(info.activePowers[currentPhase]) do
             if power.index == powerIndex then
                 p.selectedCardPower = name
+
+                -- Use power instantly
+                if p.selectedCardPower == "DRAW" then
+                    dealTo(power.strength, player)
+
+                    if not p.cardsAlreadyUsed[obj.getGUID()] then
+                        p.cardsAlreadyUsed[obj.getGUID()] = {}
+                    end
+
+                    p.selectedGoods = {}
+                    p.cardsAlreadyUsed[obj.getGUID()][name .. powerIndex] = true
+                    p.selectedCard = nil
+                    p.selectedCardPower = ""
+                    p.miscSelectedCards = {}
+
+                    queueUpdate(player, true)
+                    return
+                end
                 break
             end
         end
