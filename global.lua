@@ -266,27 +266,23 @@ function getGoods(card)
 end
 
 function tryProduceAt(player, card)
-     local info = cardData[card.getName()]
-     local powers = info.powers["5"]
-     --local produce = getPower(powers, "PRODUCE")
+    local info = card_db[card.getName()]
+    local powers = info.passivePowers["5"]
 
-     --if produce then
-          local goods = getGoods(card)
-          if not goods then
-               -- no goods, produce on planet
-               playerData[player].produceCount[info.goods] = playerData[player].produceCount[info.goods] + 1
-               card.memo = placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), card.getRotation()[2], player)
+    local goods = getGoods(card)
+    if not goods then
+        local p = playerData[player]
 
-               local drawIf = getPower(powers, "DRAW_IF")
-               if drawIf then
-                    dealTo(drawIf.strength, player)
-               end
+        -- no goods, produce on planet
+        p.produceCount[info.goods] = p.produceCount[info.goods] + 1
+        card.memo = placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), card.getRotation()[2], player)
 
-               return true
-          end
-     --end
+        if powers and powers["DRAW_IF"] then dealTo(powers["DRAW_IF"].strength, player) end
 
-     return false
+        return true
+    end
+
+    return false
 end
 
 function getVpChips(player, n)
@@ -1173,33 +1169,30 @@ function startConsumePhase()
 end
 
 function startProducePhase()
-     -- for player, data in pairs(playerData) do
-     --      data.cardsAlreadyUsed = {}
-     --      data.produceCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0}
-     --      savePowersSnapshot(player, "5")
+    for player, data in pairs(playerData) do
+        data.cardsAlreadyUsed = {}
+        data.produceCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0}
 
-     --      -- produce on production planets first
-     --      for card in allCardsInTableau(player) do
-     --           local info = cardData[card.getName()]
+        capturePowersSnapshot(player, "5")
 
-     --           if info.powers["5"] then
-     --                local produce = getPower(info.powers["5"], "PRODUCE")
-     --                if produce then
-     --                     tryProduceAt(player, card)
-     --                end
-     --           end
-     --      end
+        -- produce on production planets first
+        for card in allCardsInTableau(player) do
+            local info = card_db[card.getName()]
 
-     --      -- Force first selection choice to be the consume trade card, otherwise it'll be nil
-     --      local card = checkIfSelectedAction(player, "Produce")
-     --      if card then
-     --           data.selectedCard = card.getGUID()
-     --           data.selectedCardPowerIndex = 1
-     --      end
+            if info.passivePowers["5"] and info.passivePowers["5"]["PRODUCE"] then
+                tryProduceAt(player, card)
+            end
+        end
 
-     --      updateTableauState(player)
-     --      updateHandState(player)
-     -- end
+        -- Force first selection choice to be the consume trade card, otherwise it'll be nil
+        local card = checkIfSelectedAction(player, "Produce")
+        if card then
+            data.selectedCard = card.getGUID()
+            data.selectedCardPower = "WINDFALL_ANY"
+        end
+
+        queueUpdate(player, true)
+    end
 end
 
 -- phase = (string) current phase
@@ -1432,10 +1425,10 @@ function updateTableauState(player)
 
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
-            -- if parentData.flags["WINDFALL"] and not getGoods(obj) then
-            --     windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
-            --     windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
-            -- end
+            if parentData.flags["WINDFALL"] and not getGoods(obj) then
+                windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
+                windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
+            end
         elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then  -- facedown goods on tableau
             local parentCard = getObjectFromGUID(obj.getDescription())
             local parentData = card_db[parentCard.getName()]
@@ -1611,13 +1604,7 @@ function updateTableauState(player)
                     p.mustConsumeCount = math.max(baseAmount[powerIndex], goodslimit)
                 end
             elseif currentPhase == "5" then
-     --                local actions = getCardActions("5", card)
-
-     --                if selectedCard then
-     --                     selectedCard.highlightOn(color(0,1,0))
-     --                end
-
-     --                if not selectedCard and actions then
+                if not selectedCard then
      --                     local needsSpace = false
 
      --                     for _, action in pairs(actions) do
@@ -1643,7 +1630,8 @@ function updateTableauState(player)
      --                     elseif actions and #actions == 2 then
 
      --                     end
-     --                elseif selectedCard == card then
+                elseif selectedCard then
+                    local power = selectedInfo.activePowers[currentPhase][p.selectedCardPower]
      --                     local paidCost = playerData[player].paidCost[card.getGUID()]
      --                     if paidCost and paidCost[playerData[player].selectedCardPowerIndex] then
                               
@@ -1656,27 +1644,21 @@ function updateTableauState(player)
      --                     end
      --                end
 
-     --                -- create produce here button for windfall planets
-     --                if selectedCard then
-     --                     local selectedAction = getCardActions("5", selectedCard)[playerData[player].selectedCardPowerIndex]
-     --                     local action = selectedAction.name
+                    -- create produce here button for windfall planets
+                    --local selectedAction = getCardActions("5", selectedCard)[playerData[player].selectedCardPowerIndex]
 
      --                     -- doing some special stuff here if needed
      --                     if selectedAction and selectedAction.name == "DISCARD" and selectedAction.data.codes["WINDFALL_ANY"] and 
      --                          playerData[player].paidCost[selectedCard.getGUID()] and playerData[player].paidCost[selectedCard.getGUID()][playerData[player].selectedCardPowerIndex] then
      --                          action = "WINDFALL_ANY"
      --                     end
-
-     --                     if selectedAction and info.goods and info.flags["WINDFALL"] and not getGoods(card) and
-     --                     (action == "WINDFALL_ANY" or
-     --                     action == "WINDFALL_NOVELTY" and info.goods == "NOVELTY" or
-     --                     action == "WINDFALL_RARE" and info.goods == "RARE" or
-     --                     action == "WINDFALL_GENE" and info.goods == "GENE" or
-     --                     action == "WINDFALL_ALIEN" and info.goods == "ALIEN")
-     --                     then
-     --                          createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
-     --                     end
-     --                end
+                    if info.goods and info.flags["WINDFALL"] and not getGoods(card) and p.selectedCardPower:sub(1,8) == "WINDFALL" then
+                        local targetGood = p.selectedCardPower:sub(10, p.selectedCardPower:len())
+                        if targetGood == "ANY" or targetGood == info.goods then
+                            createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
+                        end
+                    end
+                end
             end
         end
     end
@@ -1796,38 +1778,6 @@ function confirmPowerClick(obj, player, rightClick)
     markUsed(player, obj, power)
 end
 
-function confirmConsumePowerClick(card, player, rightClick)
-     -- if rightClick then return end
-
-     -- local pd = playerData[player]
-
-     -- if card.hasTag("Slot") then card = getCard(card) end
-
-     -- local actions = getCardActions("4", card)
-     -- local action = actions[pd.selectedCardPowerIndex]
-
-     -- if action.name == "DISCARD_HAND" then
-     --      local times = math.min(action.data.times, discardMarkedCards(player))
-     --      if action.data.codes["GET_VP"] then
-     --           getVpChips(player, times)
-     --      end
-     -- end
-
-     -- if not pd.cardsAlreadyUsed[pd.selectedCard] then
-     --      local emptyArr = {}
-     --      for i=1, #actions do
-     --           emptyArr[i] = false
-     --      end
-     --      pd.cardsAlreadyUsed[pd.selectedCard] = emptyArr
-     -- end
-
-     -- pd.cardsAlreadyUsed[pd.selectedCard][pd.selectedCardPowerIndex] = true
-     -- pd.selectedCard = nil
-     -- card.clearButtons()
-
-     -- updateTableauState(player)
-end
-
 function confirmProducePowerClick(card, player, rightClick)
      -- if rightClick then return end
 
@@ -1875,7 +1825,8 @@ function goodSelectClick(parentCard, player, rightClick)
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = card_db[selectedCard.getName()]
     local currentPhase = tostring(getCurrentPhase())
-    local power = selectedInfo.activePowers[currentPhase][p.selectedCardPower]
+    local powers = selectedInfo.activePowers[currentPhase]
+    local power = powers[p.selectedCardPower]
     local powerUsed = false
 
     if currentPhase == "4" then    -- consume the goods card
@@ -1921,27 +1872,11 @@ function goodSelectClick(parentCard, player, rightClick)
             powerUsed = true
         end
     elseif currentPhase == "5" then     -- produce the goods card
-     --      local actions = getCardActions("5", selectedCard)
-     --      local action = actions[powerIndex]
-     --      -- local card = placeGoodsAt(parentCard.positionToWorld(goodsSnapPointOffset), parentCard.getRotation()[2], player)
+        if p.selectedCardPower:sub(1,8) == "WINDFALL" then
+            tryProduceAt(player, parentCard)
+        end
 
-     --      -- pd.produceCount[info.goods] = pd.produceCount[info.goods] + 1
-     --      -- parentCard.memo = card.getGUID()
-
-     --      -- if action.name == "DRAW_IF" then
-     --      --      dealTo(action.data.strength, player)
-     --      -- end
-     --      tryProduceAt(player, parentCard)
-
-     --      local cardsUsed = pd.cardsAlreadyUsed
-     --      if not cardsUsed[selectedCard.getGUID()] then
-     --           cardsUsed[selectedCard.getGUID()] = {}
-     --           for i=1, #actions do
-     --                cardsUsed[selectedCard.getGUID()][i] = false
-     --           end
-
-     --      pd.cardsAlreadyUsed[selectedCard.getGUID()][powerIndex] = true
-     --      pd.selectedCard = nil
+        powerUsed = true
     end
 
     if powerUsed then
