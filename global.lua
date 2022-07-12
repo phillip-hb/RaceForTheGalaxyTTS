@@ -858,9 +858,11 @@ end
 -- Makes all the ready buttons belonging to player the same toggle state
 -- [1] = owner, [2] = state
 function updateReadyButtons(params)
-     local i = playerData[params[1]].index
-     getObjectFromGUID(readyTokens_GUID[i]).call("setToggleState", params[2])
-     getObjectFromGUID(smallReadyTokens_GUID[i]).call("setToggleState", params[2])
+    local i = playerData[params[1]].index
+    local token = getObjectFromGUID(readyTokens_GUID[i])
+    if token then token.call("setToggleState", params[2]) end
+    token = getObjectFromGUID(smallReadyTokens_GUID[i])
+    if token then token.call("setToggleState", params[2]) end
 end
 
 function checkAllReadyCo()
@@ -1536,22 +1538,6 @@ function updateTableauState(player)
                             createCancelButton(card)
                         end
                     end
-
---                          if miscSelectedCardsTable[card.getGUID()] then
---                               createCardTopButton(card, "Cancel", "cancelSettlePowerClick", "Cancel power.")
---                               if action.name == "MILITARY_HAND" then
---                                    createCardBottomButton(card, "Confirm", "confirmSettlePowerClick")
---                               end
---                               break
---                          elseif action.data.codes["REDUCE_ZERO"] and not selectedInfo.flags["ALIEN"] and (not selectedInfo.flags["MILITARY"] or miscPowerSnapshot["PAY_MILITARY"])    -- colony ship
---                               or action.data.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] and not miscPowerSnapshot["PAY_MILITARY"]     -- new military tactics
---                               or action.name == "PAY_MILITARY" and selectedInfo.flags["MILITARY"] and not selectedInfo.flags["ALIEN"] and not miscCodeSnapshot["EXTRA_MILITARY"]
---                               or action.name == "MILITARY_HAND" and selectedInfo.flags["MILITARY"] -- space mercenaries
---                               then
---                               createCardTopButton(card, "Use Power", "useSettlePowerClick", settleActions[action.name] or "")
---                               createdButton = true
---                               break
---                          end
                 end
             elseif currentPhase == "4" and ap then
                 local baseAmount = {}
@@ -1653,19 +1639,11 @@ function updateTableauState(player)
         end
     end
 
-     -- -- Force the player ready when they have nothing left to do
-     -- if (getCurrentPhase() == 4 or getCurrentPhase() == 5) and forcedReady[i] == false and createdButton == false and not selectedCard and incomingGood[i] == false then
-     --      forcedReady[i] = true
-     --      local token = getObjectFromGUID(readyTokens_GUID[i])
-     --      if token then
-     --           token.call("setToggleState", true)
-     --           playerReadyClicked(player)
-     --      end
-     --      token = getObjectFromGUID(smallReadyTokens_GUID[i])
-     --      if token then
-     --           token.call("setToggleState", true)
-     --      end
-     -- end
+    -- Force the player ready when they have nothing left to do
+    if (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and createdButton == false and not selectedCard and not p.incomingGood then
+        updateReadyButtons({player, true})
+        playerReadyClicked(player)
+    end
 end
 
 function markUsed(player, card, power)
