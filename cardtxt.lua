@@ -88,7 +88,7 @@ E@0:1
 #E:1:1:1:1:1
 F:PROMO | START | START_BLUE | TERRAFORMING
 P:3:DRAW_AFTER:1:0
-P:5:DISCARD | WINDFALL_ANY:1:0
+P:5:DISCARD_HAND | WINDFALL_ANY:1:0
 
 N:Galactic Trade Emissaries
 T:1:2:1
@@ -871,7 +871,7 @@ E@1:1
 #E:0:1:1:1:0
 G:ALIEN
 F:START | START_RED | MILITARY | ALIEN
-P:5:DISCARD | PRODUCE:0:0
+P:5:DISCARD_HAND | PRODUCE:0:0
 
 N:Doomed World
 T:1:1:-1
@@ -1692,7 +1692,7 @@ G:NOVELTY
 P:1:DISCARD_ANY:0:0
 P:4:TRADE_ANY:1:0
 P:5:PRODUCE:0:0
-P:5:DISCARD | WINDFALL_ANY:1:0
+P:5:DISCARD_HAND | WINDFALL_ANY:1:0
 
 N:Black Hole Miners
 T:1:4:0
@@ -2257,7 +2257,7 @@ T:1:5:4
 E@5:1
 G:ALIEN
 P:3:REDUCE | ALIEN:2:0
-P:5:DISCARD | PRODUCE:0:0
+P:5:DISCARD_HAND | PRODUCE:0:0
 
 N:Alien Weapon Cache
 T:1:3:1
@@ -2320,7 +2320,7 @@ F:TERRAFORMING | UPLIFT
 P:1:DRAW:1:0
 P:3:REDUCE:1:0
 P:3:PAY_MILITARY | AGAINST_CHROMO:0:0
-P:5:DISCARD | WINDFALL_GENE:0:0
+P:5:DISCARD_HAND | WINDFALL_GENE:0:0
 
 N:Anti-Xeno Assault Troops
 T:2:3:2
@@ -2458,7 +2458,7 @@ activePowers = {
           DRAW_EACH_NOVELTY = "Draw 1 card for each Novelty good you produced.",
           DRAW_EACH_ALIEN = "Draw 1 card for each Alien good you produced.",
           DRAW_DIFFERENT = "Draw 1 card for each kind of good you produced.",
-          DISCARD = "Discard from hand."
+          DISCARD_HAND = "Discard from hand."
      }
 }
 
