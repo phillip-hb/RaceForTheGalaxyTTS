@@ -2428,7 +2428,7 @@ activePowers = {
 
      },
      ["3"] = {
-          DISCARD = "Discard from hand.",
+          DISCARD = "Discard this card.",
           PAY_MILITARY = "Place military world as normal world.",
           MILITARY_HAND = "Discard from hand.",
           REDUCE_ZERO = "Reduce settle cost."

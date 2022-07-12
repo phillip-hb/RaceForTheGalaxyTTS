@@ -1016,29 +1016,29 @@ function beginNextPhase()
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
     -- Apply end of phase powers here
-    -- if getCurrentPhase() == 5 then
-    --     local tie = false
-    --     local most = {["RARE"]=nil}
-    --     for player, i in pairs(playerColorIndex) do
-    --         if not most["RARE"] or playerData[player].produceCount["RARE"] > playerData[most["RARE"]].produceCount["RARE"]  then
-    --             tie = false
-    --             most["RARE"] = player
-    --         elseif playerData[player].produceCount["RARE"] == playerData[most["RARE"]].produceCount["RARE"] then
-    --             tie = true
-    --         end
-    --     end
+    if getCurrentPhase() == 5 then
+        local tie = false
+        local most = {["RARE"]=nil}
+        for player, data in pairs(playerData) do
+            if not most["RARE"] or data.produceCount["RARE"] > playerData[most["RARE"]].produceCount["RARE"]  then
+                tie = false
+                most["RARE"] = player
+            elseif data.produceCount["RARE"] == playerData[most["RARE"]].produceCount["RARE"] then
+                tie = true
+            end
+        end
 
-    --     for player, data in pairs(playerData) do
-    --         if data.phasePowersSnapshot["DRAW_MOST_RARE"] then
-    --             if tie or most["RARE"] ~= player then
-    --                     broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Black")
-    --             elseif most["RARE"] == player then
-    --                     broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
-    --                     dealTo(data.phasePowersSnapshot["DRAW_MOST_RARE"], player)
-    --             end
-    --         end
-    --     end
-    -- end
+        for player, data in pairs(playerData) do
+            if data.powersSnapshot["DRAW_MOST_RARE"] then
+                if tie or most["RARE"] ~= player then
+                    broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Grey")
+                elseif most["RARE"] == player then
+                    broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
+                    dealTo(data.powersSnapshot["DRAW_MOST_RARE"], player)
+                end
+            end
+        end
+    end
 
     currentPhaseIndex = currentPhaseIndex + 1
     
