@@ -796,46 +796,6 @@ function queueUpdate(playerColor, now)
 end
 
 -- ======================
--- UI
--- ======================
-
--- function uiSetVisibilityToPlayer(id, playerColor, visible)
---      local attr = UI.getAttribute(id, "visibility")
---      if visible then
---           attr = attr .. "|" .. playerColor
---      else
---           local newAttr = ""
---           tokens = split(attr, "|")
---
---           for i=1, #tokens do
---                if tokens[i] ~= playerColor then
---                     newAttr = newAttr .. tokens[i] .. "|"
---                end
---           end
---
---           if newAttr == "" then
---                attr = "Brown"
---           else
---                attr = newAttr:sub(1, newAttr:len() - 1)
---           end
---      end
---
---      UI.setAttribute(id, "visibility", attr)
--- end
---
--- function closeHelpClick(player, button)
---      if button == "-1" then
---           uiSetVisibilityToPlayer("helpWindow", player.color, false)
---      end
--- end
---
--- function showHelpClick(player, button)
---      if button == "-1" then
---           uiSetVisibilityToPlayer("helpWindow", player.color, true)
---      end
--- end
-
--- ======================
 -- Game functions
 -- ======================
 
@@ -1006,15 +966,15 @@ function checkAllReadyCo()
             end
 
             -- Doing some checks for double selection of phase cards for 2p advanced variant
-    --            if playerSelectedPhases["DevelopAdv2p"] and not playerSelectedPhases["Develop"] then
-    --                 playerSelectedPhases["DevelopAdv2p"] = nil
-    --                 playerSelectedPhases["Develop"] = true
-    --            end
+            if selectedActions["DevelopAdv2p"] and not selectedActions["Develop"] then
+                selectedActions["DevelopAdv2p"] = nil
+                selectedActions["Develop"] = true
+            end
 
-    --            if playerSelectedPhases["SettleAdv2p"] and not playerSelectedPhases["Settle"] then
-    --                 playerSelectedPhases["SettleAdv2p"] = nil
-    --                 playerSelectedPhases["Settle"] = true
-    --            end
+            if selectedActions["SettleAdv2p"] and not selectedActions["Settle"] then
+                selectedActions["SettleAdv2p"] = nil
+                selectedActions["Settle"] = true
+            end
 
             for name, value in pairs(selectedActions) do
                 if value then phases[name] = true end
@@ -1304,17 +1264,15 @@ function capturePowersSnapshot(player, phase)
 
                 -- count certain powers only in specific cases
                 if phase == "2" then
-    --                 if advanced2p and card.getName() == "Develop" then
-    --                     if ignore2ndDevelop then goto skip_add end
-    --                     ignore2ndDevelop = true
-    --                 end
+                    if advanced2p and card.getName() == "Develop" then
+                        if ignore2ndDevelop then goto skip end
+                        ignore2ndDevelop = true
+                    end
                 elseif phase == "3" then
-    --                     --  if advanced2p and card.getName() == "Settle" then
-    --                     --       if ignore2ndSettle then
-    --                     --            goto skip_add
-    --                     --       end
-    --                     --       ignore2ndSettle = true
-    --                     --  end
+                    if advanced2p and card.getName() == "Settle" then
+                        if ignore2ndSettle then goto skip end
+                        ignore2ndSettle = true
+                    end
                     -- Do some manipulations for special cases
                     if selectedCard then
                         local selectedInfo = card_db[selectedCard.getName()]
