@@ -2449,6 +2449,7 @@ activePowers = {
      },
      ["5"] = {
           DRAW = "Draw card(s)",
+          DRAW_MILITARY = "Draw card(s)",
           WINDFALL_ANY = "Produce good on any windfall world.",
           WINDFALL_NOVELTY = "Produce good on Novelty windfall world.",
           WINDFALL_RARE = "Produce good on Rare windfall world.",
