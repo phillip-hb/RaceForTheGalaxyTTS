@@ -158,7 +158,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            if obj then obj.interactable = false end
+            --if obj then obj.interactable = false end
         end
     end
 
@@ -856,11 +856,17 @@ end
 -- Makes all the ready buttons belonging to player the same toggle state
 -- [1] = owner, [2] = state
 function updateReadyButtons(params)
-    local i = playerData[params[1]].index
+    local player = params[1]
+    local state = params[2]
+    local i = playerData[player].index
     local token = getObjectFromGUID(readyTokens_GUID[i])
-    if token then token.call("setToggleState", params[2]) end
+    if token then token.call("setToggleState", state) end
     token = getObjectFromGUID(smallReadyTokens_GUID[i])
-    if token then token.call("setToggleState", params[2]) end
+    if token then token.call("setToggleState", state) end
+
+    if params[2] then
+        playerReadyClicked(player)
+    end
 end
 
 function checkAllReadyCo()
@@ -878,6 +884,8 @@ function checkAllReadyCo()
     local phase = getCurrentPhase()
 
     for _, player in pairs(players) do
+        --updateReadyButtons({player, false})
+
         local p = playerData[player]
         local node = p.miscSelectedCards
         while node and node.value do
@@ -994,12 +1002,14 @@ function checkAllReadyCo()
 
         wait(1.2)
 
-        startLuaCoroutine(self, "beginNextPhase")
+        beginNextPhase()
     elseif currentPhaseIndex >= 1 then
+        endOfPhaseGoalCheck()
+
         if currentPhaseIndex > #selectedPhases then
             -- round end check
         else
-            startLuaCoroutine(self, "beginNextPhase")
+            beginNextPhase()
         end
     end
     return 1
@@ -1093,8 +1103,6 @@ function beginNextPhase()
     for player, data in pairs(playerData) do
         queueUpdate(player, true)
     end
-
-    return 1
 end
 
 function updatePhaseTilesHighlight()
@@ -1693,8 +1701,10 @@ function updateTableauState(player)
 
     -- Force the player ready when they have nothing left to do
     if (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and createdButton == false and not selectedCard and not p.incomingGood then
-        updateReadyButtons({player, true})
-        playerReadyClicked(player)
+        p.forcedReady = true
+        if Player[player].seated then
+            updateReadyButtons({player, true})
+        end
     end
 end
 
@@ -2094,6 +2104,10 @@ function updateVp(player)
         if obj.hasTag("VP") then
             if obj.hasTag("VP Chip") then
                 vpChipCount = vpChipCount + math.max(1, obj.getQuantity())
+            elseif obj.hasTag("Most Goal") then
+                flatVp = flatVp + 5
+            elseif obj.hasTag("First Goal") then
+                flatVp = flatVp + 3
             end
         elseif obj.type == "Card" and not obj.hasTag("Action Card") then
             if obj.is_face_down and obj.getDescription() ~= "" then -- the card is a good
@@ -2223,5 +2237,40 @@ function updateVp(player)
     local statTracker = getObjectFromGUID(statTracker_GUID[i])
     if statTracker then
          statTracker.call("updateLabel", {"vp", flatVp + vpChipCount + devVp})
+    end
+end
+
+function endOfPhaseGoalCheck()
+    local firstGoals = getObjectsWithTag("First Goal")
+
+    for _, goal in pairs(firstGoals) do
+        goal.call("endPhaseCheck", {getCurrentPhase(), tableauZone_GUID, playerData})
+    end
+end
+
+-- [1] = goal tile, [2] = player
+function moveGoalToPlayer(params)
+    local tile = params[1]
+    local player = params[2]
+    local i = playerData[player].index
+    local tableau = getObjectFromGUID(tableau_GUID[i])
+    local sp = tableau.getSnapPoints()
+    local spIndexOffset = 5
+
+    -- find first empty spot
+    local spot = sp[#sp-spIndexOffset]
+    for i=#sp-spIndexOffset, #sp do
+        local pos = tableau.positionToWorld(sp[i].position)
+        local hits = Physics.cast({
+            origin = add(pos, {0, 1, 0}),
+            direction = {0,-1,0},
+            max_direction = 3,
+        })
+
+        if #hits > 0 and hits[1].hit_object == tableau then
+            tile.setPosition(add(pos, {0, 0.3, 0}))
+            tile.setRotation(tableau.getRotation())
+            break
+        end
     end
 end
