@@ -6,6 +6,7 @@ require("gameUi")
 currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
+placeTwoTriggered = false
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
@@ -25,7 +26,8 @@ function player(i)
         paidCost = {},
         tempMilitary = 0,
         incomingGood = false,
-        forcedReady = false
+        forcedReady = false,
+        lastPlayedCard = nil
     }
 end
 
@@ -128,6 +130,7 @@ function onSave()
     saved_data.drawDeck_GUID = drawDeck_GUID
     saved_data.advanced2p = advanced2p
     saved_data.playerData = playerData
+    saved_data.placeTwoTriggered = placeTwoTriggered
     return JSON.encode(saved_data)
 end
 
@@ -145,6 +148,7 @@ function onload(saved_data)
         drawDeck_GUID = data.drawDeck_GUID
         advanced2p = data.advanced2p
         playerData = data.playerData
+        placeTwoTriggered = data.placeTwoTriggered
     end
 
     card_db = loadData(0)
@@ -425,6 +429,10 @@ function attemptPlayCard(card, player)
                card.removeTag("Selected")
                highlightOff(card)
 
+               if getCurrentPhase() == 3 then
+                    playerData[player].lastPlayedCard = card.getGUID()
+               end
+
                -- if windfall, place a goods on top
                if card_db[card.getName()].flags["WINDFALL"] then
                     placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
@@ -528,6 +536,20 @@ function dealTo(n, player)
                     card.deal(1, player)
                end, 1, 0)
      end
+end
+
+function resetPlayerState(player)
+    local data = playerData[player]
+    data.powersSnapshot = {}
+    data.selectedCard = nil
+    data.selectedCardPower = ""
+    data.miscSelectedCards = {}
+    data.miscSelectedCard = nil
+    data.lastPlayedCard = nil
+    data.paidCost = {}
+    data.forcedReady = false
+    data.incomingGood = false
+    data.selectedGoods = {}
 end
 
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
@@ -746,16 +768,25 @@ function onObjectLeaveContainer(container, leave_object)
 end
 
 function onUpdate()
-     for player, willUpdate in pairs(queueUpdateState) do
-          if willUpdate and os.clock() > updateTimeSnapshot[player] + 0.2 then
-               queueUpdateState[player] = false
-               capturePowersSnapshot(player, tostring(getCurrentPhase()))
-               updateHandState(player)
-               updateTableauState(player)
-               updateVp(player)
-               updateHelpText(player)
-          end
-     end
+    for player, willUpdate in pairs(queueUpdateState) do
+        if willUpdate and os.clock() > updateTimeSnapshot[player] + 0.2 then
+            queueUpdateState[player] = false
+
+            local p = playerData[player]
+            if p.selectedCard and not getObjectFromGUID(p.selectedCard) then
+                p.selectedCard = nil
+                p.selectedCardPower = ""
+                p.miscSelectedCards = {}
+                p.miscSelectedCard = nil
+            end
+
+            capturePowersSnapshot(player, tostring(getCurrentPhase()))
+            updateHandState(player)
+            updateTableauState(player)
+            updateVp(player)
+            updateHelpText(player)
+        end
+    end
 end
 
 function queueUpdate(playerColor, now)
@@ -905,7 +936,11 @@ function checkAllReadyCo()
 
     if discardHappened then wait(0.1) end
 
-     -- play selected cards in hand
+    -- play selected cards in hand
+    local skipPlaceTwo = placeTwoTriggered
+    placeTwoTriggered = false
+    local placeTwo = {false,false,false,false}
+
     for _, player in pairs(players) do
         for _, obj in pairs(Player[player].getHandObjects(1)) do
             if obj.type == 'Card' and obj.hasTag("Selected") then
@@ -916,15 +951,36 @@ function checkAllReadyCo()
             end
         end
 
+        local p = playerData[player]
+        if not skipPlaceTwo and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
+            placeTwo[p.index] = true
+            placeTwoTriggered = true
+        end
+
         -- discard all face down cards in hand
         discardMarkedCards(player)
-        playerData[player].selectedCard = nil
+        p.selectedCard = nil
     end
 
     wait(0.1)
 
     for _, player in pairs(players) do
-        updateReadyButtons({player, false})
+        if placeTwoTriggered then
+            if placeTwo[playerData[player].index] then
+                updateReadyButtons({player, false})
+                broadcastToAll("Waiting for " .. Player[player].steam_name .. "'s use of Improved Logistics.", player)
+                queueUpdate(player, true)
+            else
+                updateReadyButtons({player, true})
+            end
+        else
+            updateReadyButtons({player, false})
+        end
+    end
+
+    -- Trigger Improved Logistics
+    if placeTwoTriggered then
+        return 1
     end
 
     if gameStarted and currentPhaseIndex == -1 then
@@ -997,8 +1053,7 @@ function startNewRound()
     broadcastToAll("Starting new round.", "White")
 
     for player, data in pairs(playerData) do
-        data.phasePowersSnapshot = {}
-        data.selectedCard = nil
+        resetPlayerState(player)
         queueUpdate(player, true)
     end
 
@@ -1050,16 +1105,10 @@ function beginNextPhase()
     end
 
     currentPhaseIndex = currentPhaseIndex + 1
-    
-    -- Init player data at start of phase
     for player, data in pairs(playerData) do
-        data.miscSelectedCards = {}
-        data.paidCost = {}
-        data.forcedReady = false
-        data.incomingGood = false
+        resetPlayerState(player)
     end
-
-     updatePhaseTilesHighlight()
+    updatePhaseTilesHighlight()
 
     if currentPhaseIndex <= #selectedPhases then
         local phase = getCurrentPhase()
@@ -1241,6 +1290,11 @@ function capturePowersSnapshot(player, phase)
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
 
+        -- Place two triggered, skip the action card power and the last played card's powers
+        if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) then
+            goto next_card
+        end
+
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
             for name, power in pairs(powers) do
@@ -1299,6 +1353,8 @@ function capturePowersSnapshot(player, phase)
         if info.flags["CHROMO"] then
             chromoCount = chromoCount + 1
         end
+
+        ::next_card::
     end
 
     if tradeChromoBonus then
@@ -1356,11 +1412,17 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
+            if phase == 3 and placeTwoTriggered and not p.powersSnapshot["PLACE_TWO"] then
+                goto skip
+            end
+
             if not p.selectedCard then
                 createSelectButtonOnCard(obj)
             elseif p.selectedCard == obj.getGUID() then
                 createCancelButtonOnCard(obj)
             end
+
+            ::skip::
         end
 
         -- Explore orange highlight
@@ -1520,7 +1582,7 @@ function updateTableauState(player)
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
 
-            if miscSelected then
+            if miscSelected or placeTwoTriggered and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
                 highlightOn(card, "rgb(0,1,0)", player)
             end
 
@@ -1967,7 +2029,7 @@ function updateHelpText(playerColor)
             local discarded = handCount - cardsInHand
             setHelpText(playerColor, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
-            setHelpText(playerColor, "▼ Develop: may select a development.")
+            setHelpText(playerColor, "▼ Develop: may play a development.")
         end
     elseif currentPhase == 3 then
         if p.selectedCard then
@@ -1979,6 +2041,7 @@ function updateHelpText(playerColor)
             local reduceZeroName = ""
             local payMilitary = false
             local node = p.miscSelectedCards
+            local militaryHandBonus = 0
 
             while node and node.value do
                 local miscCard = getObjectFromGUID(node.value)
@@ -1989,27 +2052,17 @@ function updateHelpText(playerColor)
                         reduceZeroName = miscCard.getName()
                     elseif miscPowers["PAY_MILITARY"] then
                         payMilitary = true
+                    elseif miscPowers["MILITARY_HAND"] then
+                        local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                        militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
                     end
                 end
-     --                local actions = getCardActions("3", miscCard)
-     --                if actions then
-     --                     for _, action in pairs(actions) do
-     --                          if action.data.codes["REDUCE_ZERO"] then
-     --                               reduceZero = true
-     --                               reduceZeroName = miscCard.getName()
-     --                          elseif action.data.codes["EXTRA_MILITARY"] then
-     --                               bonusMilitary = bonusMilitary + action.data.strength
-     --                          elseif action.name == "PAY_MILITARY" then
-     --                               payMilitary = true
-     --                          end
-     --                     end
-     --                end
-
                 node = node.next
             end
 
             if info.flags["MILITARY"] and not payMilitary then
-                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] .. "/" .. info.cost .. ")")
+                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + militaryHandBonus .. "/" .. info.cost .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
@@ -2020,7 +2073,15 @@ function updateHelpText(playerColor)
                 end
             end
         else
-            setHelpText(playerColor, "▼ Settle: may select a world.")
+            if placeTwoTriggered then
+                if not p.powersSnapshot["PLACE_TWO"] then
+                    setHelpText(playerColor, "Please wait for other players.")
+                else
+                    setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
+                end
+            else
+                setHelpText(playerColor, "▼ Settle: may play a world.")
+            end
         end
     elseif currentPhase == 4 then
         if p.selectedCard then
@@ -2138,7 +2199,12 @@ function updateVp(player)
                 otherWorld = false
                 vp = vp + dev.vpFlags["REBEL_MILITARY"]
             end
-
+            if dev.vpFlags["TERRAFORMING_FLAG"] and info.flags["TERRAFORMING"] then
+                vp = vp + dev.vpFlags["TERRAFORMING_FLAG"]
+            end
+            if dev.vpFlags["IMPERIUM_FLAG"] and info.flags["IMPERIUM"] then
+                vp = vp + dev.vpFlags["IMPERIUM_FLAG"]
+            end
             if otherWorld and dev.vpFlags["MILITARY"] and info.type == 1 and info.flags["MILITARY"] then
                 vp = vp + dev.vpFlags["MILITARY"]
             end
