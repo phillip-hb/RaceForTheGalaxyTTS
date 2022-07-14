@@ -2,7 +2,7 @@ require("util")
 require("cardtxt")
 require("gameUi")
 
----1: starting hand, 0: select action. Otherwise, index of selectedPhases
+---1: starting hand, 0: select action. 100: end of round. Otherwise, index of selectedPhases
 currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
@@ -27,7 +27,8 @@ function player(i)
         tempMilitary = 0,
         incomingGood = false,
         forcedReady = false,
-        lastPlayedCard = nil
+        lastPlayedCard = nil,
+        roundEndDiscardCount = 0
     }
 end
 
@@ -428,10 +429,7 @@ function attemptPlayCard(card, player)
                card.setRotation({rot[1], rot[2], 0})
                card.removeTag("Selected")
                highlightOff(card)
-
-               if getCurrentPhase() == 3 then
-                    playerData[player].lastPlayedCard = card.getGUID()
-               end
+                playerData[player].lastPlayedCard = card.getGUID()
 
                -- if windfall, place a goods on top
                if card_db[card.getName()].flags["WINDFALL"] then
@@ -550,6 +548,7 @@ function resetPlayerState(player)
     data.forcedReady = false
     data.incomingGood = false
     data.selectedGoods = {}
+    data.roundEndDiscardCount = 0
 end
 
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
@@ -926,7 +925,10 @@ function checkAllReadyCo()
         end
 
         -- discard all face down cards in hand
-        discardMarkedCards(player)
+        local n = discardMarkedCards(player)
+        if currentPhaseIndex == #selectedPhases then
+            p.roundEndDiscardCount = n
+        end
         p.selectedCard = nil
     end
 
@@ -995,6 +997,8 @@ function checkAllReadyCo()
             tile.setRotationSmooth({0, 180, 0})
             selectedPhases[#selectedPhases + 1] = phaseIndex[phase]
         end
+
+        selectedPhases[#selectedPhases + 1] = 100
 
         table.sort(selectedPhases)
 
@@ -1080,7 +1084,7 @@ function beginNextPhase()
     end
     updatePhaseTilesHighlight()
 
-    if currentPhaseIndex <= #selectedPhases then
+    if currentPhaseIndex <= #selectedPhases - 1 then
         local phase = getCurrentPhase()
         broadcastToAll(phaseText[selectedPhases[currentPhaseIndex]], "White")
 
@@ -1094,6 +1098,31 @@ function beginNextPhase()
             startConsumePhase()
         elseif phase == 5 then
             startProducePhase()
+        end
+    elseif currentPhaseIndex == #selectedPhases then
+        broadcastToAll("Round End", "White")
+        wait(1)
+        -- Check if any players need to discard cards
+        local skipPlayers = {}
+        local mustDiscard = false
+        local players = getSeatedPlayersWithHands()
+        for _, player in pairs(players) do
+            local n = countCardsInHand(player)
+            playerData[player].handCountSnapshot = n
+            if n > 10 then
+                mustDiscard = true
+                broadcastToAll((Player[player].steam_name or player) .. " must discard down to 10 cards.", player)
+            else
+                skipPlayers[player] = true
+            end
+        end
+
+        if not mustDiscard then
+            startNewRound()
+        else
+            for _, player in pairs(skipPlayers) do
+                updateReadyButtons({player, true})
+            end
         end
     else
         -- end of round
@@ -1109,7 +1138,7 @@ function updatePhaseTilesHighlight()
     phaseTilesHighlightOff()
 
     local phase = selectedPhases[currentPhaseIndex]
-    if phase then
+    if phase and phase < 100 then
         -- hilight current phase tile
         local tile = getObjectFromGUID(phaseTilePlacement[phase][1])
         tile.UI.setAttribute("highlight", "active", true)
@@ -1660,7 +1689,7 @@ function updateTableauState(player)
                             power.codes["WINDFALL_ANY"] and windfallCount["TOTAL"] <= 0 or
                             power.codes["PRODUCE"] and getGoods(card) or 
                             windfallPrefix and targetGood == "ANY" and windfallCount["TOTAL"] <= 0 or
-                            windfallPrefix and windfallCount[targetGood] <= 0 then
+                            windfallPrefix and windfallCount[targetGood] and windfallCount[targetGood] <= 0 then
                             goto skip
                         end
 
@@ -1965,7 +1994,7 @@ function updateHelpText(playerColor)
     local i = p.index
     local powers = p.powersSnapshot
     local handCount = p.handCountSnapshot
-    local cardsInHand = countCardsInHand(playerColor, false)
+    local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
     local currentPhase = getCurrentPhase()
 
     -- opening hand
@@ -2081,7 +2110,12 @@ function updateHelpText(playerColor)
         else
             setHelpText(playerColor, "▲ Produce: use powers.")
         end
-     end
+    elseif currentPhase == 100 then
+        local discardTarget = cardsInHand - 10
+        local discarded = cardsInHand - countCardsInHand(playerColor, false)
+
+        setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
+    end
 end
 
 function updateVp(player)
@@ -2273,4 +2307,20 @@ function moveGoalToPlayer(params)
             break
         end
     end
+end
+
+function statCountingForGoals()
+    -- local results = {}
+
+    -- for player, data in pairs(playerData) do
+    --     results[player] = {
+    --         vpChips = 0,
+    --         military = 0,
+    --         worldsCount = 0,
+    --         developmentsCount = 0,
+    --     }
+    --     local i = data.index
+    -- end
+
+    -- return results
 end
