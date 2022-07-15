@@ -39,7 +39,8 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 gameEndMessage = false
 
 requiresConfirm = {["DISCARD_HAND"]=1}
-requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_ALL"]=1}
+requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
+    ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
      ["RARE"] = color(0.709, 0.407, 0.129),
@@ -240,19 +241,26 @@ function updateHandCount(playerColor)
      end
 end
 
-function countTrait(player, trait, name)
-     local count = 0
-     for card in allCardsInTableau(player) do
-          if card.hasTag("Action Card") == false then
-               local info = card_db[card.getName()]
-               if trait == "goods" and info[trait] == name or
-                    trait ~= "goods" and info[trait][name] then
-                    count = count + 1
-               end
-          end
-     end
+function countTrait(player, trait, name, cardType)
+    local count = 0
+    for card in allCardsInTableau(player) do
+        if card.hasTag("Action Card") == false then
+            local info = card_db[card.getName()]
 
-     return count
+            if cardType and cardType ~= info.type then
+                goto skip
+            end
+
+            if trait == "goods" and info[trait] == name or
+                trait ~= "goods" and info[trait][name] then
+                count = count + 1
+            end
+
+            ::skip::
+        end
+    end
+
+    return count
 end
 
 function getGoods(card)
@@ -1108,11 +1116,13 @@ function beginNextPhase()
         local mustDiscard = false
         local players = getSeatedPlayersWithHands()
         for _, player in pairs(players) do
+            local p = playerData[player]
             local n = countCardsInHand(player)
-            playerData[player].handCountSnapshot = n
-            if n > 10 then
+            local maxHandSize = p.powersSnapshot["DISCARD_TO_12"] and 12 or 10
+            p.handCountSnapshot = n
+            if n > maxHandSize then
                 mustDiscard = true
-                broadcastToAll((Player[player].steam_name or player) .. " must discard down to 10 cards.", player)
+                broadcastToAll((Player[player].steam_name or player) .. " must discard down to " .. maxHandSize .. " cards.", player)
             else
                 skipPlayers[player] = true
             end
@@ -1283,7 +1293,9 @@ function capturePowersSnapshot(player, phase)
     local ignore2ndDevelop = false
     local ignore2ndSettle = false
     local chromoCount = 0
+    local militaryWorldCount = 0
     local tradeChromoBonus = false
+    local perMilitary = false
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
@@ -1291,6 +1303,10 @@ function capturePowersSnapshot(player, phase)
         -- Place two triggered, skip the action card power and the last played card's powers
         if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) then
             goto next_card
+        end
+
+        if info.flags["DISCARD_TO_12"] then
+            results["DISCARD_TO_12"] = 1
         end
 
         if info.passivePowers[phase] then
@@ -1311,21 +1327,23 @@ function capturePowersSnapshot(player, phase)
                         if ignore2ndSettle then goto skip end
                         ignore2ndSettle = true
                     end
+
                     -- Do some manipulations for special cases
                     if selectedCard then
                         local selectedInfo = card_db[selectedCard.getName()]
 
-                        -- Reduce powers with non matching types
-                        if name == "REDUCE" and next(power.codes) ~= nil and not power.codes[selectedInfo.goods or ""] then
+                        -- Reduce powers with non matching types or improper bonus military
+                        if name == "REDUCE" and next(power.codes) ~= nil and not power.codes[selectedInfo.goods or ""] or
+                            name == "BONUS_MILITARY" and (power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                                                      not power.codes["AGAINST_REBEL"] and not power.codes[selectedInfo.goods or ""]) then
                             goto skip
-                        -- Specialized military
-                        elseif name == "EXTRA_MILITARY" and next(power.codes) ~= nil and
-                            (power.codes["AGAINST_REBEL"] and selectedInfo.flags["REBEL"] or power.codes[selectedInfo.goods or ""]) then
-                            name = "BONUS_MILITARY"
                         end
                     end
 
                     if name == "EXTRA_MILITARY" and next(power.codes) ~= nil then
+                        if power.codes["PER_MILITARY"] then
+                            perMilitary = true
+                        end
                         goto skip
                     end
                 end
@@ -1350,11 +1368,19 @@ function capturePowersSnapshot(player, phase)
             chromoCount = chromoCount + 1
         end
 
+        if info.flags["MILITARY"] then
+            militaryWorldCount = militaryWorldCount + 1
+        end
+
         ::next_card::
     end
 
     if tradeChromoBonus then
         results["TRADE_GENE"] = results["TRADE_GENE"] + chromoCount
+    end
+
+    if perMilitary then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + militaryWorldCount
     end
     
     -- Track special cases
@@ -1421,8 +1447,8 @@ function updateHandState(playerColor)
             ::skip::
         end
 
-        if phase == 1 and p.powersSnapshot["DISCARD_ANY"] and not obj.hasTag("Explore Highlight") then
-            obj.hasTag("Explore Highlight")
+        if phase == 1 and p.powersSnapshot["DISCARD_ANY"] ~= nil and not obj.hasTag("Explore Highlight") then
+            obj.addTag("Explore Highlight")
         end
 
         -- Explore orange highlight
@@ -1538,7 +1564,7 @@ function updateTableauState(player)
                         local power = ap[p.selectedCardPower]
 
                         if p.selectedCardPower == "CONSUME_ANY" or p.selectedCardPower == "CONSUME_ALL" or p.selectedCardPower == "CONSUME_" .. (parentData.goods or "") or
-                            ((p.selectedCardPower == "CONSUME_3_DIFF" and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
+                            (((p.selectedCardPower == "CONSUME_3_DIFF" or p.selectedCardPower == "CONSUME_N_DIFF") and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
                             makeButton = true
                         end
 
@@ -1591,6 +1617,11 @@ function updateTableauState(player)
                 if selectedCard then
                     for name, power in pairs(ap) do
                         local powerName = ""
+                        
+                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] then
+                            goto skip_power
+                        end
+
                         if miscSelectedCount <= 0 then
                             if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
                                 powerName = name
@@ -1631,6 +1662,8 @@ function updateTableauState(player)
                                 createConfirmButton(miscSelected)
                             end
                         end
+
+                        ::skip_power::
                     end
                 end
             elseif currentPhase == "4" and ap then
@@ -1644,7 +1677,7 @@ function updateTableauState(player)
 
                 if #baseAmount > 0 then
                     for name, power in pairs(info.activePowers[currentPhase]) do
-                        if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "TRADE_ACTION" then
+                        if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "CONSUME_N_DIFF" or name == "TRADE_ACTION" then
                             goodslimit = goodsCount["TOTAL"]
                         elseif name:sub(1,7) == "CONSUME" then
                             goodslimit = goodsCount[name:sub(9, name:len())]
@@ -1656,6 +1689,8 @@ function updateTableauState(player)
                             baseAmount[power.index] = goodsCount["TOTAL"]
                         elseif name == "CONSUME_3_DIFF" then
                             baseAmount[power.index] = uniqueCount < 3 and 100 or 3
+                        elseif name == "CONSUME_N_DIFF" then
+                            baseAmount[power.index] = math.max(1, uniqueCount)
                         elseif not requiresGoods[name] then
                             baseAmount[power.index] = 0
                         end
@@ -1689,12 +1724,18 @@ function updateTableauState(player)
                         local windfallPrefix = name:sub(1,8) == "WINDFALL"
                         local targetGood = windfallPrefix and name:sub(10, name:len()) or ""
                         local used = p.cardsAlreadyUsed[card.getGUID()]
+                        local windfallCountTarget = windfallCount[targetGood]
+                        local open = getGoods(card)
+
+                        if power.codes["NOT_THIS"] and not open then
+                            windfallCountTarget = windfallCountTarget - 1
+                        end
 
                         if used and used[name .. power.index] or
                             power.codes["WINDFALL_ANY"] and windfallCount["TOTAL"] <= 0 or
-                            power.codes["PRODUCE"] and getGoods(card) or 
+                            power.codes["PRODUCE"] and open or 
                             windfallPrefix and targetGood == "ANY" and windfallCount["TOTAL"] <= 0 or
-                            windfallPrefix and windfallCount[targetGood] and windfallCount[targetGood] <= 0 then
+                            windfallPrefix and windfallCountTarget and windfallCountTarget <= 0 then
                             goto skip
                         end
 
@@ -1714,7 +1755,7 @@ function updateTableauState(player)
                         makeButton = true
                     end
 
-                    if info.goods and info.flags["WINDFALL"] and open and p.selectedCardPower:sub(1,8) == "WINDFALL" or makeButton then
+                    if info.goods and info.flags["WINDFALL"] and open and p.selectedCardPower:sub(1,8) == "WINDFALL" and card ~= selectedCard or makeButton then
                         local targetGood = p.selectedCardPower:sub(10, p.selectedCardPower:len())
                         if targetGood == "ANY" or targetGood == info.goods or power.codes["WINDFALL_ANY"] then
                             createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
@@ -1779,6 +1820,11 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                     dealTo(power.strength, player)
                     markUsed(player, obj, power)
                     return
+                elseif p.selectedCardPower == "VP" then
+                    local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
+                    getVpChips(player, power.strength * vpMultiplier)
+                    markUsed(player, obj, power)
+                    return
                 end
                 break
             end
@@ -1809,6 +1855,14 @@ function usePowerClick(obj, player, rightClick, powerIndex)
             usedPower = true
         elseif power.name == "DRAW_MILITARY" then
             local n = countTrait(player, "flags", "MILITARY")
+            dealTo(n * power.strength, player)
+            usedPower = true
+        elseif power.name == "DRAW_CHROMO" then
+            local n = countTrait(player, "flags", "CHROMO")
+            dealTo(n * power.strength, player)
+            usedPower = true
+        elseif power.name == "DRAW_REBEL" then
+            local n = countTrait(player, "flags", "REBEL", 1)
             dealTo(n * power.strength, player)
             usedPower = true
         end
@@ -1923,7 +1977,7 @@ function goodSelectClick(parentCard, player, rightClick)
                 dealTo(price, player)
             elseif p.selectedCardPower == "CONSUME_ALL" then
                 times = selectedGoodsCount - 1
-            elseif selectedGoodsCount <= power.times then
+            elseif selectedGoodsCount <= power.times or p.selectedCardPower == "CONSUME_N_DIFF" then
                 times = selectedGoodsCount
             end
 
@@ -2042,6 +2096,7 @@ function updateHelpText(playerColor)
             local reduceZero = false
             local reduceZeroName = ""
             local payMilitary = false
+            local payMilitaryStr = 0
             local node = p.miscSelectedCards
             local militaryHandBonus = 0
 
@@ -2054,6 +2109,7 @@ function updateHelpText(playerColor)
                         reduceZeroName = miscCard.getName()
                     elseif miscPowers["PAY_MILITARY"] then
                         payMilitary = true
+                        payMilitaryStr = miscPowers["PAY_MILITARY"].strength
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
                         militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
@@ -2069,7 +2125,11 @@ function updateHelpText(playerColor)
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
-                    local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - (payMilitary and 1 or 0))
+                    local payDiscount = 0
+                    if payMilitary then
+                        payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
+                    end
+                    local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
                     local discarded = handCount - cardsInHand
                     setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
                 end
@@ -2116,10 +2176,11 @@ function updateHelpText(playerColor)
             setHelpText(playerColor, "▲ Produce: use powers.")
         end
     elseif currentPhase == 100 then
-        local discardTarget = cardsInHand - 10
+        local maxHandSize = p.powersSnapshot["DISCARD_TO_12"] and 12 or 10
+        local discardTarget = cardsInHand - maxHandSize
         local discarded = cardsInHand - countCardsInHand(playerColor, false)
 
-        if cardsInHand > 10 then
+        if cardsInHand > maxHandSize then
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "Please wait for other players.")
@@ -2136,6 +2197,8 @@ function updateVp(player)
     local flatVp = 0
     local devVp = 0
     local goodsCount = 0
+    local uniqueWorldsCount = 0
+    local uniqueWorlds = {}
     local baseMilitary = p.powersSnapshot["EXTRA_MILITARY"]
     local sixCostDevs = {}
     local cardNames = {}
@@ -2161,6 +2224,11 @@ function updateVp(player)
                 cardNames[obj.getName()] = true
                 flatVp = flatVp + info.vp
 
+                if info.goods and not uniqueWorlds[info.goods] then
+                    uniqueWorldsCount = uniqueWorldsCount + 1
+                    uniqueWorlds[info.goods] = true
+                end
+
                 if info.vpFlags then
                     sixCostDevs[#sixCostDevs + 1] = {obj, info}
                 end
@@ -2180,6 +2248,7 @@ function updateVp(player)
         for card in allCardsInTableau(player) do
             local info = card_db[card.getName()]
             local otherAlien = true
+            local otherUplift = true
 
             -- world types
             local otherWorld = true
@@ -2220,11 +2289,18 @@ function updateVp(player)
             if dev.vpFlags["IMPERIUM_FLAG"] and info.flags["IMPERIUM"] then
                 vp = vp + dev.vpFlags["IMPERIUM_FLAG"]
             end
+            if dev.vpFlags["CHROMO_FLAG"] and info.flags["CHROMO"] then
+                otherUplift = false
+                vp = vp + dev.vpFlags["CHROMO_FLAG"]
+            end
             if otherWorld and dev.vpFlags["MILITARY"] and info.type == 1 and info.flags["MILITARY"] then
                 vp = vp + dev.vpFlags["MILITARY"]
             end
             if otherWorld and dev.vpFlags["WORLD"] and info.type == 1 then
                 vp = vp + dev.vpFlags["WORLD"]
+            end
+            if otherUplift and dev.vpFlags["UPLIFT_FLAG"] and info.flags["UPLIFT"] then
+                vp = vp + dev.vpFlags["UPLIFT_FLAG"]
             end
 
             -- development types
@@ -2270,6 +2346,10 @@ function updateVp(player)
         end
         if dev.vpFlags["TOTAL_MILITARY"] then
             vp = vp + baseMilitary * dev.vpFlags["TOTAL_MILITARY"]
+        end
+        if dev.vpFlags["KIND_GOOD"] and uniqueWorldsCount > 0 then
+            local amt = {1,3,6,10}
+            vp = amt[uniqueWorldsCount]
         end
 
         displayVpHexOn(item[1], vp)
