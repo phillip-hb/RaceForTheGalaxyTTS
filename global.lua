@@ -149,7 +149,7 @@ function onload(saved_data)
         drawDeck_GUID = data.drawDeck_GUID
         advanced2p = data.advanced2p
         playerData = data.playerData
-        placeTwoTriggered = data.placeTwoTriggered
+        placeTwoTriggered = data.placeTwoTriggered or false
     end
 
     card_db = loadData(0)
@@ -875,7 +875,6 @@ function checkAllReadyCo()
     for _, player in pairs(players) do
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
         if not readyToken.getVar("isReady") then return 1 end
-        setHelpText(player, "")
     end
 
     -- remove misc selected cards if they have discard power
@@ -883,8 +882,6 @@ function checkAllReadyCo()
     local phase = getCurrentPhase()
 
     for _, player in pairs(players) do
-        --updateReadyButtons({player, false})
-
         local p = playerData[player]
         local node = p.miscSelectedCards
         while node and node.value do
@@ -935,16 +932,17 @@ function checkAllReadyCo()
     wait(0.1)
 
     for _, player in pairs(players) do
+        updateReadyButtons({player, false})
+    end
+
+    for _, player in pairs(players) do
         if placeTwoTriggered then
             if placeTwo[playerData[player].index] then
-                updateReadyButtons({player, false})
                 broadcastToAll("Waiting for " .. Player[player].steam_name .. "'s use of Improved Logistics.", player)
                 queueUpdate(player, true)
             else
                 updateReadyButtons({player, true})
             end
-        else
-            updateReadyButtons({player, false})
         end
     end
 
@@ -1008,6 +1006,9 @@ function checkAllReadyCo()
 
         beginNextPhase()
     elseif currentPhaseIndex >= 1 then
+        for player, data in pairs(playerData) do
+            capturePowersSnapshot(player)
+        end
         endOfPhaseGoalCheck()
 
         if currentPhaseIndex > #selectedPhases then
@@ -1120,7 +1121,7 @@ function beginNextPhase()
         if not mustDiscard then
             startNewRound()
         else
-            for _, player in pairs(skipPlayers) do
+            for player, skip in pairs(skipPlayers) do
                 updateReadyButtons({player, true})
             end
         end
@@ -1418,6 +1419,10 @@ function updateHandState(playerColor)
             end
 
             ::skip::
+        end
+
+        if phase == 1 and p.powersSnapshot["DISCARD_ANY"] and not obj.hasTag("Explore Highlight") then
+            obj.hasTag("Explore Highlight")
         end
 
         -- Explore orange highlight
@@ -2114,7 +2119,11 @@ function updateHelpText(playerColor)
         local discardTarget = cardsInHand - 10
         local discarded = cardsInHand - countCardsInHand(playerColor, false)
 
-        setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
+        if cardsInHand > 10 then
+            setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
+        else
+            setHelpText(playerColor, "Please wait for other players.")
+        end
     end
 end
 
@@ -2140,7 +2149,7 @@ function updateVp(player)
                 vpChipCount = vpChipCount + math.max(1, obj.getQuantity())
             elseif obj.hasTag("Most Goal") then
                 flatVp = flatVp + 5
-            elseif obj.hasTag("First Goal") then
+            elseif obj.hasTag("First Goal") or obj.hasTag("Tied Chip")then
                 flatVp = flatVp + 3
             end
         elseif obj.type == "Card" and not obj.hasTag("Action Card") then
@@ -2278,7 +2287,13 @@ function endOfPhaseGoalCheck()
     local firstGoals = getObjectsWithTag("First Goal")
 
     for _, goal in pairs(firstGoals) do
-        goal.call("endPhaseCheck", {getCurrentPhase(), tableauZone_GUID, playerData})
+        goal.call("endPhaseCheck", {getCurrentPhase(), playerData})
+    end
+
+    local mostGoals = getObjectsWithTag("Most Goal")
+
+    for _, goal in pairs(mostGoals) do
+        goal.call("endPhaseCheck", {getCurrentPhase(), playerData})
     end
 end
 
