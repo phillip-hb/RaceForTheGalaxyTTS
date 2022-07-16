@@ -1296,17 +1296,28 @@ function capturePowersSnapshot(player, phase)
     local militaryWorldCount = 0
     local tradeChromoBonus = false
     local perMilitary = false
+    local gameEnd14 = false
+
+    local totalCardsPlayed = 0
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
 
         -- Place two triggered, skip the action card power and the last played card's powers
-        if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) then
+        if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
             goto next_card
+        end
+
+        if not card.is_face_down then
+            totalCardsPlayed = totalCardsPlayed + 1
         end
 
         if info.flags["DISCARD_TO_12"] then
             results["DISCARD_TO_12"] = 1
+        end
+
+        if info.flags["GAME_END_14"] then
+            gameEnd14 = true
         end
 
         if info.passivePowers[phase] then
@@ -1406,6 +1417,12 @@ function capturePowersSnapshot(player, phase)
     if statTracker then
         statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
     end
+
+    local tableauGameEnd = gameEnd14 and 14 or 12
+    if totalCardsPlayed >= tableauGameEnd and not gameEndMessage then
+        gameEndMessage = true
+        broadcastToAll(tableauGameEnd .. " cards have been played into a tableau. This will be the final round.", "Purple")
+    end
 end
 
 function updateHandState(playerColor)
@@ -1467,6 +1484,16 @@ function updateHandState(playerColor)
     updateHandCount(playerColor)
 end
 
+function setVisibleTo(obj, player)
+    local arr = {}
+    for playerColor, data in pairs(playerData) do
+        if playerColor ~= player then
+            arr[#arr + 1] = playerColor
+        end
+    end
+    obj.setInvisibleTo(arr)
+end
+
 -- Make sure to call capturePowersSnapshot before calling this, otherwise may update with wrong modifiers
 function updateTableauState(player)
     local p = playerData[player]
@@ -1518,7 +1545,14 @@ function updateTableauState(player)
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
-        if obj.hasTag("Slot") then obj.clearButtons() end
+        if obj.hasTag("Slot") then
+            obj.clearButtons()
+            if currentPhase == "2" or currentPhase == "3" then
+                setVisibleTo(obj, player)
+            else
+                obj.setInvisibleTo({})
+            end
+        end
 
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
