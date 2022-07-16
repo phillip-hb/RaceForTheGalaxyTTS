@@ -51,8 +51,8 @@ goodsHighlightColor = {
 -- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the second a matching code
 compatible = {
     ["DISCARD|REDUCE_ZERO"] = {"PAY_MILITARY"},
-    ["DISCARD|EXTRA_MILITARY"] = {"MILITARY_HAND"},
-    ["MILITARY_HAND"] = {"DISCARD|EXTRA_MILITARY"}
+    ["DISCARD|EXTRA_MILITARY"] = {"MILITARY_HAND", "DISCARD_CONQUER_SETTLE"},
+    ["MILITARY_HAND"] = {"DISCARD|EXTRA_MILITARY", "DISCARD_CONQUER_SETTLE"},
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -896,7 +896,7 @@ function checkAllReadyCo()
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
             local powers = info.activePowers[tostring(phase)]
-            if powers and (powers["DISCARD"] or powers["DISCARD_REDUCE"]) then
+            if powers and (powers["DISCARD"] or powers["DISCARD_REDUCE"] or powers["DISCARD_CONQUER_SETTLE"]) then
                 discardCard(card)
                 discardHappened = true
             end
@@ -1638,6 +1638,8 @@ function updateTableauState(player)
                                 powerName = name
                             elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
                                 powerName = name
+                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
+                                powerName = name
                             elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
                                 powerName = name
                             elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
@@ -2121,8 +2123,10 @@ function updateHelpText(playerColor)
             -- Check for special settle power modifiers
             local reduceZero = false
             local reduceZeroName = ""
+            local doMilitary = info.flags["MILITARY"]
             local payMilitary = false
             local payMilitaryStr = 0
+            local militaryDiscount = 0
             local node = p.miscSelectedCards
             local militaryHandBonus = 0
 
@@ -2139,14 +2143,17 @@ function updateHelpText(playerColor)
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
                         militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
+                    elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
+                        doMilitary = true
+                        militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
                     end
                 end
                 node = node.next
             end
 
-            if info.flags["MILITARY"] and not payMilitary then
-                setHelpText(playerColor, "Settle: " .. info.cost .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + militaryHandBonus .. "/" .. info.cost .. ")")
+            if doMilitary and not payMilitary then
+                setHelpText(playerColor, "Settle: " .. info.cost - militaryDiscount .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + militaryHandBonus .. "/" .. info.cost - militaryDiscount .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")

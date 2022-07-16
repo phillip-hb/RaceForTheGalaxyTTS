@@ -1161,7 +1161,7 @@ T:2:1:1
 E@2:2
 #E:0:0:2:2:0
 F:IMPERIUM
-P:3:DISCARD | CONQUER_SETTLE | NO_TAKEOVER:2:0
+P:3:DISCARD_CONQUER_SETTLE | NO_TAKEOVER:2:0
 P:3:DISCARD | TAKEOVER_MILITARY:0:0
 
 N:Imperium Troops
@@ -1433,7 +1433,7 @@ E@3:2
 #E:0:0:0:2:0
 F:IMPERIUM | PRESTIGE
 P:3:EXTRA_MILITARY:3:0
-P:3:EXTRA_MILITARY | AGAINST_REBEL:1:0
+P:3:BONUS_MILITARY | AGAINST_REBEL:1:0
 P:3:DISCARD | CONQUER_SETTLE | PRESTIGE:0:0
 
 N:Uplift Gene Breeders
@@ -1712,6 +1712,7 @@ activePowers = {
      },
      ["3"] = {
           DISCARD = "Discard this card.",
+          DISCARD_CONQUER_SETTLE = "Discard this card.",
           PAY_MILITARY = "Place military world as normal world.",
           MILITARY_HAND = "Discard from hand.",
           REDUCE_ZERO = "Reduce settle cost."
