@@ -1708,7 +1708,7 @@ activePowers = {
 
      },
      ["2"] = {
-
+          DISCARD_REDUCE = "Discard this card to reduce cost."
      },
      ["3"] = {
           DISCARD = "Discard this card.",

@@ -896,7 +896,7 @@ function checkAllReadyCo()
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
             local powers = info.activePowers[tostring(phase)]
-            if powers and powers["DISCARD"] then
+            if powers and (powers["DISCARD"] or powers["DISCARD_REDUCE"]) then
                 discardCard(card)
                 discardHappened = true
             end
@@ -1612,12 +1612,23 @@ function updateTableauState(player)
                 highlightOn(card, "rgb(0,1,0)", player)
             end
 
-            if currentPhase == "3" and ap then
+            if currentPhase == "2" and ap then
+                for name, power in pairs(ap) do
+                    if selectedCard then
+                        if miscSelectedCount <= 0 then
+                            createdButton = true
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                        else
+                            createCancelButton(card)
+                        end
+                    end
+                end
+            elseif currentPhase == "3" and ap then
                 -- Create buttons for active powers
                 if selectedCard then
                     for name, power in pairs(ap) do
                         local powerName = ""
-                        
+
                         if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] then
                             goto skip_power
                         end
@@ -1902,7 +1913,7 @@ function cancelPowerClick(obj, player, rightClick)
 
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
-    if getCurrentPhase() ~= 3 then
+    if getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
         p.selectedCard = nil
         p.selectedCardPower = ""
         p.selectedGoods = {}
@@ -2083,6 +2094,21 @@ function updateHelpText(playerColor)
             local info = card_db[card.getName()]
             local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
             local discarded = handCount - cardsInHand
+            local node = p.miscSelectedCards
+
+            while node and node.value do
+                local miscCard = getObjectFromGUID(node.value)
+                local miscPowers = card_db[miscCard.getName()].activePowers["2"]
+
+                if miscPowers then
+                    if miscPowers["DISCARD_REDUCE"] then
+                        discardTarget = math.max(0, discardTarget - 3)
+                    end
+                end
+
+                node = node.next
+            end
+
             setHelpText(playerColor, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Develop: may play a development.")
@@ -2402,20 +2428,4 @@ function moveGoalToPlayer(params)
             break
         end
     end
-end
-
-function statCountingForGoals()
-    -- local results = {}
-
-    -- for player, data in pairs(playerData) do
-    --     results[player] = {
-    --         vpChips = 0,
-    --         military = 0,
-    --         worldsCount = 0,
-    --         developmentsCount = 0,
-    --     }
-    --     local i = data.index
-    -- end
-
-    -- return results
 end
