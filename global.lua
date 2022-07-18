@@ -164,10 +164,6 @@ function onload(saved_data)
         end
     end
 
-    for _, o in pairs(getObjectsWithTag("Slot")) do
-        o.interactable = false
-    end
-
     handZoneMap = {}
     for i=1, #handZone_GUID do
         handZoneMap[handZone_GUID[i]] = true
@@ -421,7 +417,7 @@ function attemptPlayCard(card, player)
           })
 
           -- found empty spot
-          if hits[1].hit_object.hasTag("Slot") then
+          if hits[1].hit_object == tableau then
                -- trigger certain power bonuses based on phase
                if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
                     local phase = getCurrentPhase()
@@ -676,8 +672,6 @@ function onObjectLeaveZone(zone, object)
                 displayVpHexOff(object)
                 object.setSnapPoints({})
                 object.clearButtons()
-                local slot = getCardSlot(object)
-                if slot then slot.clearButtons() end
             end
 
             p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, object.getGUID())
@@ -1545,15 +1539,6 @@ function updateTableauState(player)
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
-        if obj.hasTag("Slot") then
-            obj.clearButtons()
-            if currentPhase == "2" or currentPhase == "3" then
-                setVisibleTo(obj, player)
-            else
-                obj.setInvisibleTo({})
-            end
-        end
-
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
             if parentData.flags["WINDFALL"] and not getGoods(obj) then
@@ -1850,7 +1835,6 @@ function usePowerClick3(obj, player, button) usePowerClick(obj, player, button, 
 
 function usePowerClick(obj, player, rightClick, powerIndex)
     if rightClick then return end
-    if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
@@ -1943,7 +1927,6 @@ end
 
 function cancelPowerClick(obj, player, rightClick)
     if rightClick then return end
-    if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
 
@@ -1960,7 +1943,6 @@ end
 
 function confirmPowerClick(obj, player, rightClick)
     if rightClick then return end
-    if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
@@ -2059,8 +2041,6 @@ end
 function cardSelectClick(object, player, rightClick)
     if rightClick then return end
 
-    if object.hasTag("Slot") then object = getCard(object) end
-
     local p = playerData[player]
 
     p.selectedCard = object.getGUID()
@@ -2073,10 +2053,6 @@ end
 
 function cardCancelClick(object, player, rightClick)
      if rightClick then return end
-
-     if object.hasTag("Slot") then
-          object = getCard(object)
-     end
 
      local p = playerData[player]
 

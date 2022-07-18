@@ -28,73 +28,45 @@ function createCancelButtonOnCard(card)
     })
 end
 
-function createCardBottomButton(card, text, func)
-    local slot = getCardSlot(card)
-    slot.createButton({
-        click_function = func,
-        function_owner = Global,
-        label = text,
-        font_size = 150,
-        width = 900,
-        height = 220,
-        position = {0, 0, .63},
-        scale = {0.5, 1, 0.4}
-    })
-end
-
 function createConfirmButton(card)
-    local slot = getCardSlot(card)
-
-    if not slot then return end
-
-    slot.createButton({
+    card.createButton({
         click_function = "confirmPowerClick",
         function_owner = Global,
         label = "Confirm",
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, .63},
-        scale = {0.5, 1, 0.4}
+        position = {0, 0, 1.85},
     })
 end
 
 function createUsePowerButton(card, powerIndex, powersCount, tooltip)
-    local slot = getCardSlot(card)
-
-    if not slot then return end
-
     local w = 900 / powersCount
     local xW = 1
     local offx = xW / powersCount
 
-    slot.createButton({
+    card.createButton({
         click_function = "usePowerClick" .. powerIndex,
         function_owner = Global,
         label = powersCount == 1 and "Use Power" or "Pow " .. powerIndex,
         font_size = 150,
         height = 220,
         width = w,
-        scale = {0.5, 1, 0.4},
-        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.63},
+
+        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -1.85},
         tooltip = tooltip
     })
 end
 
 function createCancelButton(card)
-    local slot = getCardSlot(card)
-
-    if not slot then return end
-
-    slot.createButton({
+    card.createButton({
         click_function = "cancelPowerClick",
         function_owner = Global,
         label = "Cancel",
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, -.63},
-        scale = {0.5, 1, 0.4},
+        position = {0, 0, -1.85},
         tooltip = "Cancel power.",
     })
 end
