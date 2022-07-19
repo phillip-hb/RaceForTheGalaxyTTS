@@ -436,6 +436,7 @@ function attemptPlayCard(card, player)
                card.setPosition(add(pos, {0, 0.02, 0}))
                card.setRotation({rot[1], rot[2], 0})
                card.removeTag("Selected")
+               card.setLock(true)
                highlightOff(card)
                 playerData[player].lastPlayedCard = card.getGUID()
 
@@ -518,6 +519,7 @@ function discardCard(card)
      card.setTags({""})
      card.highlightOff()
      card.setScale({1,1,1})
+     card.setLock(false)
 
      if not discardPile or discardPile.isDestroyed() then
           discardPile = getDeckOrCardInZone(discardZone)
@@ -1418,11 +1420,11 @@ function capturePowersSnapshot(player, phase)
         statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
     end
 
-    local tableauGameEnd = gameEnd14 and 14 or 12
-    if totalCardsPlayed >= tableauGameEnd and not gameEndMessage then
-        gameEndMessage = true
-        broadcastToAll(tableauGameEnd .. " cards have been played into a tableau. This will be the final round.", "Purple")
-    end
+    -- local tableauGameEnd = gameEnd14 and 14 or 12
+    -- if totalCardsPlayed >= tableauGameEnd and not gameEndMessage then
+    --     gameEndMessage = true
+    --     broadcastToAll(tableauGameEnd .. " cards have been played into a tableau. This will be the final round.", "Purple")
+    -- end
 end
 
 function updateHandState(playerColor)
