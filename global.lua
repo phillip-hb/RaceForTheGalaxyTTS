@@ -48,11 +48,13 @@ goodsHighlightColor = {
      ["ALIEN"] = color(0.933, 0.909, 0.105),
 }
 
--- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the second a matching code
+-- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the rest are matching codes.
+-- Key = card's power, Value = what the key can be chained with
 compatible = {
-    ["DISCARD|REDUCE_ZERO"] = {"PAY_MILITARY"},
-    ["DISCARD|EXTRA_MILITARY"] = {"DISCARD_CONQUER_SETTLE"},
-    ["MILITARY_HAND"] = {"DISCARD|EXTRA_MILITARY", "DISCARD_CONQUER_SETTLE"},
+    ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
+    -- ["DISCARD|REDUCE_ZERO"] = {["PAY_MILITARY"]=1},
+    -- ["DISCARD|EXTRA_MILITARY"] = {["DISCARD_CONQUER_SETTLE"]=1},
+    -- ["MILITARY_HAND"] = {["DISCARD_CONQUER_SETTLE"]=1, ["DISCARD|EXTRA_MILITARY"]=1},
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -873,8 +875,9 @@ function gameStart(params)
 end
 
 function playerReadyClicked(playerColor)
-    local i = playerData[playerColor]
+    local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
+    local currentPhase = getCurrentPhase()
 
     if currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
         if advanced2p then
@@ -885,6 +888,17 @@ function playerReadyClicked(playerColor)
 
         updateReadyButtons({playerColor, false})
         return
+    elseif currentPhase == 2 or currentPhase == 3 then
+        local node = p.miscSelectedCards
+        while node and node.next do
+            node = node.next
+        end
+
+        if node and node.power and requiresConfirm[node.power.name] then
+            broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
     end
 
     startLuaCoroutine(Global, "checkAllReadyCo")
@@ -1560,15 +1574,22 @@ function updateTableauState(player)
     local miscPowerSnapshot = {}
     local miscSelectedCardsTable = {}
     local miscSelectedCount = 0
+    local miscActiveNode = nil
+    local miscActiveNodePowerKey = ""
     local list = p.miscSelectedCards
 
     while list and list.value do
         local card = getObjectFromGUID(list.value)
-        miscSelectedCardsTable[list.value] = card
+        miscSelectedCardsTable[list.value] = list
 
         local info = card_db[card.getName()]
         for name, power in pairs(info.activePowers[currentPhase]) do
             miscPowerSnapshot[name] = power
+        end
+
+        if not list.next then
+            miscActiveNode = list
+            miscActiveNodePowerKey = concatPowerName(miscActiveNode.power)
         end
 
         list = list.next
@@ -1661,12 +1682,13 @@ function updateTableauState(player)
     end
 
     local createdButton = false
+    local currentMiscSelected = nil
 
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
 
-        if p.selectedCard == card.getGUID() then
+        if selectedCard == card then
             highlightOn(card, "rgb(0,1,0)", player)
         end
 
@@ -1696,38 +1718,30 @@ function updateTableauState(player)
                         local powerName = ""
                         local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
-                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] then
+                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[miscActiveNode.power.name] then
                             goto skip_power
                         end
 
-                        if miscSelectedCount <= 0 then
-                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            end
-                        elseif not miscSelectedCardsTable[card.getGUID()] then
-                            -- check for compatible chains
-                            local key = name
-                            if name == "DISCARD" then
-                                for code, _ in pairs(power.codes) do
-                                    key = key .. "|" .. code
+                        if not used then
+                            if miscSelectedCount <= 0 then
+                                if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
                                 end
-                            end
+                            elseif not miscSelectedCardsTable[card.getGUID()] then
+                                -- check for compatible chains
+                                local key = concatPowerName(power)
 
-                            if compatible[key] then
-                                for _, str in pairs(compatible[key]) do
-                                    local tokens = split(str, "|")
-                                    if (#tokens == 1 and miscPowerSnapshot[tokens[1]]) or (miscPowerSnapshot[tokens[1]] and miscPowerSnapshot[tokens[1]][tokens[2]]) then
-                                        powerName = name
-                                        break
-                                    end
+                                if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
+                                    powerName = power.name
                                 end
                             end
                         end
@@ -1739,7 +1753,7 @@ function updateTableauState(player)
                             createCancelButton(card)
 
                             if requiresConfirm[name] then
-                                createConfirmButton(miscSelected)
+                                createConfirmButton(card)
                             end
                         end
 

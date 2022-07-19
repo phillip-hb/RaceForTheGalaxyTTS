@@ -113,8 +113,18 @@ function getLinkedListNode(list, value)
             return node
         end
         
-        if not node.next then return end
+        if not node.next then return nil end
 
         node = node.next
     end
+
+    return nil
+end
+
+function concatPowerName(power)
+    local value = power.name
+    for code, _ in pairs(power.codes) do
+        value = value .. "|" .. code
+    end
+    return value
 end
