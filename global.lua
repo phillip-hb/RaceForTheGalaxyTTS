@@ -1990,8 +1990,10 @@ function confirmPowerClick(obj, player, rightClick)
     markUsed(player, obj, power)
 end
 
-function goodSelectClick(parentCard, player, rightClick)
+function goodSelectClick(slot, player, rightClick)
     if rightClick then return end
+
+    local parentCard = getCard(slot)
 
     local p = playerData[player]
     local selectedCard = getObjectFromGUID(p.selectedCard)

@@ -100,10 +100,10 @@ function createCancelButton(card)
 end
 
 function createGoodsButton(card, label, color)
-    local offset = {0.6, 1, 0.4}
+    local offset = {0.28, 5, 0.13}
 
     local slot = getCardSlot(card)
-    card.createButton({
+    slot.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
         label = label or "",
@@ -111,7 +111,8 @@ function createGoodsButton(card, label, color)
         color = color or "White",
         width = 500,
         height = 750,
-        position = offset
+        position = offset,
+        scale = {0.5, 1, 0.35}
     })
 end
 
