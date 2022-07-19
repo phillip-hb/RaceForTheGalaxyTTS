@@ -900,15 +900,21 @@ function playerReadyClicked(playerColor)
             node = node.next
         end
 
-        if node and node.power and requiresConfirm[node.power.name] then
+        if node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
         end
     elseif currentPhase == 4 or currentPhase == 5 then
-        if p.selectedCard and requiresConfirm[p.selectedCardPower] then
-            broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
-            updateReadyButtons({playerColor, false})
+        if p.selectedCard then
+            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
+            if info.activePowers[tostring(currentPhase)] then
+                local power = info.activePowers[tostring(currentPhase)][p.selectedCardPower]
+                if power and requiresConfirm[concatPowerName(power)] then
+                    broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+                    updateReadyButtons({playerColor, false})
+                end
+            end
             return
         end
     end
@@ -1750,10 +1756,11 @@ function updateTableauState(player)
                 if selectedCard then
                     for name, power in pairs(ap) do
                         local powerName = ""
+                        local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
                         local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
                         if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
-                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[miscActiveNode.power.name] then
+                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
                             goto skip_power
                         end
 
@@ -1785,7 +1792,7 @@ function updateTableauState(player)
                         elseif miscSelected then
                             createCancelButton(card)
 
-                            if requiresConfirm[name] then
+                            if requiresConfirm[fullName] then
                                 createConfirmButton(card)
                             end
                         end
