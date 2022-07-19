@@ -629,6 +629,20 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
         end
     end
 
+    -- check to see if the object is in the player's hand zone to prevent mark for deletion
+    if (object.hasTag("Selected") or 
+            object.hasTag("Explore Highlight") and currentPhaseIndex == -1 or 
+            not object.hasTag("Explore Highlight") and getCurrentPhase() == 1) and
+            inHandZone and flip == 180 then
+        local rot = object.getRotation()
+        object.setRotation({rot[1], rot[2], 0})
+        return
+    elseif object.hasTag("Marked") and inHandZone and flip == 0 then
+        local rot = object.getRotation()
+        object.setRotation({rot[1], rot[2], 180})
+        return
+    end
+
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
         if flip == 180 then
             object.addTag("Discard")
@@ -637,15 +651,6 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
         end
 
         updateHelpText(player_color)
-    end
-
-    -- check to see if the object is in the player's hand zone to prevent mark for deletion
-    if (object.hasTag("Selected") or object.hasTag("Explore Highlight") and currentPhaseIndex == -1) and inHandZone and flip == 180 then
-        local rot = object.getRotation()
-        object.setRotation({rot[1], rot[2], 0})
-    elseif object.hasTag("Marked") and inHandZone and flip == 0 then
-        local rot = object.getRotation()
-        object.setRotation({rot[1], rot[2], 180})
     end
 end
 
@@ -2171,15 +2176,13 @@ function updateHelpText(playerColor)
     local powers = p.powersSnapshot
     local handCount = p.handCountSnapshot
     local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
-    local discardInHand = countDiscardInHand(playerColor, false)
+    local discarded = countDiscardInHand(playerColor, false)
     local currentPhase = getCurrentPhase()
 
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
             local discardTarget = powers["DISCARD"]
-            local discarded = handCount - cardsInHand
-
             setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Select your start world.")
@@ -2192,8 +2195,6 @@ function updateHelpText(playerColor)
     -- explore
     elseif currentPhase == 1 then
         local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
-        local discarded = handCount - cardsInHand
-
         setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
     elseif currentPhase == 2 then
         if p.selectedCard then
