@@ -165,7 +165,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            if obj then obj.interactable = false end
+            --if obj then obj.interactable = false end
         end
     end
 
