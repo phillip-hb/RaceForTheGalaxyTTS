@@ -54,6 +54,7 @@ optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1}
 compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
     ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
+    ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
     -- ["DISCARD|REDUCE_ZERO"] = {["PAY_MILITARY"]=1},
     -- ["DISCARD|EXTRA_MILITARY"] = {["DISCARD_CONQUER_SETTLE"]=1},
     -- ["MILITARY_HAND"] = {["DISCARD_CONQUER_SETTLE"]=1, ["DISCARD|EXTRA_MILITARY"]=1},
@@ -220,8 +221,10 @@ function getCurrentPhase()
             phase = 2
         elseif phase == 4 or phase == 5 then
             phase = 3
-        elseif phase >= 6 then
+        elseif phase >= 6 and phase < 100 then
             phase = phase - 2
+        else
+            phase = 100
         end
     end
 
@@ -1061,7 +1064,7 @@ function checkAllReadyCo()
         beginNextPhase()
     elseif currentPhaseIndex >= 1 then
         for player, data in pairs(playerData) do
-            capturePowersSnapshot(player)
+            capturePowersSnapshot(player, tostring(getCurrentPhase()))
         end
         endOfPhaseGoalCheck()
 
@@ -1333,8 +1336,8 @@ function capturePowersSnapshot(player, phase)
     end
 
     results["EXTRA_MILITARY"] = 0
-    results["BONUS_MILITARY"] = 0
     results["TEMP_MILITARY"] = 0
+    results["BONUS_MILITARY"] = 0
 
     local ignore2ndDevelop = false
     local ignore2ndSettle = false
@@ -1698,8 +1701,10 @@ function updateTableauState(player)
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
 
-            if miscSelected or placeTwoTriggered and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+            if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
+            elseif placeTwoTriggered and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+                card.highlightOn("Yellow")
             end
 
             if currentPhase == "2" and ap then
@@ -2276,8 +2281,9 @@ function updateHelpText(playerColor)
             end
 
             if doMilitary and not payMilitary then
-                setHelpText(playerColor, "Settle: " .. info.cost - militaryDiscount .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. info.cost - militaryDiscount .. ")")
+                local def = info.cost - militaryDiscount
+                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
