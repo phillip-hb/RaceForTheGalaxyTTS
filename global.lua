@@ -47,11 +47,13 @@ goodsHighlightColor = {
      ["GENE"] = color(0.278, 0.760, 0.141),
      ["ALIEN"] = color(0.933, 0.909, 0.105),
 }
+optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1}
 
 -- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the rest are matching codes.
 -- Key = card's power, Value = what the key can be chained with
 compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
+    ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
     -- ["DISCARD|REDUCE_ZERO"] = {["PAY_MILITARY"]=1},
     -- ["DISCARD|EXTRA_MILITARY"] = {["DISCARD_CONQUER_SETTLE"]=1},
     -- ["MILITARY_HAND"] = {["DISCARD_CONQUER_SETTLE"]=1, ["DISCARD|EXTRA_MILITARY"]=1},
@@ -1549,7 +1551,7 @@ function updateTableauState(player)
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
     local currentPhase = tostring(getCurrentPhase())
-
+    local optColor = color(0.5,1,0.9)
     local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
@@ -1739,7 +1741,6 @@ function updateTableauState(player)
                             elseif not miscSelectedCardsTable[card.getGUID()] then
                                 -- check for compatible chains
                                 local key = concatPowerName(power)
-
                                 if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
                                     powerName = power.name
                                 end
@@ -1798,7 +1799,7 @@ function updateTableauState(player)
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
                             createdButton = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
@@ -2173,6 +2174,7 @@ function cardCancelClick(object, player, rightClick)
      p.selectedCard = nil
      p.selectedCardPower = ""
      p.miscSelectedCards = {}
+
      object.removeTag("Selected")
      highlightOff(object)
 

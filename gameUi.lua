@@ -59,7 +59,7 @@ function createConfirmButton(card)
     })
 end
 
-function createUsePowerButton(card, powerIndex, powersCount, tooltip)
+function createUsePowerButton(card, powerIndex, powersCount, tooltip, color)
     local slot = getCardSlot(card)
 
     if not slot then return end
@@ -77,7 +77,8 @@ function createUsePowerButton(card, powerIndex, powersCount, tooltip)
         width = w,
         scale = {0.5, 1, 0.4},
         position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.63},
-        tooltip = tooltip
+        tooltip = tooltip,
+        color = color or "White"
     })
 end
 
