@@ -365,7 +365,7 @@ function countCardsInHand(playerColor, countMarked)
           local n = 0
 
           for _, obj in pairs(objs) do
-               if not obj.hasTag("Discard") and not obj.hasTag("Action Card") then
+               if (not obj.hasTag("Discard") or obj.hasTag("Marked")) and not obj.hasTag("Action Card") then
                     n = n + 1
                end
           end
@@ -410,14 +410,14 @@ function discardMarkedCards(player, markForDiscard)
 
     local cards = {}
     for _, obj in pairs(Player[player].getHandObjects(1)) do
-        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) and not obj.hasTag("Marked") then
-            if not markForDiscard then
-                discardCard(obj)
-            else
+        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
+            if markForDiscard and not obj.hasTag("Marked") then
                 obj.addTag("Marked")
+                cards[#cards + 1] = obj
+            elseif not markForDiscard then
+                discardCard(obj)
+                cards[#cards + 1] = obj
             end
-
-            cards[#cards + 1] = obj
         end
     end
     return cards
@@ -1040,7 +1040,7 @@ function checkAllReadyCo()
 
         currentPhaseIndex = -1000
 
-        wait(1.2)
+        wait(1.25)
 
         beginNextPhase()
     elseif currentPhaseIndex >= 1 then
@@ -2004,6 +2004,7 @@ function cancelPowerClick(obj, player, rightClick)
 
     local p = playerData[player]
 
+    p.handCountSnapshot = countCardsInHand(player, true)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
@@ -2022,6 +2023,8 @@ function confirmPowerClick(obj, player, rightClick)
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
     local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
+
+    p.handCountSnapshot = countCardsInHand(player)
 
     if currentPhase == "2" or currentPhase == "3" then
         local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
@@ -2176,7 +2179,7 @@ function updateHelpText(playerColor)
     local powers = p.powersSnapshot
     local handCount = p.handCountSnapshot
     local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
-    local discarded = countDiscardInHand(playerColor, false)
+    local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
 
     -- opening hand
@@ -2201,7 +2204,6 @@ function updateHelpText(playerColor)
             local card = getObjectFromGUID(p.selectedCard)
             local info = card_db[card.getName()]
             local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
-            local discarded = handCount - cardsInHand
             local node = p.miscSelectedCards
 
             while node and node.value do
@@ -2234,7 +2236,6 @@ function updateHelpText(playerColor)
             local payMilitaryStr = 0
             local militaryDiscount = 0
             local node = p.miscSelectedCards
-            local militaryHandBonus = 0
 
             while node and node.value do
                 local miscCard = getObjectFromGUID(node.value)
@@ -2248,9 +2249,7 @@ function updateHelpText(playerColor)
                         payMilitaryStr = miscPowers["PAY_MILITARY"].strength
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                        militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
-
-                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
                         return
                     elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
                         doMilitary = true
@@ -2262,7 +2261,7 @@ function updateHelpText(playerColor)
 
             if doMilitary and not payMilitary then
                 setHelpText(playerColor, "Settle: " .. info.cost - militaryDiscount .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + militaryHandBonus .. "/" .. info.cost - militaryDiscount .. ")")
+                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. info.cost - militaryDiscount .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
@@ -2272,7 +2271,6 @@ function updateHelpText(playerColor)
                         payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
                     end
                     local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
-                    local discarded = handCount - cardsInHand
                     setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
                 end
             end
@@ -2320,7 +2318,7 @@ function updateHelpText(playerColor)
     elseif currentPhase == 100 then
         local maxHandSize = p.powersSnapshot["DISCARD_TO_12"] and 12 or 10
         local discardTarget = cardsInHand - maxHandSize
-        local discarded = cardsInHand - countCardsInHand(playerColor, false)
+        discarded = cardsInHand - countCardsInHand(playerColor, false)
 
         if cardsInHand > maxHandSize then
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
