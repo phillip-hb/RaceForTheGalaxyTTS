@@ -2108,8 +2108,12 @@ function confirmPowerClick(obj, player, rightClick)
         end
     elseif p.selectedCardPower == "DISCARD_HAND" then
         local times = math.min(power.times, #discardMarkedCards(player))
+        if times == 0 then return end
         if power.codes["GET_VP"] then
             getVpChips(player, times)
+        end
+        if power.codes["GET_CARD"] then
+            dealTo(power.strength, player)
         end
     end
 
@@ -2237,6 +2241,8 @@ function updateHelpText(playerColor)
     local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
 
+    log(currentPhase)
+
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
@@ -2349,7 +2355,16 @@ function updateHelpText(playerColor)
             if p.selectedCardPower == "TRADE_ACTION" then
                 setHelpText(playerColor, "▲ Consume: select a good to sell.")
             elseif p.selectedCardPower == "DISCARD_HAND" then
-                setHelpText(playerColor, "▼ Consume: discard cards for VP.")
+                local reward = ""
+                local power = info.activePowers["4"][p.selectedCardPower]
+                if power.codes["GET_VP"] then reward = "get VP"
+                elseif power.codes["GET_CARD"] then reward = "draw card"
+                end
+
+                local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                local appendStr = ". (" .. discardCount .. "/" .. power.times .. ")"
+
+                setHelpText(playerColor, "▼ Consume: discard to " .. reward .. appendStr)
             else
                 setHelpText(playerColor, "▲ Consume: select goods to consume.")
             end
