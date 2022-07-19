@@ -101,7 +101,8 @@ end
 
 function createGoodsButton(card, label, color)
     local offset = {0.6, 1, 0.4}
-    card.clearButtons()
+
+    local slot = getCardSlot(card)
     card.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
