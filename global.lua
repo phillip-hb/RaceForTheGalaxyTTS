@@ -37,6 +37,7 @@ queueUpdateState = {Yellow=false, Red=false, Blue=false, Green=false}
 updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
+gameDone = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -165,7 +166,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            --if obj then obj.interactable = false end
+            if obj then obj.interactable = false end
         end
     end
 
@@ -1074,7 +1075,7 @@ function checkAllReadyCo()
         endOfPhaseGoalCheck()
 
         if currentPhaseIndex > #selectedPhases then
-            -- round end check
+            -- round end
         else
             beginNextPhase()
         end
@@ -1087,7 +1088,13 @@ function startNewRound()
     selectedPhases = {}
     resetPhaseTiles()
 
-    broadcastToAll("Starting new round.", "White")
+    if checkEndGame() and not gameDone then
+        gameDone = true
+        wait(1.5)
+        broadcastToAll("The game has ended.", "Purple")
+    else
+        broadcastToAll("Starting new round.", "White")
+    end
 
     for player, data in pairs(playerData) do
         resetPlayerState(player)
@@ -1134,9 +1141,9 @@ function beginNextPhase()
         for player, data in pairs(playerData) do
             if data.powersSnapshot["DRAW_MOST_RARE"] then
                 if tie or most["RARE"] ~= player then
-                    broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Grey")
+                    broadcastToColor("Mining Conglomerate: You did not produce the most Rare goods this phase.", player, "Grey")
                 elseif most["RARE"] == player then
-                    broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
+                    broadcastToColor("Mining Conglomerate: You produced the most Rare goods this phase.", player, player)
                     dealTo(data.powersSnapshot["DRAW_MOST_RARE"], player)
                 end
             end
@@ -1199,6 +1206,30 @@ function beginNextPhase()
     for player, data in pairs(playerData) do
         queueUpdate(player, true)
     end
+end
+
+function checkEndGame()
+    log('in here?')
+    if not gameEndMessage then
+        for player, data in pairs(playerData) do
+            local p = playerData[player]
+            local count = 0
+            for card in allCardsInTableau(player) do
+                if not card.hasTag("Ignore Tableau") and not card.is_face_down and not card.hasTag("Action Card") then
+                    count = count + 1
+                end
+            end
+
+            log(count)
+
+            if p.powersSnapshot["GAME_END_14"] and count >= 14 or not p.powersSnapshot["GAME_END_14"] and count >= 12 then
+                broadcastToAll((Player[player].steam_name or player) .. " has played " .. count .. " cards in their tableau.", player)
+                gameEndMessage = true
+            end
+        end
+    end
+
+    return gameEndMessage
 end
 
 function updatePhaseTilesHighlight()
@@ -1352,9 +1383,6 @@ function capturePowersSnapshot(player, phase)
     local militaryWorldCount = 0
     local tradeChromoBonus = false
     local perMilitary = false
-    local gameEnd14 = false
-
-    local totalCardsPlayed = 0
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
@@ -1364,16 +1392,12 @@ function capturePowersSnapshot(player, phase)
             goto next_card
         end
 
-        if not card.is_face_down then
-            totalCardsPlayed = totalCardsPlayed + 1
-        end
-
         if info.flags["DISCARD_TO_12"] then
             results["DISCARD_TO_12"] = 1
         end
 
         if info.flags["GAME_END_14"] then
-            gameEnd14 = true
+            results["GAME_END_14"] = 1
         end
 
         if info.passivePowers[phase] then
@@ -1473,12 +1497,6 @@ function capturePowersSnapshot(player, phase)
     if statTracker then
         statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
     end
-
-    -- local tableauGameEnd = gameEnd14 and 14 or 12
-    -- if totalCardsPlayed >= tableauGameEnd and not gameEndMessage then
-    --     gameEndMessage = true
-    --     broadcastToAll(tableauGameEnd .. " cards have been played into a tableau. This will be the final round.", "Purple")
-    -- end
 end
 
 function updateHandState(playerColor)
