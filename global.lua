@@ -38,7 +38,7 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 
-requiresConfirm = {["DISCARD_HAND"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
     ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
@@ -51,7 +51,7 @@ goodsHighlightColor = {
 -- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the second a matching code
 compatible = {
     ["DISCARD|REDUCE_ZERO"] = {"PAY_MILITARY"},
-    ["DISCARD|EXTRA_MILITARY"] = {"MILITARY_HAND", "DISCARD_CONQUER_SETTLE"},
+    ["DISCARD|EXTRA_MILITARY"] = {"DISCARD_CONQUER_SETTLE"},
     ["MILITARY_HAND"] = {"DISCARD|EXTRA_MILITARY", "DISCARD_CONQUER_SETTLE"},
 }
 
@@ -160,7 +160,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            --if obj then obj.interactable = false end
+            if obj then obj.interactable = false end
         end
     end
 
@@ -390,16 +390,22 @@ function getSelectedActionsCount(player)
 end
 
 -- returns number of cards discarded from hand
-function discardMarkedCards(player)
-     local count = 0
-     for _, obj in pairs(Player[player].getHandObjects(1)) do
-          if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
-               discardCard(obj)
-               count = count + 1
-          end
-     end
+function discardMarkedCards(player, markForDiscard)
+    if markForDiscard == nil then markForDiscard = false end
 
-     return count
+    local cards = {}
+    for _, obj in pairs(Player[player].getHandObjects(1)) do
+        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) and not obj.hasTag("Marked") then
+            if not markForDiscard then
+                discardCard(obj)
+            else
+                obj.addTag("Marked")
+            end
+
+            cards[#cards + 1] = obj
+        end
+    end
+    return cards
 end
 
 -- check zone for any 'Selected' cards and attempt to play them
@@ -516,7 +522,7 @@ end
 function discardCard(card)
      card.memo = ''
      card.setDescription('')
-     card.setTags({""})
+     card.setTags({})
      card.highlightOff()
      card.setScale({1,1,1})
      card.setLock(false)
@@ -622,7 +628,9 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     if object.hasTag("Selected") and inHandZone and flip == 180 then
         local rot = object.getRotation()
         object.setRotation({rot[1], rot[2], 0})
-        return
+    elseif object.hasTag("Marked") and inHandZone and flip == 0 then
+        local rot = object.getRotation()
+        object.setRotation({rot[1], rot[2], 180})
     end
 end
 
@@ -932,7 +940,7 @@ function checkAllReadyCo()
         end
 
         -- discard all face down cards in hand
-        local n = discardMarkedCards(player)
+        local n = #discardMarkedCards(player)
         if currentPhaseIndex == #selectedPhases then
             p.roundEndDiscardCount = n
         end
@@ -943,13 +951,13 @@ function checkAllReadyCo()
 
     for _, player in pairs(players) do
         updateReadyButtons({player, false})
+        queueUpdate(player, true)
     end
 
     for _, player in pairs(players) do
         if placeTwoTriggered then
             if placeTwo[playerData[player].index] then
                 broadcastToAll("Waiting for " .. Player[player].steam_name .. "'s use of Improved Logistics.", player)
-                queueUpdate(player, true)
             else
                 updateReadyButtons({player, true})
             end
@@ -1480,6 +1488,8 @@ function updateHandState(playerColor)
 
         if obj.hasTag("Selected") then
             highlightOn(obj, "rgb(0,1,0,1)", playerColor)
+        elseif obj.hasTag("Marked") then
+            highlightOn(obj, "Red", playerColor)
         end
     end
 
@@ -1832,18 +1842,43 @@ function updateTableauState(player)
     end
 end
 
-function markUsed(player, card, power)
+function markUsed(player, card, power, n)
     local p = playerData[player]
 
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
 
     p.selectedGoods = {}
-    p.cardsAlreadyUsed[card.getGUID()][p.selectedCardPower .. power.index] = true
+    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
     p.selectedCard = nil
     p.selectedCardPower = ""
     p.miscSelectedCards = {}
 
     queueUpdate(player, true)
+end
+
+function markUsedMisc(player, card, power, n)
+    local p = playerData[player]
+
+    if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
+
+    p.selectedGoods = {}
+    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
+    p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, card.getGUID())
+
+    queueUpdate(player, true)
+end
+
+function getActivePower(name, phase, powerIndex)
+    local info = card_db[name]
+    if info and info.activePowers[phase] then
+        for _, power in pairs(info.activePowers[phase]) do
+            if power.index == powerIndex then
+                return power
+            end
+        end
+    end
+
+    return nil
 end
 
 function usePowerClick1(obj, player, button) usePowerClick(obj, player, button, 1) end
@@ -1923,8 +1958,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         end
     end
 
-    local selectedCard = getObjectFromGUID(p.selectedCard)
-    local selectedInfo = card_db[selectedCard.getName()]
     local node = p.miscSelectedCards
 
     while node and node.next do
@@ -1933,11 +1966,12 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if not p.miscSelectedCards then p.miscSelectedCards = {} end
 
+    local power = getActivePower(obj.getName(), currentPhase, powerIndex)
     if not p.miscSelectedCards.value then
-         p.miscSelectedCards = {value = obj.getGUID(), next = nil}
+         p.miscSelectedCards = {value = obj.getGUID(), power=power, next = nil}
          p.miscSelectedCard = obj.getGUID()
     else
-         node.next = {value = obj.getGUID(), next = nil}
+         node.next = {value = obj.getGUID(), power=power, next = nil}
     end
 
     queueUpdate(player, true)
@@ -1968,7 +2002,20 @@ function confirmPowerClick(obj, player, rightClick)
     local currentPhase = tostring(getCurrentPhase())
     local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
 
-    if currentPhase == "5" then
+    if currentPhase == "2" or currentPhase == "3" then
+        local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
+        local n = 0
+        power = node.power
+        if power.name == "MILITARY_HAND" then
+            local marked = discardMarkedCards(player, true)
+            n = #marked
+        end
+
+        if n == 0 then return end
+
+        markUsedMisc(player, obj, power, power.strength)
+        return
+    elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
             discardMarkedCards(player)
             if power.codes["WINDFALL_ANY"] then
@@ -1981,7 +2028,7 @@ function confirmPowerClick(obj, player, rightClick)
             end
         end
     elseif p.selectedCardPower == "DISCARD_HAND" then
-        local times = math.min(power.times, discardMarkedCards(player))
+        local times = math.min(power.times, #discardMarkedCards(player))
         if power.codes["GET_VP"] then
             getVpChips(player, times)
         end
@@ -2090,6 +2137,8 @@ function cardCancelClick(object, player, rightClick)
      object.removeTag("Selected")
      highlightOff(object)
 
+     updateReadyButtons({player, false})
+
      queueUpdate(player, true)
 end
 
@@ -2181,6 +2230,9 @@ function updateHelpText(playerColor)
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
                         militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
+
+                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                        return
                     elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
                         doMilitary = true
                         militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
@@ -2289,7 +2341,7 @@ function updateVp(player)
         elseif obj.type == "Card" and not obj.hasTag("Action Card") then
             if obj.is_face_down and obj.getDescription() ~= "" then -- the card is a good
                 goodsCount = goodsCount + 1
-            else
+            elseif not obj.is_face_down then
                 local info = card_db[obj.getName()]
 
                 cardNames[obj.getName()] = true

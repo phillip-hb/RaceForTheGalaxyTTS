@@ -9,7 +9,7 @@ function createSelectButtonOnCard(card)
          width = 600,
          height = 1000,
          font_size = 150,
-         color = color(1, 1, 1, 0.5),
+         color = color(0, 1, 1, 0.5),
          tooltip = 'Select "' .. card.getName() .. '"'
     })
 end
@@ -23,7 +23,7 @@ function createCancelButtonOnCard(card)
          width = 600,
          height = 1000,
          font_size = 150,
-         color = color(1, 1, 1, 0.5),
+         color = color(1, 0.5, 0.5, 0.5),
          tooltip = 'Cancel "' .. card.getName() .. '"'
     })
 end

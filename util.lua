@@ -104,3 +104,17 @@ function deleteLinkedListNode(list, value)
 
     return list
 end
+
+function getLinkedListNode(list, value)
+    local node = list
+
+    while node do
+        if node.value == value then
+            return node
+        end
+        
+        if not node.next then return end
+
+        node = node.next
+    end
+end
