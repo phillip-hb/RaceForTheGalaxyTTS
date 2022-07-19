@@ -374,6 +374,21 @@ function countCardsInHand(playerColor, countMarked)
      end
 end
 
+function countDiscardInHand(playerColor, countMarked)
+    countMarked = countMarked == nil and false or countMarked
+
+    local objs = Player[playerColor].getHandObjects(1)
+
+    local n = 0
+    for _, obj in pairs(objs) do
+        if obj.hasTag("Discard") and not obj.hasTag("Marked") or countMarked then
+            n = n + 1
+        end
+    end
+
+    return n
+end
+
 -- returns number of selected actions. 0 = no actions selected.
 function getSelectedActionsCount(player)
      local i = playerData[player].index
@@ -625,7 +640,7 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     end
 
     -- check to see if the object is in the player's hand zone to prevent mark for deletion
-    if object.hasTag("Selected") and inHandZone and flip == 180 then
+    if (object.hasTag("Selected") or object.hasTag("Explore Highlight") and currentPhaseIndex == -1) and inHandZone and flip == 180 then
         local rot = object.getRotation()
         object.setRotation({rot[1], rot[2], 0})
     elseif object.hasTag("Marked") and inHandZone and flip == 0 then
@@ -1674,6 +1689,7 @@ function updateTableauState(player)
                 if selectedCard then
                     for name, power in pairs(ap) do
                         local powerName = ""
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
                         if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] then
                             goto skip_power
@@ -1711,7 +1727,7 @@ function updateTableauState(player)
                             end
                         end
 
-                        if powerName ~= "" and not miscSelected then
+                        if powerName ~= "" and not miscSelected and not used then
                             createdButton = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][powerName])
                         elseif miscSelected then
@@ -2009,11 +2025,12 @@ function confirmPowerClick(obj, player, rightClick)
         if power.name == "MILITARY_HAND" then
             local marked = discardMarkedCards(player, true)
             n = #marked
+            p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
         end
 
         if n == 0 then return end
 
-        markUsedMisc(player, obj, power, power.strength)
+        markUsedMisc(player, obj, power, n)
         return
     elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
@@ -2154,6 +2171,7 @@ function updateHelpText(playerColor)
     local powers = p.powersSnapshot
     local handCount = p.handCountSnapshot
     local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
+    local discardInHand = countDiscardInHand(playerColor, false)
     local currentPhase = getCurrentPhase()
 
     -- opening hand
