@@ -1452,6 +1452,8 @@ function capturePowersSnapshot(player, phase)
             local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
             if mil and next(mil.codes) == nil then
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
+            elseif mil and mil.codes["PER_MILITARY"] then
+                perMilitary = true
             end
         end
 
