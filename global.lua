@@ -6,7 +6,7 @@ require("gameUi")
 currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
-placeTwoTriggered = false
+placeTwoPhase = false
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
@@ -38,7 +38,7 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 
-requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
     ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
@@ -137,7 +137,7 @@ function onSave()
     saved_data.drawDeck_GUID = drawDeck_GUID
     saved_data.advanced2p = advanced2p
     saved_data.playerData = playerData
-    saved_data.placeTwoTriggered = placeTwoTriggered
+    saved_data.placeTwoPhase = placeTwoPhase
     return JSON.encode(saved_data)
 end
 
@@ -155,7 +155,7 @@ function onload(saved_data)
         drawDeck_GUID = data.drawDeck_GUID
         advanced2p = data.advanced2p
         playerData = data.playerData
-        placeTwoTriggered = data.placeTwoTriggered or false
+        placeTwoPhase = data.placeTwoPhase or false
     end
 
     card_db = loadData(0)
@@ -904,6 +904,12 @@ function playerReadyClicked(playerColor)
             updateReadyButtons({playerColor, false})
             return
         end
+    elseif currentPhase == 4 or currentPhase == 5 then
+        if p.selectedCard and requiresConfirm[p.selectedCardPower] then
+            broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
     end
 
     startLuaCoroutine(Global, "checkAllReadyCo")
@@ -958,10 +964,8 @@ function checkAllReadyCo()
     if discardHappened then wait(0.1) end
 
     -- play selected cards in hand
-    local skipPlaceTwo = placeTwoTriggered
-    placeTwoTriggered = false
     local placeTwo = {false,false,false,false}
-
+    local placeTwoTriggered = false
     for _, player in pairs(players) do
         for _, obj in pairs(Player[player].getHandObjects(1)) do
             if obj.type == 'Card' and obj.hasTag("Selected") then
@@ -973,8 +977,9 @@ function checkAllReadyCo()
         end
 
         local p = playerData[player]
-        if not skipPlaceTwo and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
+        if not placeTwoPhase and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
             placeTwo[p.index] = true
+            placeTwoPhase = true
             placeTwoTriggered = true
         end
 
@@ -1110,6 +1115,8 @@ function beginNextPhase()
     end
 
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
+
+    placeTwoPhase = false
 
     -- Apply end of phase powers here
     if getCurrentPhase() == 5 then
@@ -1353,7 +1360,7 @@ function capturePowersSnapshot(player, phase)
         local info = card_db[card.getName()]
 
         -- Place two triggered, skip the action card power and the last played card's powers
-        if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
+        if placeTwoPhase and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
             goto next_card
         end
 
@@ -1500,7 +1507,7 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoTriggered and not p.powersSnapshot["PLACE_TWO"] then
+            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] then
                 goto skip
             end
 
@@ -1703,7 +1710,7 @@ function updateTableauState(player)
 
             if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
-            elseif placeTwoTriggered and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+            elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
                 card.highlightOn("Yellow")
             end
 
@@ -2297,7 +2304,7 @@ function updateHelpText(playerColor)
                 end
             end
         else
-            if placeTwoTriggered then
+            if placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Please wait for other players.")
                 else
