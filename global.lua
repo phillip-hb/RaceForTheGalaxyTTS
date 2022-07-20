@@ -56,9 +56,6 @@ compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
     ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
-    -- ["DISCARD|REDUCE_ZERO"] = {["PAY_MILITARY"]=1},
-    -- ["DISCARD|EXTRA_MILITARY"] = {["DISCARD_CONQUER_SETTLE"]=1},
-    -- ["MILITARY_HAND"] = {["DISCARD_CONQUER_SETTLE"]=1, ["DISCARD|EXTRA_MILITARY"]=1},
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -328,23 +325,23 @@ function getVpChips(player, n)
 end
 
 function getCardActions(phase, card)
-     local data = cardData[card.getName()]
+    local data = cardData[card.getName()]
 
-     if not data.powers[phase] then
-          return nil
-     end
+    if not data.powers[phase] then
+        return nil
+    end
 
-     local results = {}
+    local results = {}
 
-     for i, data in pairs(data.powers[phase]) do
-          if phase == "3" and settleActions[data.name] or
-             phase == "4" and consumeActions[data.name] or
-             phase == "5" and produceActions[data.name] then
-               results[i] = {name = data.name, data = data}
-          end
-     end
+    for i, data in pairs(data.powers[phase]) do
+        if phase == "3" and settleActions[data.name] or
+            phase == "4" and consumeActions[data.name] or
+            phase == "5" and produceActions[data.name] then
+            results[i] = {name = data.name, data = data}
+        end
+    end
 
-     return results
+    return results
 end
 
 function checkIfSelectedAction(player, actionName)
@@ -361,23 +358,23 @@ end
 
 -- countMarked = whether or not to include face-down cards in the count (default is true)
 function countCardsInHand(playerColor, countMarked)
-     countMarked = countMarked == nil and true or countMarked
+    countMarked = countMarked == nil and true or countMarked
 
-     local objs = Player[playerColor].getHandObjects(1)
+    local objs = Player[playerColor].getHandObjects(1)
 
-     if countMarked then
-          return #objs
-     else
-          local n = 0
+    if countMarked then
+        return #objs
+    else
+        local n = 0
 
-          for _, obj in pairs(objs) do
-               if (not obj.hasTag("Discard") or obj.hasTag("Marked")) and not obj.hasTag("Action Card") then
-                    n = n + 1
-               end
-          end
+        for _, obj in pairs(objs) do
+            if (not obj.hasTag("Discard") or obj.hasTag("Marked")) and not obj.hasTag("Action Card") then
+                n = n + 1
+            end
+        end
 
-          return n
-     end
+        return n
+    end
 end
 
 function countDiscardInHand(playerColor, countMarked)
@@ -397,17 +394,17 @@ end
 
 -- returns number of selected actions. 0 = no actions selected.
 function getSelectedActionsCount(player)
-     local i = playerData[player].index
-     local zone = getObjectFromGUID(selectedActionZone_GUID[i])
-     local n = 0
+    local i = playerData[player].index
+    local zone = getObjectFromGUID(selectedActionZone_GUID[i])
+    local n = 0
 
-     for _, obj in pairs(zone.getObjects()) do
-          if obj.hasTag("Action Card") then
-               n = n + 1
-          end
-     end
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.hasTag("Action Card") then
+            n = n + 1
+        end
+    end
 
-     return n
+    return n
 end
 
 -- returns number of cards discarded from hand
@@ -431,50 +428,50 @@ end
 
 -- check zone for any 'Selected' cards and attempt to play them
 function attemptPlayCard(card, player)
-     if type(card) == "table" then
-          player = card[2]
-          card = card[1]
-     end
+    if type(card) == "table" then
+        player = card[2]
+        card = card[1]
+    end
 
-     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
-     local sp = tableau.getSnapPoints()
+    local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    local sp = tableau.getSnapPoints()
 
-     -- Find first empty spot on tableau
-     for i=1, #sp do
-          local hits = Physics.cast({
-               origin = tableau.positionToWorld(add(sp[i].position, {0,1,0})),
-               direction = {0, -1, 0},
-               max_direction = 2
-          })
+    -- Find first empty spot on tableau
+    for i=1, #sp do
+        local hits = Physics.cast({
+            origin = tableau.positionToWorld(add(sp[i].position, {0,1,0})),
+            direction = {0, -1, 0},
+            max_direction = 2
+        })
 
-          -- found empty spot
-          if hits[1].hit_object.hasTag("Slot") then
-               -- trigger certain power bonuses based on phase
-               if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
-                    local phase = getCurrentPhase()
-                    local powers = playerData[player].powersSnapshot
-                    if powers["DRAW_AFTER"] then
-                         dealTo(powers["DRAW_AFTER"], player)
-                    end
-               end
+        -- found empty spot
+        if hits[1].hit_object.hasTag("Slot") then
+            -- trigger certain power bonuses based on phase
+            if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
+                local phase = getCurrentPhase()
+                local powers = playerData[player].powersSnapshot
+                if powers["DRAW_AFTER"] then
+                    dealTo(powers["DRAW_AFTER"], player)
+                end
+            end
 
-               local pos = tableau.positionToWorld(sp[i].position)
-               local rot = tableau.getRotation()
-               card.setPosition(add(pos, {0, 0.02, 0}))
-               card.setRotation({rot[1], rot[2], 0})
-               card.removeTag("Selected")
-               card.setLock(true)
-               highlightOff(card)
-                playerData[player].lastPlayedCard = card.getGUID()
+            local pos = tableau.positionToWorld(sp[i].position)
+            local rot = tableau.getRotation()
+            card.setPosition(add(pos, {0, 0.02, 0}))
+            card.setRotation({rot[1], rot[2], 0})
+            card.removeTag("Selected")
+            card.setLock(true)
+            highlightOff(card)
+            playerData[player].lastPlayedCard = card.getGUID()
 
-               -- if windfall, place a goods on top
-               if card_db[card.getName()].flags["WINDFALL"] then
-                    placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
-               end
+            -- if windfall, place a goods on top
+            if card_db[card.getName()].flags["WINDFALL"] then
+                placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
+            end
 
-               return
-          end
-     end
+            return
+        end
+    end
 end
 
 function placeGoodsAt(position, yRotation, player)
@@ -506,38 +503,38 @@ function reshuffleDiscardPile()
 end
 
 function getDeckOrCardInZone(zone)
-     for _, obj in pairs(zone.getObjects()) do
-          if obj.type == 'Deck' or obj.type == 'Card' then
-               return obj
-          end
-     end
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.type == 'Deck' or obj.type == 'Card' then
+            return obj
+        end
+    end
 
-     return nil
+    return nil
 end
 
 function drawCard()
-     local card = nil
-     if not drawDeck or drawDeck.isDestroyed() then
-          drawDeck = getDeckOrCardInZone(drawZone)
-          if not drawDeck then
-               drawDeck = reshuffleDiscardPile()
-          end
-     end
+    local card = nil
+    if not drawDeck or drawDeck.isDestroyed() then
+        drawDeck = getDeckOrCardInZone(drawZone)
+        if not drawDeck then
+            drawDeck = reshuffleDiscardPile()
+        end
+    end
 
-     if drawDeck.type == 'Deck' then
-          card = drawDeck.takeObject()
+    if drawDeck.type == 'Deck' then
+        card = drawDeck.takeObject()
 
-          if drawDeck.remainder then
-               drawDeck = drawDeck.remainder
-          end
-     elseif drawDeck.type == 'Card' then
-          card = drawDeck
-          drawDeck = reshuffleDiscardPile()
-     end
+        if drawDeck.remainder then
+            drawDeck = drawDeck.remainder
+        end
+    elseif drawDeck.type == 'Card' then
+        card = drawDeck
+        drawDeck = reshuffleDiscardPile()
+    end
 
-     drawDeck_GUID = drawDeck.getGUID()
+    drawDeck_GUID = drawDeck.getGUID()
 
-     return card
+    return card
 end
 
 function discardCard(card)
@@ -563,14 +560,14 @@ function discardCard(card)
 end
 
 function dealTo(n, player)
-     for i=1, n do
-          local card = drawCard()
-          Wait.frames(
-               function()
-                    card.addTag("Ignore Tableau")
-                    card.deal(1, player)
-               end, 1, 0)
-     end
+    for i=1, n do
+        local card = drawCard()
+        Wait.frames(
+            function()
+                card.addTag("Ignore Tableau")
+                card.deal(1, player)
+            end, 1, 0)
+    end
 end
 
 function resetPlayerState(player)
@@ -590,30 +587,30 @@ end
 
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
 function allCardsInTableau(player)
-     local pi = playerData[player].index
-     local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()
-     local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()
+    local pi = playerData[player].index
+    local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()
+    local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()
 
-     for _, item in pairs(actionCards) do
-          if item.hasTag("Action Card") then
-               objs[#objs + 1] = item
-          end
-     end
+    for _, item in pairs(actionCards) do
+        if item.hasTag("Action Card") then
+            objs[#objs + 1] = item
+        end
+    end
 
-     local n = #objs
-     local i = 0
+    local n = #objs
+    local i = 0
 
-     return function()
-               i = i + 1
+    return function()
+            i = i + 1
 
-               while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
-                    i = i + 1
-               end
+            while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
+                i = i + 1
+            end
 
-               if i <= n then
-                    return objs[i]
-               end
-          end
+            if i <= n then
+                return objs[i]
+            end
+        end
 end
 
 -- ======================
@@ -787,19 +784,7 @@ function onObjectEnterZone(zone, object)
 end
 
 function onObjectEnterContainer(container, enter_object)
-     if container.hasTag("VP") then
-          for _, zone in pairs(container.getZones()) do
-               local owner = tableauZoneOwner[zone.getGUID()]
-               if owner then
-                    queueUpdate(owner)
-                    return
-               end
-          end
-     end
-end
-
-function onObjectLeaveContainer(container, leave_object)
-     if container.hasTag("VP") then
+    if container.hasTag("VP") then
         for _, zone in pairs(container.getZones()) do
             local owner = tableauZoneOwner[zone.getGUID()]
             if owner then
@@ -807,7 +792,19 @@ function onObjectLeaveContainer(container, leave_object)
                 return
             end
         end
-     end
+    end
+end
+
+function onObjectLeaveContainer(container, leave_object)
+    if container.hasTag("VP") then
+        for _, zone in pairs(container.getZones()) do
+            local owner = tableauZoneOwner[zone.getGUID()]
+            if owner then
+                queueUpdate(owner)
+                return
+            end
+        end
+    end
 end
 
 function onUpdate()
@@ -1003,6 +1000,7 @@ function checkAllReadyCo()
         queueUpdate(player, true)
     end
 
+    -- Trigger Improved Logistics
     for _, player in pairs(players) do
         if placeTwoTriggered then
             if placeTwo[playerData[player].index] then
@@ -1013,7 +1011,6 @@ function checkAllReadyCo()
         end
     end
 
-    -- Trigger Improved Logistics
     if placeTwoTriggered then
         return 1
     end
@@ -1368,7 +1365,7 @@ function capturePowersSnapshot(player, phase)
 
     local results = {}
 
-    -- -- Default values for certain phases
+    -- -- Default values for Explore phase
     if phase == "1" then
         results["DRAW"] = 2
         results["KEEP"] = 1
@@ -1448,8 +1445,10 @@ function capturePowersSnapshot(player, phase)
 
                 ::skip::
             end
+        end
+
         -- Count base military for stat display purposes
-        elseif phase ~= "3" and info.passivePowers["3"] then               
+        if phase ~= "3" and info.passivePowers["3"] then               
             local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
             if mil and next(mil.codes) == nil then
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
@@ -1492,6 +1491,10 @@ function capturePowersSnapshot(player, phase)
 
             list = list.next
         end
+    end
+
+    if placeTwoPhase then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
     end
 
     p.powersSnapshot = results
