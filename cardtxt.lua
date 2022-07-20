@@ -1711,7 +1711,7 @@ activePowers = {
           DISCARD_REDUCE = "Discard this card to reduce cost."
      },
      ["3"] = {
-          DISCARD = "Discard from tableau to use.",
+          DISCARD = "Discard from tableau to ",
           DISCARD_CONQUER_SETTLE = "Discard from tableau to place normal world as military world.",
           PAY_MILITARY = "Place military world as normal world.",
           MILITARY_HAND = "Discard from hand for bonus military.",
@@ -1748,6 +1748,12 @@ activePowers = {
           DRAW_CHROMO = "Draw 2 cards for each Gene world w/ Chromosome in tableau.",
           DRAW_REBEL = "Draw 1 card for each Rebel world in tableau."
      }
+}
+
+subtooltip = {
+     REDUCE_ZERO = "settle normal world (non-Alien) for free.",
+     EXTRA_MILITARY = "gain extra military.",
+     TAKEOVER_MILITARY = "perform takeover."
 }
 
 function loadData(expansions)

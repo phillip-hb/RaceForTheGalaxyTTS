@@ -480,6 +480,19 @@ function attemptPlayCard(card, player)
     end
 end
 
+function getTooltip(phase, power)
+    local tooltip = activePowers[phase][power.name]
+    if power.name == "DISCARD" then
+        for code, v in pairs(power.codes) do
+            if subtooltip[code] then
+                tooltip = tooltip .. subtooltip[code]
+                break
+            end
+        end
+    end
+    return tooltip
+end
+
 function placeGoodsAt(position, yRotation, player)
      local card = drawCard()
 
@@ -1809,7 +1822,7 @@ function updateTableauState(player)
 
                         if powerName ~= "" and not miscSelected and not used then
                             createdButton = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][powerName])
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
                             createCancelButton(card)
 
@@ -1825,7 +1838,7 @@ function updateTableauState(player)
                         -- make buttons for takeover powers
                         if power.codes["TAKEOVER_MILITARY"] and not miscSelected then
                             createButton = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
                             createCancelButton(card)
                         end
