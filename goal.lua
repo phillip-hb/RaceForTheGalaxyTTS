@@ -7,7 +7,7 @@ mostGoalsPlacement = {{5.69, 1.48, -1.01},{5.69, 1.48, 0.96}}
 tableSurface_GUID = "4ee1f2"
 tiedVpBag_GUID = "d95c9e"
 
-function onsave()
+function onSave()
     local data = {}
     data.owner = owner
     data.tiedOwners = tiedOwners
@@ -18,9 +18,7 @@ function onload(saved_data)
     if saved_data ~= "" then
         local data = JSON.decode(saved_data)
         owner = data.owner
-        tiedOwners = data.tiedOwners
-
-        if not tiedOwners then tiedOwners = {} end
+        tiedOwners = data.tiedOwners or {}
     end
 end
 

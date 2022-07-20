@@ -6,7 +6,7 @@ require("gameUi")
 currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
-placeTwoTriggered = false
+placeTwoPhase = false
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
@@ -37,8 +37,9 @@ queueUpdateState = {Yellow=false, Red=false, Blue=false, Green=false}
 updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
+gameDone = false
 
-requiresConfirm = {["DISCARD_HAND"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
     ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 goodsHighlightColor = {
@@ -47,12 +48,14 @@ goodsHighlightColor = {
      ["GENE"] = color(0.278, 0.760, 0.141),
      ["ALIEN"] = color(0.933, 0.909, 0.105),
 }
+optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1}
 
--- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the second a matching code
+-- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the rest are matching codes.
+-- Key = card's power, Value = what the key can be chained with
 compatible = {
-    ["DISCARD|REDUCE_ZERO"] = {"PAY_MILITARY"},
-    ["DISCARD|EXTRA_MILITARY"] = {"MILITARY_HAND", "DISCARD_CONQUER_SETTLE"},
-    ["MILITARY_HAND"] = {"DISCARD|EXTRA_MILITARY", "DISCARD_CONQUER_SETTLE"},
+    ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
+    ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
+    ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -132,7 +135,7 @@ function onSave()
     saved_data.drawDeck_GUID = drawDeck_GUID
     saved_data.advanced2p = advanced2p
     saved_data.playerData = playerData
-    saved_data.placeTwoTriggered = placeTwoTriggered
+    saved_data.placeTwoPhase = placeTwoPhase
     return JSON.encode(saved_data)
 end
 
@@ -150,7 +153,7 @@ function onload(saved_data)
         drawDeck_GUID = data.drawDeck_GUID
         advanced2p = data.advanced2p
         playerData = data.playerData
-        placeTwoTriggered = data.placeTwoTriggered or false
+        placeTwoPhase = data.placeTwoPhase or false
     end
 
     card_db = loadData(0)
@@ -160,7 +163,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            --if obj then obj.interactable = false end
+            if obj then obj.interactable = false end
         end
     end
 
@@ -212,7 +215,7 @@ function getCurrentPhase()
             phase = 2
         elseif phase == 4 or phase == 5 then
             phase = 3
-        elseif phase >= 6 then
+        elseif phase >= 6 and phase < 100 then
             phase = phase - 2
         end
     end
@@ -318,23 +321,23 @@ function getVpChips(player, n)
 end
 
 function getCardActions(phase, card)
-     local data = cardData[card.getName()]
+    local data = cardData[card.getName()]
 
-     if not data.powers[phase] then
-          return nil
-     end
+    if not data.powers[phase] then
+        return nil
+    end
 
-     local results = {}
+    local results = {}
 
-     for i, data in pairs(data.powers[phase]) do
-          if phase == "3" and settleActions[data.name] or
-             phase == "4" and consumeActions[data.name] or
-             phase == "5" and produceActions[data.name] then
-               results[i] = {name = data.name, data = data}
-          end
-     end
+    for i, data in pairs(data.powers[phase]) do
+        if phase == "3" and settleActions[data.name] or
+            phase == "4" and consumeActions[data.name] or
+            phase == "5" and produceActions[data.name] then
+            results[i] = {name = data.name, data = data}
+        end
+    end
 
-     return results
+    return results
 end
 
 function checkIfSelectedAction(player, actionName)
@@ -351,71 +354,85 @@ end
 
 -- countMarked = whether or not to include face-down cards in the count (default is true)
 function countCardsInHand(playerColor, countMarked)
-     countMarked = countMarked == nil and true or countMarked
+    countMarked = countMarked == nil and true or countMarked
 
-     local objs = Player[playerColor].getHandObjects(1)
+    local objs = Player[playerColor].getHandObjects(1)
 
-     if countMarked then
-          return #objs
-     else
-          local n = 0
+    if countMarked then
+        return #objs
+    else
+        local n = 0
 
-          for _, obj in pairs(objs) do
-               if not obj.hasTag("Discard") and not obj.hasTag("Action Card") then
-                    n = n + 1
-               end
-          end
+        for _, obj in pairs(objs) do
+            if (not obj.hasTag("Discard") or obj.hasTag("Marked")) and not obj.hasTag("Action Card") then
+                n = n + 1
+            end
+        end
 
-          return n
-     end
+        return n
+    end
+end
+
+function countDiscardInHand(playerColor, countMarked)
+    countMarked = countMarked == nil and false or countMarked
+
+    local objs = Player[playerColor].getHandObjects(1)
+
+    local n = 0
+    for _, obj in pairs(objs) do
+        if obj.hasTag("Discard") and not obj.hasTag("Marked") or countMarked then
+            n = n + 1
+        end
+    end
+
+    return n
 end
 
 -- returns number of selected actions. 0 = no actions selected.
 function getSelectedActionsCount(player)
-     local i = playerData[player].index
-     local zone = getObjectFromGUID(selectedActionZone_GUID[i])
-     local n = 0
+    local i = playerData[player].index
+    local zone = getObjectFromGUID(selectedActionZone_GUID[i])
+    local n = 0
 
-     for _, obj in pairs(zone.getObjects()) do
-          if obj.hasTag("Action Card") then
-               n = n + 1
-          end
-     end
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.hasTag("Action Card") then
+            n = n + 1
+        end
+    end
 
-     return n
+    return n
 end
 
 -- returns number of cards discarded from hand
-function discardMarkedCards(player)
-     local count = 0
-     for _, obj in pairs(Player[player].getHandObjects(1)) do
-          if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
-               discardCard(obj)
-               count = count + 1
-          end
-     end
+function discardMarkedCards(player, markForDiscard)
+    if markForDiscard == nil then markForDiscard = false end
 
-     return count
+    local cards = {}
+    for _, obj in pairs(Player[player].getHandObjects(1)) do
+        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
+            if markForDiscard and not obj.hasTag("Marked") then
+                obj.addTag("Marked")
+                cards[#cards + 1] = obj
+            elseif not markForDiscard then
+                discardCard(obj)
+                cards[#cards + 1] = obj
+            end
+        end
+    end
+    return cards
 end
 
 -- check zone for any 'Selected' cards and attempt to play them
 function attemptPlayCard(card, player)
-     if type(card) == "table" then
-          player = card[2]
-          card = card[1]
-     end
+    if type(card) == "table" then
+        player = card[2]
+        card = card[1]
+    end
 
-     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
-     local sp = tableau.getSnapPoints()
+    local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    local sp = tableau.getSnapPoints()
 
-     -- Find first empty spot on tableau
-     for i=1, #sp do
-          local hits = Physics.cast({
-               origin = tableau.positionToWorld(add(sp[i].position, {0,1,0})),
-               direction = {0, -1, 0},
-               max_direction = 2
-          })
-
+<<<<<<< HEAD
           -- found empty spot
           if hits[1].hit_object == tableau then
                -- trigger certain power bonuses based on phase
@@ -426,23 +443,44 @@ function attemptPlayCard(card, player)
                          dealTo(powers["DRAW_AFTER"], player)
                     end
                end
+=======
+    -- Find first empty spot on tableau
+    for i=1, #sp do
+        local hits = Physics.cast({
+            origin = tableau.positionToWorld(add(sp[i].position, {0,1,0})),
+            direction = {0, -1, 0},
+            max_direction = 2
+        })
+>>>>>>> oldSystem
 
-               local pos = tableau.positionToWorld(sp[i].position)
-               local rot = tableau.getRotation()
-               card.setPosition(add(pos, {0, 0.02, 0}))
-               card.setRotation({rot[1], rot[2], 0})
-               card.removeTag("Selected")
-               highlightOff(card)
-                playerData[player].lastPlayedCard = card.getGUID()
+        -- found empty spot
+        if hits[1].hit_object.hasTag("Slot") then
+            -- trigger certain power bonuses based on phase
+            if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
+                local phase = getCurrentPhase()
+                local powers = playerData[player].powersSnapshot
+                if powers["DRAW_AFTER"] then
+                    dealTo(powers["DRAW_AFTER"], player)
+                end
+            end
 
-               -- if windfall, place a goods on top
-               if card_db[card.getName()].flags["WINDFALL"] then
-                    placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
-               end
+            local pos = tableau.positionToWorld(sp[i].position)
+            local rot = tableau.getRotation()
+            card.setPosition(add(pos, {0, 0.02, 0}))
+            card.setRotation({rot[1], rot[2], 0})
+            card.removeTag("Selected")
+            card.setLock(true)
+            highlightOff(card)
+            playerData[player].lastPlayedCard = card.getGUID()
 
-               return
-          end
-     end
+            -- if windfall, place a goods on top
+            if card_db[card.getName()].flags["WINDFALL"] then
+                placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
+            end
+
+            return
+        end
+    end
 end
 
 function placeGoodsAt(position, yRotation, player)
@@ -474,46 +512,47 @@ function reshuffleDiscardPile()
 end
 
 function getDeckOrCardInZone(zone)
-     for _, obj in pairs(zone.getObjects()) do
-          if obj.type == 'Deck' or obj.type == 'Card' then
-               return obj
-          end
-     end
+    for _, obj in pairs(zone.getObjects()) do
+        if obj.type == 'Deck' or obj.type == 'Card' then
+            return obj
+        end
+    end
 
-     return nil
+    return nil
 end
 
 function drawCard()
-     local card = nil
-     if not drawDeck or drawDeck.isDestroyed() then
-          drawDeck = getDeckOrCardInZone(drawZone)
-          if not drawDeck then
-               drawDeck = reshuffleDiscardPile()
-          end
-     end
+    local card = nil
+    if not drawDeck or drawDeck.isDestroyed() then
+        drawDeck = getDeckOrCardInZone(drawZone)
+        if not drawDeck then
+            drawDeck = reshuffleDiscardPile()
+        end
+    end
 
-     if drawDeck.type == 'Deck' then
-          card = drawDeck.takeObject()
+    if drawDeck.type == 'Deck' then
+        card = drawDeck.takeObject()
 
-          if drawDeck.remainder then
-               drawDeck = drawDeck.remainder
-          end
-     elseif drawDeck.type == 'Card' then
-          card = drawDeck
-          drawDeck = reshuffleDiscardPile()
-     end
+        if drawDeck.remainder then
+            drawDeck = drawDeck.remainder
+        end
+    elseif drawDeck.type == 'Card' then
+        card = drawDeck
+        drawDeck = reshuffleDiscardPile()
+    end
 
-     drawDeck_GUID = drawDeck.getGUID()
+    drawDeck_GUID = drawDeck.getGUID()
 
-     return card
+    return card
 end
 
 function discardCard(card)
      card.memo = ''
      card.setDescription('')
-     card.setTags({""})
+     card.setTags({})
      card.highlightOff()
      card.setScale({1,1,1})
+     card.setLock(false)
 
      if not discardPile or discardPile.isDestroyed() then
           discardPile = getDeckOrCardInZone(discardZone)
@@ -530,14 +569,14 @@ function discardCard(card)
 end
 
 function dealTo(n, player)
-     for i=1, n do
-          local card = drawCard()
-          Wait.frames(
-               function()
-                    card.addTag("Ignore Tableau")
-                    card.deal(1, player)
-               end, 1, 0)
-     end
+    for i=1, n do
+        local card = drawCard()
+        Wait.frames(
+            function()
+                card.addTag("Ignore Tableau")
+                card.deal(1, player)
+            end, 1, 0)
+    end
 end
 
 function resetPlayerState(player)
@@ -557,30 +596,30 @@ end
 
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
 function allCardsInTableau(player)
-     local pi = playerData[player].index
-     local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()
-     local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()
+    local pi = playerData[player].index
+    local objs = getObjectFromGUID(tableauZone_GUID[pi]).getObjects()
+    local actionCards = getObjectFromGUID(selectedActionZone_GUID[pi]).getObjects()
 
-     for _, item in pairs(actionCards) do
-          if item.hasTag("Action Card") then
-               objs[#objs + 1] = item
-          end
-     end
+    for _, item in pairs(actionCards) do
+        if item.hasTag("Action Card") then
+            objs[#objs + 1] = item
+        end
+    end
 
-     local n = #objs
-     local i = 0
+    local n = #objs
+    local i = 0
 
-     return function()
-               i = i + 1
+    return function()
+            i = i + 1
 
-               while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
-                    i = i + 1
-               end
+            while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
+                i = i + 1
+            end
 
-               if i <= n then
-                    return objs[i]
-               end
-          end
+            if i <= n then
+                return objs[i]
+            end
+        end
 end
 
 -- ======================
@@ -602,6 +641,20 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
         end
     end
 
+    -- check to see if the object is in the player's hand zone to prevent mark for deletion
+    if (object.hasTag("Selected") or 
+            object.hasTag("Explore Highlight") and currentPhaseIndex == -1 or 
+            not object.hasTag("Explore Highlight") and getCurrentPhase() == 1) and
+            inHandZone and flip == 180 then
+        local rot = object.getRotation()
+        object.setRotation({rot[1], rot[2], 0})
+        return
+    elseif object.hasTag("Marked") and inHandZone and flip == 0 then
+        local rot = object.getRotation()
+        object.setRotation({rot[1], rot[2], 180})
+        return
+    end
+
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
         if flip == 180 then
             object.addTag("Discard")
@@ -610,13 +663,6 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
         end
 
         updateHelpText(player_color)
-    end
-
-    -- check to see if the object is in the player's hand zone to prevent mark for deletion
-    if object.hasTag("Selected") and inHandZone and flip == 180 then
-        local rot = object.getRotation()
-        object.setRotation({rot[1], rot[2], 0})
-        return
     end
 end
 
@@ -745,19 +791,7 @@ function onObjectEnterZone(zone, object)
 end
 
 function onObjectEnterContainer(container, enter_object)
-     if container.hasTag("VP") then
-          for _, zone in pairs(container.getZones()) do
-               local owner = tableauZoneOwner[zone.getGUID()]
-               if owner then
-                    queueUpdate(owner)
-                    return
-               end
-          end
-     end
-end
-
-function onObjectLeaveContainer(container, leave_object)
-     if container.hasTag("VP") then
+    if container.hasTag("VP") then
         for _, zone in pairs(container.getZones()) do
             local owner = tableauZoneOwner[zone.getGUID()]
             if owner then
@@ -765,7 +799,19 @@ function onObjectLeaveContainer(container, leave_object)
                 return
             end
         end
-     end
+    end
+end
+
+function onObjectLeaveContainer(container, leave_object)
+    if container.hasTag("VP") then
+        for _, zone in pairs(container.getZones()) do
+            local owner = tableauZoneOwner[zone.getGUID()]
+            if owner then
+                queueUpdate(owner)
+                return
+            end
+        end
+    end
 end
 
 function onUpdate()
@@ -837,8 +883,9 @@ function gameStart(params)
 end
 
 function playerReadyClicked(playerColor)
-    local i = playerData[playerColor]
+    local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
+    local currentPhase = getCurrentPhase()
 
     if currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
         if advanced2p then
@@ -849,6 +896,29 @@ function playerReadyClicked(playerColor)
 
         updateReadyButtons({playerColor, false})
         return
+    elseif currentPhase == 2 or currentPhase == 3 then
+        local node = p.miscSelectedCards
+        while node and node.next do
+            node = node.next
+        end
+
+        if node and node.power and requiresConfirm[concatPowerName(node.power)] then
+            broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
+    elseif currentPhase == 4 or currentPhase == 5 then
+        if p.selectedCard then
+            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
+            if info.activePowers[tostring(currentPhase)] then
+                local power = info.activePowers[tostring(currentPhase)][p.selectedCardPower]
+                if power and requiresConfirm[concatPowerName(power)] then
+                    broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+                    updateReadyButtons({playerColor, false})
+                    return
+                end
+            end
+        end
     end
 
     startLuaCoroutine(Global, "checkAllReadyCo")
@@ -903,10 +973,8 @@ function checkAllReadyCo()
     if discardHappened then wait(0.1) end
 
     -- play selected cards in hand
-    local skipPlaceTwo = placeTwoTriggered
-    placeTwoTriggered = false
     local placeTwo = {false,false,false,false}
-
+    local placeTwoTriggered = false
     for _, player in pairs(players) do
         for _, obj in pairs(Player[player].getHandObjects(1)) do
             if obj.type == 'Card' and obj.hasTag("Selected") then
@@ -918,13 +986,14 @@ function checkAllReadyCo()
         end
 
         local p = playerData[player]
-        if not skipPlaceTwo and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
+        if not placeTwoPhase and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
             placeTwo[p.index] = true
+            placeTwoPhase = true
             placeTwoTriggered = true
         end
 
         -- discard all face down cards in hand
-        local n = discardMarkedCards(player)
+        local n = #discardMarkedCards(player)
         if currentPhaseIndex == #selectedPhases then
             p.roundEndDiscardCount = n
         end
@@ -935,20 +1004,20 @@ function checkAllReadyCo()
 
     for _, player in pairs(players) do
         updateReadyButtons({player, false})
+        queueUpdate(player, true)
     end
 
+    -- Trigger Improved Logistics
     for _, player in pairs(players) do
         if placeTwoTriggered then
             if placeTwo[playerData[player].index] then
                 broadcastToAll("Waiting for " .. Player[player].steam_name .. "'s use of Improved Logistics.", player)
-                queueUpdate(player, true)
             else
                 updateReadyButtons({player, true})
             end
         end
     end
 
-    -- Trigger Improved Logistics
     if placeTwoTriggered then
         return 1
     end
@@ -1004,17 +1073,17 @@ function checkAllReadyCo()
 
         currentPhaseIndex = -1000
 
-        wait(1.2)
+        wait(1.25)
 
         beginNextPhase()
     elseif currentPhaseIndex >= 1 then
         for player, data in pairs(playerData) do
-            capturePowersSnapshot(player)
+            capturePowersSnapshot(player, tostring(getCurrentPhase()))
         end
         endOfPhaseGoalCheck()
 
         if currentPhaseIndex > #selectedPhases then
-            -- round end check
+            -- round end
         else
             beginNextPhase()
         end
@@ -1027,7 +1096,13 @@ function startNewRound()
     selectedPhases = {}
     resetPhaseTiles()
 
-    broadcastToAll("Starting new round.", "White")
+    if checkEndGame() and not gameDone then
+        gameDone = true
+        wait(1.5)
+        broadcastToAll("The game has ended.", "Purple")
+    else
+        broadcastToAll("Starting new round.", "White")
+    end
 
     for player, data in pairs(playerData) do
         resetPlayerState(player)
@@ -1056,6 +1131,8 @@ function beginNextPhase()
 
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
+    placeTwoPhase = false
+
     -- Apply end of phase powers here
     if getCurrentPhase() == 5 then
         local tie = false
@@ -1072,9 +1149,9 @@ function beginNextPhase()
         for player, data in pairs(playerData) do
             if data.powersSnapshot["DRAW_MOST_RARE"] then
                 if tie or most["RARE"] ~= player then
-                    broadcastToColor("Mining Conglomerate: Did not produce most Rare goods this phase.", player, "Grey")
+                    broadcastToColor("Mining Conglomerate: You did not produce the most Rare goods this phase.", player, "Grey")
                 elseif most["RARE"] == player then
-                    broadcastToColor("Mining Conglomerate: Produced most Rare goods this phase.", player, player)
+                    broadcastToColor("Mining Conglomerate: You produced the most Rare goods this phase.", player, player)
                     dealTo(data.powersSnapshot["DRAW_MOST_RARE"], player)
                 end
             end
@@ -1137,6 +1214,27 @@ function beginNextPhase()
     for player, data in pairs(playerData) do
         queueUpdate(player, true)
     end
+end
+
+function checkEndGame()
+    if not gameEndMessage then
+        for player, data in pairs(playerData) do
+            local p = playerData[player]
+            local count = 0
+            for card in allCardsInTableau(player) do
+                if not card.hasTag("Ignore Tableau") and not card.is_face_down and not card.hasTag("Action Card") then
+                    count = count + 1
+                end
+            end
+
+            if p.powersSnapshot["GAME_END_14"] and count >= 14 or not p.powersSnapshot["GAME_END_14"] and count >= 12 then
+                broadcastToAll((Player[player].steam_name or player) .. " has played " .. count .. " cards in their tableau.", player)
+                gameEndMessage = true
+            end
+        end
+    end
+
+    return gameEndMessage
 end
 
 function updatePhaseTilesHighlight()
@@ -1274,15 +1372,15 @@ function capturePowersSnapshot(player, phase)
 
     local results = {}
 
-    -- -- Default values for certain phases
+    -- -- Default values for Explore phase
     if phase == "1" then
         results["DRAW"] = 2
         results["KEEP"] = 1
     end
 
     results["EXTRA_MILITARY"] = 0
-    results["BONUS_MILITARY"] = 0
     results["TEMP_MILITARY"] = 0
+    results["BONUS_MILITARY"] = 0
 
     local ignore2ndDevelop = false
     local ignore2ndSettle = false
@@ -1290,20 +1388,13 @@ function capturePowersSnapshot(player, phase)
     local militaryWorldCount = 0
     local tradeChromoBonus = false
     local perMilitary = false
-    local gameEnd14 = false
-
-    local totalCardsPlayed = 0
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
 
         -- Place two triggered, skip the action card power and the last played card's powers
-        if placeTwoTriggered and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
+        if placeTwoPhase and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
             goto next_card
-        end
-
-        if not card.is_face_down then
-            totalCardsPlayed = totalCardsPlayed + 1
         end
 
         if info.flags["DISCARD_TO_12"] then
@@ -1311,7 +1402,7 @@ function capturePowersSnapshot(player, phase)
         end
 
         if info.flags["GAME_END_14"] then
-            gameEnd14 = true
+            results["GAME_END_14"] = 1
         end
 
         if info.passivePowers[phase] then
@@ -1361,11 +1452,15 @@ function capturePowersSnapshot(player, phase)
 
                 ::skip::
             end
+        end
+
         -- Count base military for stat display purposes
-        elseif phase ~= "3" and info.passivePowers["3"] then               
+        if phase ~= "3" and info.passivePowers["3"] then               
             local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
             if mil and next(mil.codes) == nil then
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
+            elseif mil and mil.codes["PER_MILITARY"] then
+                perMilitary = true
             end
         end
 
@@ -1405,17 +1500,15 @@ function capturePowersSnapshot(player, phase)
         end
     end
 
+    if placeTwoPhase then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
+    end
+
     p.powersSnapshot = results
 
     local statTracker = getObjectFromGUID(statTracker_GUID[p.index])
     if statTracker then
         statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
-    end
-
-    local tableauGameEnd = gameEnd14 and 14 or 12
-    if totalCardsPlayed >= tableauGameEnd and not gameEndMessage then
-        gameEndMessage = true
-        broadcastToAll(tableauGameEnd .. " cards have been played into a tableau. This will be the final round.", "Purple")
     end
 end
 
@@ -1445,7 +1538,7 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoTriggered and not p.powersSnapshot["PLACE_TWO"] then
+            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] then
                 goto skip
             end
 
@@ -1472,6 +1565,8 @@ function updateHandState(playerColor)
 
         if obj.hasTag("Selected") then
             highlightOn(obj, "rgb(0,1,0,1)", playerColor)
+        elseif obj.hasTag("Marked") then
+            highlightOn(obj, "Red", playerColor)
         end
     end
 
@@ -1497,7 +1592,7 @@ function updateTableauState(player)
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
     local currentPhase = tostring(getCurrentPhase())
-
+    local optColor = color(0.5,1,0.9)
     local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
@@ -1522,15 +1617,22 @@ function updateTableauState(player)
     local miscPowerSnapshot = {}
     local miscSelectedCardsTable = {}
     local miscSelectedCount = 0
+    local miscActiveNode = nil
+    local miscActiveNodePowerKey = ""
     local list = p.miscSelectedCards
 
     while list and list.value do
         local card = getObjectFromGUID(list.value)
-        miscSelectedCardsTable[list.value] = card
+        miscSelectedCardsTable[list.value] = list
 
         local info = card_db[card.getName()]
         for name, power in pairs(info.activePowers[currentPhase]) do
             miscPowerSnapshot[name] = power
+        end
+
+        if not list.next then
+            miscActiveNode = list
+            miscActiveNodePowerKey = concatPowerName(miscActiveNode.power)
         end
 
         list = list.next
@@ -1614,12 +1716,13 @@ function updateTableauState(player)
     end
 
     local createdButton = false
+    local currentMiscSelected = nil
 
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
 
-        if p.selectedCard == card.getGUID() then
+        if selectedCard == card then
             highlightOn(card, "rgb(0,1,0)", player)
         end
 
@@ -1627,8 +1730,10 @@ function updateTableauState(player)
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
 
-            if miscSelected or placeTwoTriggered and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+            if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
+            elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+                card.highlightOn("Yellow")
             end
 
             if currentPhase == "2" and ap then
@@ -1647,51 +1752,44 @@ function updateTableauState(player)
                 if selectedCard then
                     for name, power in pairs(ap) do
                         local powerName = ""
+                        local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
-                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] then
+                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
                             goto skip_power
                         end
 
-                        if miscSelectedCount <= 0 then
-                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
-                                powerName = name
-                            end
-                        elseif not miscSelectedCardsTable[card.getGUID()] then
-                            -- check for compatible chains
-                            local key = name
-                            if name == "DISCARD" then
-                                for code, _ in pairs(power.codes) do
-                                    key = key .. "|" .. code
+                        if not used then
+                            if miscSelectedCount <= 0 then
+                                if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
                                 end
-                            end
-
-                            if compatible[key] then
-                                for _, str in pairs(compatible[key]) do
-                                    local tokens = split(str, "|")
-                                    if (#tokens == 1 and miscPowerSnapshot[tokens[1]]) or (miscPowerSnapshot[tokens[1]] and miscPowerSnapshot[tokens[1]][tokens[2]]) then
-                                        powerName = name
-                                        break
-                                    end
+                            elseif not miscSelectedCardsTable[card.getGUID()] then
+                                -- check for compatible chains
+                                local key = concatPowerName(power)
+                                if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
+                                    powerName = power.name
                                 end
                             end
                         end
 
-                        if powerName ~= "" and not miscSelected then
+                        if powerName ~= "" and not miscSelected and not used then
                             createdButton = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][powerName])
                         elseif miscSelected then
                             createCancelButton(card)
 
-                            if requiresConfirm[name] then
-                                createConfirmButton(miscSelected)
+                            if requiresConfirm[fullName] then
+                                createConfirmButton(card)
                             end
                         end
 
@@ -1736,7 +1834,7 @@ function updateTableauState(player)
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
                             createdButton = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
@@ -1815,18 +1913,43 @@ function updateTableauState(player)
     end
 end
 
-function markUsed(player, card, power)
+function markUsed(player, card, power, n)
     local p = playerData[player]
 
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
 
     p.selectedGoods = {}
-    p.cardsAlreadyUsed[card.getGUID()][p.selectedCardPower .. power.index] = true
+    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
     p.selectedCard = nil
     p.selectedCardPower = ""
     p.miscSelectedCards = {}
 
     queueUpdate(player, true)
+end
+
+function markUsedMisc(player, card, power, n)
+    local p = playerData[player]
+
+    if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
+
+    p.selectedGoods = {}
+    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
+    p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, card.getGUID())
+
+    queueUpdate(player, true)
+end
+
+function getActivePower(name, phase, powerIndex)
+    local info = card_db[name]
+    if info and info.activePowers[phase] then
+        for _, power in pairs(info.activePowers[phase]) do
+            if power.index == powerIndex then
+                return power
+            end
+        end
+    end
+
+    return nil
 end
 
 function usePowerClick1(obj, player, button) usePowerClick(obj, player, button, 1) end
@@ -1905,8 +2028,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         end
     end
 
-    local selectedCard = getObjectFromGUID(p.selectedCard)
-    local selectedInfo = card_db[selectedCard.getName()]
     local node = p.miscSelectedCards
 
     while node and node.next do
@@ -1915,11 +2036,12 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if not p.miscSelectedCards then p.miscSelectedCards = {} end
 
+    local power = getActivePower(obj.getName(), currentPhase, powerIndex)
     if not p.miscSelectedCards.value then
-         p.miscSelectedCards = {value = obj.getGUID(), next = nil}
+         p.miscSelectedCards = {value = obj.getGUID(), power=power, next = nil}
          p.miscSelectedCard = obj.getGUID()
     else
-         node.next = {value = obj.getGUID(), next = nil}
+         node.next = {value = obj.getGUID(), power=power, next = nil}
     end
 
     queueUpdate(player, true)
@@ -1930,6 +2052,7 @@ function cancelPowerClick(obj, player, rightClick)
 
     local p = playerData[player]
 
+    p.handCountSnapshot = countCardsInHand(player, true)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
@@ -1948,7 +2071,23 @@ function confirmPowerClick(obj, player, rightClick)
     local currentPhase = tostring(getCurrentPhase())
     local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
 
-    if currentPhase == "5" then
+    p.handCountSnapshot = countCardsInHand(player)
+
+    if currentPhase == "2" or currentPhase == "3" then
+        local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
+        local n = 0
+        power = node.power
+        if power.name == "MILITARY_HAND" then
+            local marked = discardMarkedCards(player, true)
+            n = #marked
+            p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
+        end
+
+        if n == 0 then return end
+
+        markUsedMisc(player, obj, power, n)
+        return
+    elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
             discardMarkedCards(player)
             if power.codes["WINDFALL_ANY"] then
@@ -1961,17 +2100,23 @@ function confirmPowerClick(obj, player, rightClick)
             end
         end
     elseif p.selectedCardPower == "DISCARD_HAND" then
-        local times = math.min(power.times, discardMarkedCards(player))
+        local times = math.min(power.times, #discardMarkedCards(player))
+        if times == 0 then return end
         if power.codes["GET_VP"] then
             getVpChips(player, times)
+        end
+        if power.codes["GET_CARD"] then
+            dealTo(power.strength, player)
         end
     end
 
     markUsed(player, obj, power)
 end
 
-function goodSelectClick(parentCard, player, rightClick)
+function goodSelectClick(slot, player, rightClick)
     if rightClick then return end
+
+    local parentCard = getCard(slot)
 
     local p = playerData[player]
     local selectedCard = getObjectFromGUID(p.selectedCard)
@@ -2059,8 +2204,11 @@ function cardCancelClick(object, player, rightClick)
      p.selectedCard = nil
      p.selectedCardPower = ""
      p.miscSelectedCards = {}
+
      object.removeTag("Selected")
      highlightOff(object)
+
+     updateReadyButtons({player, false})
 
      queueUpdate(player, true)
 end
@@ -2077,14 +2225,13 @@ function updateHelpText(playerColor)
     local powers = p.powersSnapshot
     local handCount = p.handCountSnapshot
     local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
+    local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
 
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
             local discardTarget = powers["DISCARD"]
-            local discarded = handCount - cardsInHand
-
             setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Select your start world.")
@@ -2097,15 +2244,12 @@ function updateHelpText(playerColor)
     -- explore
     elseif currentPhase == 1 then
         local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
-        local discarded = handCount - cardsInHand
-
         setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
     elseif currentPhase == 2 then
         if p.selectedCard then
             local card = getObjectFromGUID(p.selectedCard)
             local info = card_db[card.getName()]
             local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
-            local discarded = handCount - cardsInHand
             local node = p.miscSelectedCards
 
             while node and node.value do
@@ -2138,7 +2282,6 @@ function updateHelpText(playerColor)
             local payMilitaryStr = 0
             local militaryDiscount = 0
             local node = p.miscSelectedCards
-            local militaryHandBonus = 0
 
             while node and node.value do
                 local miscCard = getObjectFromGUID(node.value)
@@ -2152,7 +2295,8 @@ function updateHelpText(playerColor)
                         payMilitaryStr = miscPowers["PAY_MILITARY"].strength
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                        militaryHandBonus = math.min(miscPowers["MILITARY_HAND"].strength, discardCount)
+                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                        return
                     elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
                         doMilitary = true
                         militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
@@ -2162,8 +2306,9 @@ function updateHelpText(playerColor)
             end
 
             if doMilitary and not payMilitary then
-                setHelpText(playerColor, "Settle: " .. info.cost - militaryDiscount .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + militaryHandBonus .. "/" .. info.cost - militaryDiscount .. ")")
+                local def = info.cost - militaryDiscount
+                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
@@ -2173,12 +2318,11 @@ function updateHelpText(playerColor)
                         payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
                     end
                     local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
-                    local discarded = handCount - cardsInHand
                     setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
                 end
             end
         else
-            if placeTwoTriggered then
+            if placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Please wait for other players.")
                 else
@@ -2196,7 +2340,16 @@ function updateHelpText(playerColor)
             if p.selectedCardPower == "TRADE_ACTION" then
                 setHelpText(playerColor, "▲ Consume: select a good to sell.")
             elseif p.selectedCardPower == "DISCARD_HAND" then
-                setHelpText(playerColor, "▼ Consume: discard cards for VP.")
+                local reward = ""
+                local power = info.activePowers["4"][p.selectedCardPower]
+                if power.codes["GET_VP"] then reward = "get VP"
+                elseif power.codes["GET_CARD"] then reward = "draw card"
+                end
+
+                local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                local appendStr = ". (" .. discardCount .. "/" .. power.times .. ")"
+
+                setHelpText(playerColor, "▼ Consume: discard to " .. reward .. appendStr)
             else
                 setHelpText(playerColor, "▲ Consume: select goods to consume.")
             end
@@ -2221,7 +2374,7 @@ function updateHelpText(playerColor)
     elseif currentPhase == 100 then
         local maxHandSize = p.powersSnapshot["DISCARD_TO_12"] and 12 or 10
         local discardTarget = cardsInHand - maxHandSize
-        local discarded = cardsInHand - countCardsInHand(playerColor, false)
+        discarded = cardsInHand - countCardsInHand(playerColor, false)
 
         if cardsInHand > maxHandSize then
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
@@ -2261,7 +2414,7 @@ function updateVp(player)
         elseif obj.type == "Card" and not obj.hasTag("Action Card") then
             if obj.is_face_down and obj.getDescription() ~= "" then -- the card is a good
                 goodsCount = goodsCount + 1
-            else
+            elseif not obj.is_face_down then
                 local info = card_db[obj.getName()]
 
                 cardNames[obj.getName()] = true

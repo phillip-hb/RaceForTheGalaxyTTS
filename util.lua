@@ -58,17 +58,42 @@ function deleteLinkedListNode(list, value)
     local node = list
 
     while node and node.value do
-         if node.value == value then   -- head of list
-              list = {}
-              break
-         elseif node.next and node.next.value == value then
-              node.next = nil
-              break
-         else
-              break
-         end
-         node = node.next
+        if node.value == value then   -- head of list
+            list = {}
+            break
+        elseif node.next and node.next.value == value then
+            node.next = nil
+            break
+        elseif not node.next then
+            break
+        end
+        node = node.next
     end
 
     return list
+end
+
+function getLinkedListNode(list, value)
+    local node = list
+
+    while node do
+        if node.value == value then
+            return node
+        end
+        
+        if not node.next then return nil end
+
+        node = node.next
+    end
+
+    return nil
+end
+
+function concatPowerName(power)
+    local value = power.name
+    if power.name ~= "DISCARD" then return value end
+    for code, _ in pairs(power.codes) do
+        value = value .. "|" .. code
+    end
+    return value
 end

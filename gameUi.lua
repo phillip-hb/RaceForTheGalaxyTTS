@@ -9,7 +9,7 @@ function createSelectButtonOnCard(card)
          width = 600,
          height = 1000,
          font_size = 150,
-         color = color(1, 1, 1, 0.5),
+         color = color(0, 1, 1, 0.5),
          tooltip = 'Select "' .. card.getName() .. '"'
     })
 end
@@ -23,7 +23,7 @@ function createCancelButtonOnCard(card)
          width = 600,
          height = 1000,
          font_size = 150,
-         color = color(1, 1, 1, 0.5),
+         color = color(1, 0.5, 0.5, 0.5),
          tooltip = 'Cancel "' .. card.getName() .. '"'
     })
 end
@@ -40,7 +40,15 @@ function createConfirmButton(card)
     })
 end
 
+<<<<<<< HEAD
 function createUsePowerButton(card, powerIndex, powersCount, tooltip)
+=======
+function createUsePowerButton(card, powerIndex, powersCount, tooltip, color)
+    local slot = getCardSlot(card)
+
+    if not slot then return end
+
+>>>>>>> oldSystem
     local w = 900 / powersCount
     local xW = 1
     local offx = xW / powersCount
@@ -52,9 +60,16 @@ function createUsePowerButton(card, powerIndex, powersCount, tooltip)
         font_size = 150,
         height = 220,
         width = w,
+<<<<<<< HEAD
 
         position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -1.85},
         tooltip = tooltip
+=======
+        scale = {0.5, 1, 0.4},
+        position = {-offx / 2 * (powersCount - 1) + (powerIndex-1) * offx, 0, -0.63},
+        tooltip = tooltip,
+        color = color or "White"
+>>>>>>> oldSystem
     })
 end
 
@@ -72,9 +87,10 @@ function createCancelButton(card)
 end
 
 function createGoodsButton(card, label, color)
-    local offset = {0.6, 1, 0.4}
-    card.clearButtons()
-    card.createButton({
+    local offset = {0.28, 5, 0.13}
+    local slot = getCardSlot(card)
+
+    slot.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
         label = label or "",
@@ -82,7 +98,8 @@ function createGoodsButton(card, label, color)
         color = color or "White",
         width = 500,
         height = 750,
-        position = offset
+        position = offset,
+        scale = {0.5, 2, 0.35}
     })
 end
 

@@ -1711,11 +1711,10 @@ activePowers = {
           DISCARD_REDUCE = "Discard this card to reduce cost."
      },
      ["3"] = {
-          DISCARD = "Discard this card.",
-          DISCARD_CONQUER_SETTLE = "Discard this card.",
+          DISCARD = "Discard from tableau to use.",
+          DISCARD_CONQUER_SETTLE = "Discard from tableau to place normal world as military world.",
           PAY_MILITARY = "Place military world as normal world.",
-          MILITARY_HAND = "Discard from hand.",
-          REDUCE_ZERO = "Reduce settle cost."
+          MILITARY_HAND = "Discard from hand for bonus military.",
      },
      ["4"] = {
           TRADE_ACTION = "Sell a good.",
@@ -1745,7 +1744,7 @@ activePowers = {
           DRAW_EACH_NOVELTY = "Draw 1 card for each Novelty good you produced.",
           DRAW_EACH_ALIEN = "Draw 1 card for each Alien good you produced.",
           DRAW_DIFFERENT = "Draw 1 card for each kind of good you produced.",
-          DISCARD_HAND = "Discard from hand.",
+          DISCARD_HAND = "Discard from hand to use.",
           DRAW_CHROMO = "Draw 2 cards for each Gene world w/ Chromosome in tableau.",
           DRAW_REBEL = "Draw 1 card for each Rebel world in tableau."
      }
