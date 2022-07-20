@@ -49,7 +49,7 @@ function createUsePowerButton(card, powerIndex, powersCount, tooltip, color)
     local xW = 1
     local offx = xW / powersCount
 
-    card.createButton({
+    slot.createButton({
         click_function = "usePowerClick" .. powerIndex,
         function_owner = Global,
         label = powersCount == 1 and "Use Power" or "Pow " .. powerIndex,
