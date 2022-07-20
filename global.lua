@@ -7,7 +7,9 @@ currentPhaseIndex = -1
 gameStarted = false
 advanced2p = false
 placeTwoPhase = false
+takeoverPhase = false
 selectedPhases = {}
+useTakeovers = false
 -- nil if no choice was made, otherwise GUID of selected object
 
 function player(i)
@@ -136,6 +138,8 @@ function onSave()
     saved_data.advanced2p = advanced2p
     saved_data.playerData = playerData
     saved_data.placeTwoPhase = placeTwoPhase
+    saved_data.useTakeovers = useTakeovers
+    saved_data.takeoverPhase = takeoverPhase
     return JSON.encode(saved_data)
 end
 
@@ -154,6 +158,8 @@ function onload(saved_data)
         advanced2p = data.advanced2p
         playerData = data.playerData
         placeTwoPhase = data.placeTwoPhase or false
+        useTakeovers = data.useTakeovers or false
+        takeoverPhase = data.takeoverPhase or false
     end
 
     card_db = loadData(0)
@@ -432,18 +438,6 @@ function attemptPlayCard(card, player)
     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
     local sp = tableau.getSnapPoints()
 
-<<<<<<< HEAD
-          -- found empty spot
-          if hits[1].hit_object == tableau then
-               -- trigger certain power bonuses based on phase
-               if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
-                    local phase = getCurrentPhase()
-                    local powers = playerData[player].powersSnapshot
-                    if powers["DRAW_AFTER"] then
-                         dealTo(powers["DRAW_AFTER"], player)
-                    end
-               end
-=======
     -- Find first empty spot on tableau
     for i=1, #sp do
         local hits = Physics.cast({
@@ -451,7 +445,6 @@ function attemptPlayCard(card, player)
             direction = {0, -1, 0},
             max_direction = 2
         })
->>>>>>> oldSystem
 
         -- found empty spot
         if hits[1].hit_object.hasTag("Slot") then
@@ -850,6 +843,7 @@ function gameStart(params)
      gameStarted = true
      currentPhaseIndex = -1
      advanced2p = params.advanced2p
+     useTakeovers = params.takeovers
 
      trySetAdvanced2pMode()
 

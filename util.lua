@@ -54,6 +54,38 @@ function add(v1, v2)
     return {v1[1] + v2[1], v1[2] + v2[2], v1[3] + v2[3]}
 end
 
+function getCardSlot(card)
+    local hits = Physics.cast({
+         origin = add(card.getPosition(), {0,1,0}),
+         direction = {0,-1,0},
+         max_distance = 5
+    })
+
+    for _, hit in pairs(hits) do
+         if hit.hit_object.hasTag("Slot") then
+              return hit.hit_object
+         end
+    end
+
+    return nil
+end
+
+function getCard(slot)
+    local hits = Physics.cast({
+         origin = add(slot.getPosition(), {0,1,0}),
+         direction = {0,-1,0},
+         max_distance = 2
+    })
+
+    for _, hit in pairs(hits) do
+         if hit.hit_object.type == 'Card' and hit.hit_object.is_face_down == false then
+              return hit.hit_object
+         end
+    end
+
+    return nil
+end
+
 function deleteLinkedListNode(list, value)
     local node = list
 
