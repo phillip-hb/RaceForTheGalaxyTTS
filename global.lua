@@ -591,6 +591,22 @@ function resetPlayerState(player)
     data.roundEndDiscardCount = 0
 end
 
+-- Check to see if player is planning to do a takeover
+function planningTakeover(player)
+    local p = playerData[player]
+    local phase = getCurrentPhase()
+    if phase ~= 3 or p.selectedCard then return false end
+
+    local node = p.miscSelectedCards
+
+    while node and node.value do
+        if node.power.codes["TAKEOVER_MILITARY"] then
+            return true
+        end
+        node = node.next
+    end
+end
+
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
 function allCardsInTableau(player)
     local pi = playerData[player].index
@@ -1538,7 +1554,7 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] then
+            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) then
                 goto skip
             end
 
@@ -1803,6 +1819,16 @@ function updateTableauState(player)
                         end
 
                         ::skip_power::
+                    end
+                else
+                    for name, power in pairs(ap) do
+                        -- make buttons for takeover powers
+                        if power.codes["TAKEOVER_MILITARY"] and not miscSelected then
+                            createButton = true
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                        elseif miscSelected then
+                            createCancelButton(card)
+                        end
                     end
                 end
             elseif currentPhase == "4" and ap then
@@ -2340,6 +2366,11 @@ function updateHelpText(playerColor)
                 end
             end
         else
+            if planningTakeover(playerColor) then
+                setHelpText(playerColor, "Settle: will perform takeover.")
+                return
+            end
+
             if placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Please wait for other players.")
