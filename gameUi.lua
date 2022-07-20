@@ -102,8 +102,8 @@ end
 
 function createGoodsButton(card, label, color)
     local offset = {0.28, 5, 0.13}
-
     local slot = getCardSlot(card)
+
     slot.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
@@ -113,7 +113,7 @@ function createGoodsButton(card, label, color)
         width = 500,
         height = 750,
         position = offset,
-        scale = {0.5, 1, 0.35}
+        scale = {0.5, 2, 0.35}
     })
 end
 

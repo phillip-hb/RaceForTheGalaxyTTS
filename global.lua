@@ -224,8 +224,6 @@ function getCurrentPhase()
             phase = 3
         elseif phase >= 6 and phase < 100 then
             phase = phase - 2
-        else
-            phase = 100
         end
     end
 
@@ -913,9 +911,9 @@ function playerReadyClicked(playerColor)
                 if power and requiresConfirm[concatPowerName(power)] then
                     broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
                     updateReadyButtons({playerColor, false})
+                    return
                 end
             end
-            return
         end
     end
 
@@ -1215,7 +1213,6 @@ function beginNextPhase()
 end
 
 function checkEndGame()
-    log('in here?')
     if not gameEndMessage then
         for player, data in pairs(playerData) do
             local p = playerData[player]
@@ -1225,8 +1222,6 @@ function checkEndGame()
                     count = count + 1
                 end
             end
-
-            log(count)
 
             if p.powersSnapshot["GAME_END_14"] and count >= 14 or not p.powersSnapshot["GAME_END_14"] and count >= 12 then
                 broadcastToAll((Player[player].steam_name or player) .. " has played " .. count .. " cards in their tableau.", player)
@@ -2240,8 +2235,6 @@ function updateHelpText(playerColor)
     local cardsInHand = countCardsInHand(playerColor, currentPhaseIndex == #selectedPhases)
     local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
-
-    log(currentPhase)
 
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
