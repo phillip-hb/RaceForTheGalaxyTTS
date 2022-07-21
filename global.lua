@@ -1571,7 +1571,6 @@ function capturePowersSnapshot(player, phase)
         results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
     end
 
-    log(results)
     p.powersSnapshot = results
 
     local statTracker = getObjectFromGUID(statTracker_GUID[p.index])
@@ -2140,7 +2139,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
-        refreshTakeoverMenu(player)
+        refreshTakeoverMenu(player, "TAKEOVER_MILITARY")
     end
 
     queueUpdate(player, true)
@@ -2432,8 +2431,7 @@ function updateHelpText(playerColor)
             end
         else
             if planningTakeover(playerColor) then
-                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
+                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.tempMilitary .. ")")
                 return
             end
 

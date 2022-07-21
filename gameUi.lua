@@ -134,10 +134,63 @@ function displayVpHexOn(o, value)
     end
 end
 
-function refreshTakeoverMenu(owner)
+function refreshTakeoverMenu(owner, takeoverPower)
     local players = {"Yellow", "Red", "Blue", "Green"}
+    local indexValues = {
+        Yellow = {main=3,Red=1,Blue=2,Green=3}
+    }
+
+    local xml = Global.UI.getXmlTable()
+    local mainPanelBody = xml[indexValues[owner].main]
+    local groupBody = mainPanelBody.children[1].children[4].children[1].children
 
     for _, player in pairs(players) do
-        Global.UI.setValue("name" .. owner .. "_" .. player, Player[player].steam_name or player)
+        if player ~= owner then
+            local column = {}
+
+            -- Name box
+            local nametext = {tag="Text", attributes={class="name",color=player}, value=Player[player].steam_name or player}
+            local panel = {tag="Panel", attributes={class="namebox"}, children={nametext}}
+            column[1] = panel
+
+            local p = playerData[player]
+
+            if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] > 0 then
+                for card in allCardsInTableau(player) do
+                    local info = card_db[card.getName()]
+                    if info.type == 1 and info.flags["MILITARY"] then
+                        local yourStrength = calcStrength(owner, card, false)
+                        local theirDefense = calcStrength(player, card, true)
+                        local canTake = yourStrength >= theirDefense
+
+                        local btn = {
+                            tag="ToggleButton",
+                            attributes = {id=owner .. "_" .. card.getGUID(), interactable=canTake, class=(canTake and "" or "disabled")},
+                            children = {},
+                            value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
+                        }
+
+                        column[#column + 1] = btn
+                    end
+                end
+            end
+
+            groupBody[indexValues[owner][player]].children = column
+        end
     end
+
+    Global.UI.setXmlTable(xml)
+end
+
+function calcStrength(player, card, addDefense)
+    local p = playerData[player]
+    local info = card_db[card.getName()]
+
+    local value = p.powersSnapshot["EXTRA_MILITARY"]
+
+    if addDefense then
+        value = value + info.cost
+    end
+
+    return value
 end
