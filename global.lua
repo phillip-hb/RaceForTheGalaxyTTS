@@ -58,6 +58,7 @@ optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1}
 compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
     ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
+    ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
 }
 
@@ -1432,7 +1433,6 @@ function capturePowersSnapshot(player, phase)
     end
 
     results["EXTRA_MILITARY"] = 0
-    results["TEMP_MILITARY"] = 0
     results["BONUS_MILITARY"] = 0
 
     local ignore2ndDevelop = false
@@ -1553,7 +1553,7 @@ function capturePowersSnapshot(player, phase)
         end
     end
 
-    if placeTwoPhase then
+    if placeTwoPhase or takeoverPhase then
         results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
     end
 
@@ -1811,7 +1811,7 @@ function updateTableauState(player)
                 end
             elseif currentPhase == "3" and ap then
                 -- Create buttons for active powers
-                if selectedCard then
+                if selectedCard or miscActiveNode then
                     for name, power in pairs(ap) do
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
@@ -1821,7 +1821,6 @@ function updateTableauState(player)
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
                             goto skip_power
                         end
-
                         if not used then
                             if miscSelectedCount <= 0 then
                                 if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
@@ -2119,6 +2118,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+        refreshTakeoverMenu(player)
     end
 
     queueUpdate(player, true)
@@ -2394,8 +2394,8 @@ function updateHelpText(playerColor)
 
             if doMilitary and not payMilitary then
                 local def = info.cost - militaryDiscount
-                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " ..p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["TEMP_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
+                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
@@ -2410,13 +2410,14 @@ function updateHelpText(playerColor)
             end
         else
             if planningTakeover(playerColor) then
-                setHelpText(playerColor, "Settle: will perform takeover.")
+                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
                 return
             end
 
             if placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
-                    setHelpText(playerColor, "Please wait for other players.")
+                    setHelpText(playerColor, "Waiting for other players.")
                 else
                     setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
                 end
@@ -2471,7 +2472,7 @@ function updateHelpText(playerColor)
         if cardsInHand > maxHandSize then
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
-            setHelpText(playerColor, "Please wait for other players.")
+            setHelpText(playerColor, "Waiting for other players.")
         end
     end
 end

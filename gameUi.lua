@@ -133,3 +133,11 @@ function displayVpHexOn(o, value)
         o.UI.setValue("vp", value)
     end
 end
+
+function refreshTakeoverMenu(owner)
+    local players = {"Yellow", "Red", "Blue", "Green"}
+
+    for _, player in pairs(players) do
+        Global.UI.setValue("name" .. owner .. "_" .. player, Player[player].steam_name or player)
+    end
+end
