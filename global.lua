@@ -9,6 +9,7 @@ advanced2p = false
 placeTwoPhase = false
 takeoverPhase = false
 useTakeovers = false
+queuePlaceTwoPhase = false
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
@@ -140,6 +141,7 @@ function onSave()
     saved_data.placeTwoPhase = placeTwoPhase
     saved_data.takeoverPhase = takeoverPhase
     saved_data.useTakeovers = useTakeovers
+    saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
     return JSON.encode(saved_data)
 end
 
@@ -160,6 +162,7 @@ function onload(saved_data)
         placeTwoPhase = data.placeTwoPhase or false
         takeoverPhase = data.takeoverPhase or false
         useTakeovers = data.useTakeovers or false
+        queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
     end
 
     card_db = loadData(0)
@@ -208,6 +211,8 @@ function onload(saved_data)
     end
 
     updatePhaseTilesHighlight()
+
+    useTakeovers = true
 end
 
 -- ======================
@@ -1036,6 +1041,23 @@ function checkAllReadyCo()
         queueUpdate(player, true)
     end
 
+    -- Trigger takeovers
+    if useTakeovers and not takeoverPhase then
+        local intendTakeover = {false, false, false, false}
+        local takeoverTriggered = false
+        for _, player in pairs(players) do
+            if planningTakeover(player) then
+                takeoverTriggered = true
+                intendTakeover[playerData[player].index] = true
+            end
+        end
+
+        if takeoverTriggered then
+            takeoverPhase = true
+            return 1
+        end
+    end
+
     -- Trigger Improved Logistics
     for _, player in pairs(players) do
         if placeTwoTriggered then
@@ -1160,7 +1182,9 @@ function beginNextPhase()
 
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
+    queuePlaceTwoPhase = false
     placeTwoPhase = false
+    takeoverPhase = false
 
     -- Apply end of phase powers here
     if getCurrentPhase() == 5 then
@@ -1836,8 +1860,8 @@ function updateTableauState(player)
                 else
                     for name, power in pairs(ap) do
                         -- make buttons for takeover powers
-                        if power.codes["TAKEOVER_MILITARY"] and not miscSelected then
-                            createButton = true
+                        if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
+                            createdButton = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
                             createCancelButton(card)
@@ -2093,6 +2117,10 @@ function usePowerClick(obj, player, rightClick, powerIndex)
          node.next = {value = obj.getGUID(), power=power, next = nil}
     end
 
+    if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
+        Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+    end
+
     queueUpdate(player, true)
 end
 
@@ -2109,6 +2137,8 @@ function cancelPowerClick(obj, player, rightClick)
         p.selectedCard = nil
         p.selectedCardPower = ""
         p.selectedGoods = {}
+    elseif useTakeovers and not p.miscSelectedCards.value then
+        Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
     end
 
     queueUpdate(player, true)
