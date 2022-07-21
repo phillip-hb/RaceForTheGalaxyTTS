@@ -136,8 +136,13 @@ end
 
 function refreshTakeoverMenu(owner, takeoverPower)
     local players = {"Yellow", "Red", "Blue", "Green"}
+
+    -- The main index value is to determine which of the UI windows to edit, and the player index determines column based on player seating.
     local indexValues = {
-        Yellow = {main=3,Red=1,Blue=2,Green=3}
+        Yellow = {main=3,Red=1,Blue=2,Green=3},
+        Red = {main=4,Blue=1,Green=2,Yellow=3},
+        Blue = {main=5,Green=1,Yellow=2,Red=3},
+        Green = {main=6,Yellow=1,Red=2,Blue=3}
     }
 
     local xml = Global.UI.getXmlTable()

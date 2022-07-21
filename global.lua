@@ -997,6 +997,9 @@ function checkAllReadyCo()
     for _, player in pairs(players) do
         local p = playerData[player]
         local node = p.miscSelectedCards
+
+        Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
+
         while node and node.value do
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
@@ -1050,18 +1053,38 @@ function checkAllReadyCo()
 
     -- Trigger takeovers
     if useTakeovers and not takeoverPhase then
+        local targettedPlayers = {}
         local intendTakeover = {false, false, false, false}
         local takeoverTriggered = false
         for _, player in pairs(players) do
             local p = playerData[player]
             if p.takeoverTarget then
+                broadcastToAll((Player[player].steam_name or player) .. " is attempting a takeover!", player)
                 takeoverTriggered = true
                 intendTakeover[p.index] = true
+
+                local card = getObjectFromGUID(p.takeoverTarget)
+                local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
+
+                if not targettedPlayers[targetPlayer] then targettedPlayers[targetPlayer] = {} end
+
+                local target = targettedPlayers[targetPlayer]
+                target[#target + 1] = player
+            end
+        end
+
+        for _, player in pairs(players) do
+            local hasAttacker = targettedPlayers[player]
+            if hasAttacker then
+                for _, attacker in pairs(hasAttacker) do
+                    broadcastToColor("You are being targetted for a takeover by " .. (Player[attacker].steam_name or attacker), player, "White")
+                end
+            else
+                updateReadyButtons({player, true})
             end
         end
 
         if takeoverTriggered then
-            log('how about now?')
             takeoverPhase = true
             return 1
         end
