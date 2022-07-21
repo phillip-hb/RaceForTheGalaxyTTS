@@ -212,8 +212,6 @@ function onload(saved_data)
     end
 
     updatePhaseTilesHighlight()
-
-    useTakeovers = true
 end
 
 -- ======================
@@ -1477,14 +1475,30 @@ function capturePowersSnapshot(player, phase)
                         ignore2ndSettle = true
                     end
 
+                    -- record specialized military for takeovers
+                    if name == "BONUS_MILITARY" then
+                        local appendName = ""
+                        for code, v in pairs(power.codes) do    -- only need to grab the first code
+                            appendName = code .. "_BONUS_MILITARY"
+                            break
+                        end
+
+                        if appendName ~= "" and not results[appendName] then
+                            results[appendName] = power.strength
+                        elseif results[appendName] then
+                            results[appendName] = results[appendName] + power.strength
+                        end
+                    end
+
                     -- Do some manipulations for special cases
                     if selectedCard then
                         local selectedInfo = card_db[selectedCard.getName()]
 
-                        -- Reduce powers with non matching types or improper bonus military
+                        -- Ignore powers with non matching types or improper bonus military
                         if name == "REDUCE" and next(power.codes) ~= nil and not power.codes[selectedInfo.goods or ""] or
                             name == "BONUS_MILITARY" and (power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
-                                                      not power.codes["AGAINST_REBEL"] and not power.codes[selectedInfo.goods or ""]) then
+                                not power.codes["AGAINST_REBEL"] and not power.codes[selectedInfo.goods or ""]) then
+
                             goto skip
                         end
                     end
@@ -1557,6 +1571,7 @@ function capturePowersSnapshot(player, phase)
         results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
     end
 
+    log(results)
     p.powersSnapshot = results
 
     local statTracker = getObjectFromGUID(statTracker_GUID[p.index])
@@ -1649,6 +1664,7 @@ function updateTableauState(player)
     local windfallCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
+    local dontAutoPass = false
 
     local selectedUniqueGoods = {}
 
@@ -1756,6 +1772,7 @@ function updateTableauState(player)
                         end
 
                         if makeButton then
+                            dontAutoPass = true
                             createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
                         end
                     end
@@ -1777,7 +1794,6 @@ function updateTableauState(player)
         p.selectedCardPower = ""
     end
 
-    local createdButton = false
     local currentMiscSelected = nil
 
     -- refresh state on all cards in tableau
@@ -1802,9 +1818,10 @@ function updateTableauState(player)
                 for name, power in pairs(ap) do
                     if selectedCard then
                         if miscSelectedCount <= 0 then
-                            createdButton = true
+                            dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
                         else
+                            dontAutoPass = true
                             createCancelButton(card)
                         end
                     end
@@ -1844,9 +1861,10 @@ function updateTableauState(player)
                         end
 
                         if powerName ~= "" and not miscSelected and not used then
-                            createdButton = true
+                            dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
+                            dontAutoPass = true
                             createCancelButton(card)
 
                             if requiresConfirm[fullName] then
@@ -1860,9 +1878,10 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         -- make buttons for takeover powers
                         if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
-                            createdButton = true
+                            dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
+                            dontAutoPass = true
                             createCancelButton(card)
                         end
                     end
@@ -1904,11 +1923,12 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
-                            createdButton = true
+                            dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
+                    dontAutoPass = true
                     createCancelButton(card)
                     local powerIndex = info.activePowers[currentPhase][p.selectedCardPower].index
 
@@ -1940,7 +1960,7 @@ function updateTableauState(player)
                             goto skip
                         end
 
-                        createdButton = true
+                        dontAutoPass = true
                         createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
 
                         ::skip::
@@ -1959,11 +1979,13 @@ function updateTableauState(player)
                     if info.goods and info.flags["WINDFALL"] and open and p.selectedCardPower:sub(1,8) == "WINDFALL" and card ~= selectedCard or makeButton then
                         local targetGood = p.selectedCardPower:sub(10, p.selectedCardPower:len())
                         if targetGood == "ANY" or targetGood == info.goods or power.codes["WINDFALL_ANY"] then
+                            dontAutoPass = true
                             createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
                         end
                     end
 
                     if selectedCard == card and not paidCost then
+                        dontAutoPass = true
                         createCancelButton(selectedCard)
 
                         if requiresConfirm[p.selectedCardPower] then
@@ -1976,7 +1998,7 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and createdButton == false and not selectedCard and not p.incomingGood then
+    if (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
