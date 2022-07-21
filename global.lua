@@ -31,7 +31,8 @@ function player(i)
         incomingGood = false,
         forcedReady = false,
         lastPlayedCard = nil,
-        roundEndDiscardCount = 0
+        roundEndDiscardCount = 0,
+        takeoverTarget = nil
     }
 end
 
@@ -606,6 +607,7 @@ function resetPlayerState(player)
     data.incomingGood = false
     data.selectedGoods = {}
     data.roundEndDiscardCount = 0
+    data.takeoverTarget = nil
 end
 
 -- Check to see if player is planning to do a takeover
@@ -940,6 +942,12 @@ function playerReadyClicked(playerColor)
             updateReadyButtons({playerColor, false})
             return
         end
+
+        if currentPhase == 3 and planningTakeover(playerColor) and not p.takeoverTarget then
+            broadcastToColor("You must have a valid takeover target.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
     elseif currentPhase == 4 or currentPhase == 5 then
         if p.selectedCard then
             local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
@@ -1045,13 +1053,15 @@ function checkAllReadyCo()
         local intendTakeover = {false, false, false, false}
         local takeoverTriggered = false
         for _, player in pairs(players) do
-            if planningTakeover(player) then
+            local p = playerData[player]
+            if p.takeoverTarget then
                 takeoverTriggered = true
-                intendTakeover[playerData[player].index] = true
+                intendTakeover[p.index] = true
             end
         end
 
         if takeoverTriggered then
+            log('how about now?')
             takeoverPhase = true
             return 1
         end
@@ -2139,6 +2149,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+        p.takeoverTarget = nil
         refreshTakeoverMenu(player, "TAKEOVER_MILITARY")
     end
 
@@ -2160,6 +2171,7 @@ function cancelPowerClick(obj, player, rightClick)
         p.selectedGoods = {}
     elseif useTakeovers and not p.miscSelectedCards.value then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
+        p.takeoverTarget = nil
     end
 
     queueUpdate(player, true)

@@ -165,7 +165,12 @@ function refreshTakeoverMenu(owner, takeoverPower)
 
                         local btn = {
                             tag="ToggleButton",
-                            attributes = {id=owner .. "_" .. card.getGUID(), interactable=canTake, class=(canTake and "" or "disabled")},
+                            attributes = {
+                                id=owner .. "_" .. card.getGUID(),
+                                interactable=canTake,
+                                class=(canTake and "" or "disabled"),
+                                onValueChanged="menuValueChanged"
+                            },
                             children = {},
                             value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
                         }
@@ -188,9 +193,34 @@ function calcStrength(player, card, addDefense)
 
     local value = p.powersSnapshot["EXTRA_MILITARY"]
 
+    -- Check for bonus military
+    if info.goods then
+        local key = info.goods .. "_BONUS_MILITARY"
+        if p.powersSnapshot[key] then
+            value = value + p.powersSnapshot[key]
+        end
+    end
+
+    if info.flags["REBEL"] then
+        local key = "AGAINST_REBEL_BONUS_MILITARY"
+        if p.powersSnapshot[key] then
+            value = value + p.powersSnapshot[key]
+        end
+    end
+
     if addDefense then
         value = value + info.cost
     end
 
     return value
+end
+
+function menuValueChanged(player, value, id)
+    if value == "True" then
+        Global.UI.setAttribute(id, "color", "rgb(0.4,0.8,1)")
+        playerData[player.color].takeoverTarget = split(id, "_")[2]
+    else
+        Global.UI.setAttribute(id, "color", "White")
+        playerData[player.color].takeoverTarget = nil
+    end
 end
