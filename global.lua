@@ -484,18 +484,30 @@ function attemptPlayCard(card, player, fromTakeover)
                 end
             end
 
+            local goods = getGoods(card)
+
             local pos = tableau.positionToWorld(sp[i].position)
             local rot = tableau.getRotation()
-            card.setPosition(add(pos, {0, 0.02, 0}))
+            if not fromTakeover then
+                card.setPosition(add(pos, {0, 0.02, 0}))
+            else
+                card.setPositionSmooth(add(pos, {0, 0.02, 0}))
+            end
             card.setRotation({rot[1], rot[2], 0})
             card.removeTag("Selected")
             card.setLock(true)
             highlightOff(card)
             playerData[player].lastPlayedCard = card.getGUID()
 
+            local isWindfall = card_db[card.getName()].flags["WINDFALL"]
+
             -- if windfall, place a goods on top
-            if card_db[card.getName()].flags["WINDFALL"] and not fromTakeover then
+            if isWindfall and not fromTakeover then
                 placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
+            elseif isWindfall and fromTakeover and goods then
+                goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
+                goods.setRotationSmooth({rot[1], rot[2], 180})
+                playerData[player].incomingGood = true
             end
 
             return
@@ -1038,8 +1050,8 @@ function checkAllReadyCo()
     if discardHappened then wait(0.1) end
 
     -- resolve takeovers
-    if takeoverPhase then
-        resolveTakeovers()
+    if takeoverPhase and resolveTakeovers() then
+        wait(1.5)
     end
 
     -- play selected cards in hand
@@ -2856,6 +2868,7 @@ function getFirstPlayer()
 end
 
 function resolveTakeovers()
+    local takeoverSuccess = false
     local players = getSeatedPlayersWithHands()
     local firstPlayer, firstIndex = getFirstPlayer()
     local taken = {}
@@ -2881,11 +2894,12 @@ function resolveTakeovers()
                 -- Discard one time use cards
                 if p.takeoverPower.name == "DISCARD" then
                     discardCard(sourceCard)
-                    wait(0.1)
+                    wait(0.05)
                 end
 
                 -- Take control of the target card
                 attemptPlayCard(targetCard, player, true)
+                takeoverSuccess = true
             else
                 broadcastToAll((Player[player].steam_name or player) .. " failed to takeover \"" .. targetCard.getName() .. '."', player)
             end
@@ -2899,4 +2913,6 @@ function resolveTakeovers()
         if i > #players then i = 1 end
         if i == firstIndex then break end
     end
+
+    return takeoverSuccess
 end
