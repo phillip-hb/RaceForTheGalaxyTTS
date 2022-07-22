@@ -592,25 +592,26 @@ function drawCard()
 end
 
 function discardCard(card)
-     card.memo = ''
-     card.setDescription('')
-     card.setTags({})
-     card.highlightOff()
-     card.setScale({1,1,1})
-     card.setLock(false)
+    card.memo = ''
+    card.setDescription('')
+    card.setTags({})
+    card.highlightOff()
+    card.setScale({1,1,1})
+    card.setLock(false)
 
-     if not discardPile or discardPile.isDestroyed() then
-          discardPile = getDeckOrCardInZone(discardZone)
-     end
+    if not discardPile or discardPile.isDestroyed() then
+        discardPile = getDeckOrCardInZone(discardZone)
+    end
 
-     if discardPile then
-          discardPile = discardPile.putObject(card)
-          return
-     end
+    if discardPile then
+        card.setPosition(add(card.getPosition(), {0, discardZone.getPosition()[2], 0}))
+        discardPile = discardPile.putObject(card)
+        return
+    end
 
-     discardPile = card
-     card.setPosition(discardZone.getPosition())
-     card.setRotation({0, 0, 180})
+    discardPile = card
+    card.setPosition(discardZone.getPosition())
+    card.setRotation({0, 0, 180})
 end
 
 function dealTo(n, player)
