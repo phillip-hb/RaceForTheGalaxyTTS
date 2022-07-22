@@ -1537,6 +1537,10 @@ function capturePowersSnapshot(player, phase)
             results["GAME_END_14"] = 1
         end
 
+        if info.flags["IMPERIUM"] then
+            results["IMPERIUM"] = 1
+        end
+
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
             for name, power in pairs(powers) do
@@ -1639,6 +1643,8 @@ function capturePowersSnapshot(player, phase)
     if takeoverDefense then
         results["TAKEOVER_DEFENSE"] = rebelMilitaryWorldCount * 2 + (militaryWorldCount - rebelMilitaryWorldCount)
     end
+
+    results["REBEL_MILITARY_WORLD_COUNT"] = rebelMilitaryWorldCount
     
     -- Track special cases
     if phase then
@@ -1932,10 +1938,11 @@ function updateTableauState(player)
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
                         local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
-                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                        if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
                             goto skip_power
                         end
+
                         if not used then
                             if miscSelectedCount <= 0 then
                                 if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
@@ -1978,9 +1985,6 @@ function updateTableauState(player)
                         if useTakeovers and isTakeoverPower(power) and not miscSelected then
                             dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected then
-                            dontAutoPass = true
-                            createCancelButton(card)
                         end
                     end
                 end
@@ -2717,6 +2721,10 @@ function updateVp(player)
             if dev.vpFlags["CHROMO_FLAG"] and info.flags["CHROMO"] then
                 otherUplift = false
                 vp = vp + dev.vpFlags["CHROMO_FLAG"]
+            end
+            if dev.vpFlags["REBEL_FLAG"] and info.flags["REBEL"] then
+                otherWorld = false
+                vp = vp + dev.vpFlags["REBEL_FLAG"]
             end
             if otherWorld and dev.vpFlags["MILITARY"] and info.type == 1 and info.flags["MILITARY"] then
                 vp = vp + dev.vpFlags["MILITARY"]

@@ -203,7 +203,8 @@ function refreshTakeoverMenu(owner, takeoverPower)
 
             local p = playerData[player]
 
-            if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] <= 0 then
+            if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] <= 0 or 
+                takeoverPower == "TAKEOVER_IMPERIUM" and not p.powersSnapshot["IMPERIUM"] then
                 goto skip_player
             end
 
@@ -269,6 +270,8 @@ function calcStrength(player, card, addDefense)
 
     if addDefense then
         value = value + info.cost + (p.powersSnapshot["TAKEOVER_DEFENSE"] or 0)
+    elseif p.takeoverPower and p.takeoverPower.name == "TAKEOVER_IMPERIUM" then
+        value = value + p.powersSnapshot["REBEL_MILITARY_WORLD_COUNT"] * p.takeoverPower.strength
     end
 
     return value
