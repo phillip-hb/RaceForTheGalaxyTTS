@@ -39,6 +39,7 @@ function player(i)
 end
 
 playerData = {Yellow=player(1),Red=player(2),Blue=player(3),Green=player(4)}
+playerOrder = {"Yellow", "Red", "Blue", "Green"}
 queueUpdateState = {Yellow=false, Red=false, Blue=false, Green=false}
 updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
@@ -1027,6 +1028,11 @@ function checkAllReadyCo()
     end
 
     if discardHappened then wait(0.1) end
+
+    -- resolve takeovers
+    if takeoverPhase then
+        resolveTakeovers()
+    end
 
     -- play selected cards in hand
     local placeTwo = {false,false,false,false}
@@ -2046,7 +2052,7 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+    if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
@@ -2775,5 +2781,87 @@ function moveGoalToPlayer(params)
             tile.setRotation(tableau.getRotation())
             break
         end
+    end
+end
+
+function getStartWorldNumber(player)
+    local startWorlds = {
+        ["Gateway Station"] = -6,
+        ["Abandoned Mine Squatters"] = -5,
+        ["Transforming Colonists"] = -4,
+        ["Galactic Trade Emissaries"] = -3,
+        ["Industrial Robots"] = -2,
+        ["Star Nomad Raiders"] = -1,
+        ["Old Earth"] = 0,
+        ["Epsilon Eridani"] = 1,
+        ["Alpha Centauri"] = 2,
+        ["New Sparta"] = 3,
+        ["Earth's Lost Colony"] = 4,
+        ["Separatist Colony"] = 5,
+        ["Ancient Race"] = 6,
+        ["Damaged Alien Factory"] = 7,
+        ["Doomed World"] = 8,
+        ["Rebel Cantina"] = 9,
+        ["Galactic Developers"] = 10,
+        ["Imperium Warlord"] = 11,
+
+    }
+    local p = playerData[player]
+    local tableau = getObjectFromGUID(tableau_GUID[p.index])
+    local sp = tableau.getSnapPoints()[1]
+    local hits = Physics.cast({
+        origin = add(tableau.positionToWorld(sp.position), {0,1,0}),
+        direction = {0,-1,0},
+        max_distance = 2,
+        debug = true
+    })
+
+    for _, hit in pairs(hits) do
+        local obj = hit.hit_object
+        if obj.type == 'Card' and not obj.is_face_down and not obj.hasTag("Ignore Tableau") and startWorlds[obj.getName()] then
+            return startWorlds[obj.getName()]
+        end
+    end
+
+    return nil
+end
+
+-- Find player with lowest start world
+function getFirstPlayer()
+    local players = getSeatedPlayersWithHands()
+    local lowest = 100
+    local target = nil
+    local index = 0
+
+    for i, player in pairs(players) do
+        local n = getStartWorldNumber(player)
+        if n < lowest then
+            lowest = n
+            target = player
+            index = i
+        end
+    end
+
+    return target, index
+end
+
+function resolveTakeovers()
+    local players = getSeatedPlayersWithHands()
+    local firstPlayer, firstIndex = getFirstPlayer()
+
+    local i = firstIndex
+    while i <= #players do
+        local p = playerData[players[i]]
+
+        if p.takeoverSource and p.takeoverTarget then
+            local sourceCard = getObjectFromGUID(p.takeoverSource)
+            local sourceInfo = card_db[sourceCard.getName()]
+            local targetCard = getObjectFromGUID(p.takeoverTarget)
+            local targetInfo = card_db[sourceCard.getName()]
+        end
+
+        i = i + 1
+        if i > #players then i = 1 end
+        if i == firstIndex then break end
     end
 end
