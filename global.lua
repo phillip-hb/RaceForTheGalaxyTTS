@@ -34,7 +34,7 @@ function player(i)
         roundEndDiscardCount = 0,
         takeoverSource = nil,
         takeoverTarget = nil,
-        beingTargetted = false
+        beingTargeted = nil
     }
 end
 
@@ -615,6 +615,7 @@ function resetPlayerState(player)
     data.roundEndDiscardCount = 0
     data.takeoverSource = nil
     data.takeoverTarget = nil
+    data.beingTargeted = nil
 end
 
 -- Check to see if player is planning to do a takeover
@@ -1058,11 +1059,12 @@ function checkAllReadyCo()
     for _, player in pairs(players) do
         updateReadyButtons({player, false})
         queueUpdate(player, true)
+        playerData[player].beingTargeted = nil
     end
 
     -- Trigger takeovers
     if useTakeovers and not takeoverPhase then
-        local targettedPlayers = {}
+        local targetedPlayers = {}
         local intendTakeover = {false, false, false, false}
         local takeoverTriggered = false
         for _, player in pairs(players) do
@@ -1074,20 +1076,13 @@ function checkAllReadyCo()
 
                 local card = getObjectFromGUID(p.takeoverTarget)
                 local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
+                local otherp = playerData[targetPlayer]
 
-                if not targettedPlayers[targetPlayer] then targettedPlayers[targetPlayer] = {} end
+                if not otherp.beingTargeted then otherp.beingTargeted = {} end
 
-                local target = targettedPlayers[targetPlayer]
-                target[#target + 1] = player
-            end
-        end
-
-        for _, player in pairs(players) do
-            local hasAttacker = targettedPlayers[player]
-            if hasAttacker then
-                for _, attacker in pairs(hasAttacker) do
-                    playerData[player].beingTargetted = true
-                    broadcastToColor("You are being targetted for a takeover by " .. (Player[attacker].steam_name or attacker) .. "!", player, "Purple")
+                otherp.beingTargeted[p.takeoverTarget] = true
+                if Player[targetPlayer].seated then
+                    broadcastToColor("You are being targeted for a takeover by " .. (Player[player].steam_name or player) .. "!", targetPlayer, "Purple")
                 end
             end
         end
@@ -1751,8 +1746,9 @@ function updateTableauState(player)
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
+        obj.clearButtons()
+        
         if obj.hasTag("Slot") then
-            obj.clearButtons()
             if currentPhase == "2" or (currentPhase == "3" and not takeoverPhase) then
                 setVisibleTo(obj, player)
             else
@@ -1867,16 +1863,16 @@ function updateTableauState(player)
                         end
                     end
                 end
-            elseif currentPhase == "3" and ap then
+            elseif currentPhase == "3" then
                 if takeoverPhase then
-                    if p.beingTargetted then
+                    if p.beingTargeted and p.beingTargeted[card.getGUID()] then
+                        createStrengthLabel(player, card, true)
                     else
                         if p.takeoverSource == card.getGUID() then
-                            card.clearButtons()
                             createStrengthLabel(player, card, false)
                         end
                     end
-                else
+                elseif ap then
                     -- Create buttons for active powers
                     if selectedCard or miscActiveNode then
                         for name, power in pairs(ap) do
