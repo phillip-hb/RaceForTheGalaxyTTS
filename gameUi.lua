@@ -274,7 +274,7 @@ function menuValueChanged(player, value, id)
 end
 
 function drawTakeoverLines()
-    local lines = {}
+    local lines = defaultVectorLines
     for player, data in pairs(playerData) do
         if data.takeoverSource and data.takeoverTarget then
             local source = getObjectFromGUID(data.takeoverSource)
