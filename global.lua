@@ -22,7 +22,6 @@ function player(i)
         selectedCard = nil,
         selectedCardPower = "",
         cardsAlreadyUsed = {},
-        miscSelectedCard = nil,
         miscSelectedCards = {},
         mustConsumeCount = 0,
         produceCount = {},
@@ -33,6 +32,7 @@ function player(i)
         lastPlayedCard = nil,
         roundEndDiscardCount = 0,
         takeoverSource = nil,
+        takeoverPower = nil,
         takeoverTarget = nil,
         beingTargeted = nil
     }
@@ -427,6 +427,15 @@ function getSelectedActionsCount(player)
     return n
 end
 
+function getOwner(card)
+    for _, zone in pairs(card.getZones()) do
+        if tableauZoneOwner[zone.getGUID()] then
+            return tableauZoneOwner[zone.getGUID()]
+        end
+    end
+    return nil
+end
+
 -- returns number of cards discarded from hand
 function discardMarkedCards(player, markForDiscard)
     if markForDiscard == nil then markForDiscard = false end
@@ -447,7 +456,7 @@ function discardMarkedCards(player, markForDiscard)
 end
 
 -- check zone for any 'Selected' cards and attempt to play them
-function attemptPlayCard(card, player)
+function attemptPlayCard(card, player, fromTakeover)
     if type(card) == "table" then
         player = card[2]
         card = card[1]
@@ -485,7 +494,7 @@ function attemptPlayCard(card, player)
             playerData[player].lastPlayedCard = card.getGUID()
 
             -- if windfall, place a goods on top
-            if card_db[card.getName()].flags["WINDFALL"] then
+            if card_db[card.getName()].flags["WINDFALL"] and not fromTakeover then
                 placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
             end
 
@@ -609,7 +618,6 @@ function resetPlayerState(player)
     data.selectedCard = nil
     data.selectedCardPower = ""
     data.miscSelectedCards = {}
-    data.miscSelectedCard = nil
     data.lastPlayedCard = nil
     data.paidCost = {}
     data.forcedReady = false
@@ -617,6 +625,7 @@ function resetPlayerState(player)
     data.selectedGoods = {}
     data.roundEndDiscardCount = 0
     data.takeoverSource = nil
+    data.takeoverPower = nil
     data.takeoverTarget = nil
     data.beingTargeted = nil
 end
@@ -869,7 +878,6 @@ function onUpdate()
                 p.selectedCard = nil
                 p.selectedCardPower = ""
                 p.miscSelectedCards = {}
-                p.miscSelectedCard = nil
             end
 
             capturePowersSnapshot(player, tostring(getCurrentPhase()))
@@ -1100,6 +1108,8 @@ function checkAllReadyCo()
             drawTakeoverLines()
             return 1
         end
+    else
+        takeoverPhase = false
     end
 
     -- Trigger Improved Logistics
@@ -2187,7 +2197,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     local power = getActivePower(obj.getName(), currentPhase, powerIndex)
     if not p.miscSelectedCards.value then
          p.miscSelectedCards = {value = obj.getGUID(), power=power, next = nil}
-         p.miscSelectedCard = obj.getGUID()
     else
          node.next = {value = obj.getGUID(), power=power, next = nil}
     end
@@ -2195,6 +2204,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
         p.takeoverSource = obj.getGUID()
+        p.takeoverPower = power
         p.takeoverTarget = nil
         refreshTakeoverMenu(player, "TAKEOVER_MILITARY")
     end
@@ -2823,7 +2833,7 @@ function getStartWorldNumber(player)
         end
     end
 
-    return nil
+    return 1000
 end
 
 -- Find player with lowest start world
@@ -2848,16 +2858,41 @@ end
 function resolveTakeovers()
     local players = getSeatedPlayersWithHands()
     local firstPlayer, firstIndex = getFirstPlayer()
+    local taken = {}
 
     local i = firstIndex
     while i <= #players do
-        local p = playerData[players[i]]
+        local player = players[i]
+        local p = playerData[player]
 
         if p.takeoverSource and p.takeoverTarget then
             local sourceCard = getObjectFromGUID(p.takeoverSource)
             local sourceInfo = card_db[sourceCard.getName()]
             local targetCard = getObjectFromGUID(p.takeoverTarget)
             local targetInfo = card_db[sourceCard.getName()]
+
+            local sourceStr = calcStrength(player, sourceCard, false)
+            local targetStr = calcStrength(getOwner(targetCard), targetCard, true)
+            -- Takeover successfull
+            if not taken[targetCard.getGUID()] and sourceStr >= targetStr then
+                broadcastToAll((Player[player].steam_name or player) .. "'s takeover of \"" .. targetCard.getName() ..'" was successful!', player)
+                taken[targetCard.getGUID()] = true
+
+                -- Discard one time use cards
+                if p.takeoverPower.name == "DISCARD" then
+                    discardCard(sourceCard)
+                    wait(0.1)
+                end
+
+                -- Take control of the target card
+                attemptPlayCard(targetCard, player, true)
+            else
+                broadcastToAll((Player[player].steam_name or player) .. " failed to takeover \"" .. targetCard.getName() .. '."', player)
+            end
+
+            p.takeoverSource = nil
+            p.takeoverPower = nil
+            p.takeoverTarget  = nil
         end
 
         i = i + 1
