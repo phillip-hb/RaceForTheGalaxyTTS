@@ -1048,7 +1048,7 @@ function checkAllReadyCo()
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
             local power = node.power
-            if power and (not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
+            if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
                 discardCard(card)
                 discardHappened = true
             end
@@ -2085,12 +2085,12 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
-        p.forcedReady = true
-        if Player[player].seated then
-            updateReadyButtons({player, true})
-        end
-    end
+    -- if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+    --     p.forcedReady = true
+    --     if Player[player].seated then
+    --         updateReadyButtons({player, true})
+    --     end
+    -- end
 end
 
 function markUsed(player, card, power, n)
@@ -2846,8 +2846,7 @@ function getStartWorldNumber(player)
     local hits = Physics.cast({
         origin = add(tableau.positionToWorld(sp.position), {0,1,0}),
         direction = {0,-1,0},
-        max_distance = 2,
-        debug = true
+        max_distance = 2
     })
 
     for _, hit in pairs(hits) do
@@ -2896,8 +2895,9 @@ function resolveTakeovers()
             local targetCard = getObjectFromGUID(p.takeoverTarget)
             local targetInfo = card_db[sourceCard.getName()]
 
-            local sourceStr = calcStrength(player, sourceCard, false)
+            local sourceStr = calcStrength(player, targetCard, false)
             local targetStr = calcStrength(getOwner(targetCard), targetCard, true)
+
             -- Takeover successfull
             if not taken[targetCard.getGUID()] and sourceStr >= targetStr then
                 broadcastToAll((Player[player].steam_name or player) .. "'s takeover of \"" .. targetCard.getName() ..'" was successful!', player)

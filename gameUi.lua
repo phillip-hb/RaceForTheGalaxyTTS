@@ -203,30 +203,41 @@ function refreshTakeoverMenu(owner, takeoverPower)
 
             local p = playerData[player]
 
-            if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] > 0 then
-                for card in allCardsInTableau(player) do
-                    local info = card_db[card.getName()]
-                    if info.type == 1 and info.flags["MILITARY"] then
-                        local yourStrength = calcStrength(owner, card, false)
-                        local theirDefense = calcStrength(player, card, true)
-                        local canTake = yourStrength >= theirDefense
-
-                        local btn = {
-                            tag="ToggleButton",
-                            attributes = {
-                                id=owner .. "_" .. card.getGUID(),
-                                interactable=canTake,
-                                class=(canTake and "" or "disabled"),
-                                onValueChanged="menuValueChanged"
-                            },
-                            children = {},
-                            value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
-                        }
-
-                        column[#column + 1] = btn
-                    end
-                end
+            if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] <= 0 then
+                goto skip_player
             end
+
+            for card in allCardsInTableau(player) do
+                local info = card_db[card.getName()]
+
+                if takeoverPower == "TAKEOVER_REBEL" and not info.flags["REBEL"] then
+                    goto skip_card
+                end
+
+                if info.type == 1 and info.flags["MILITARY"] then
+                    local yourStrength = calcStrength(owner, card, false)
+                    local theirDefense = calcStrength(player, card, true)
+                    local canTake = yourStrength >= theirDefense
+
+                    local btn = {
+                        tag="ToggleButton",
+                        attributes = {
+                            id=owner .. "_" .. card.getGUID(),
+                            interactable=canTake,
+                            class=(canTake and "" or "disabled"),
+                            onValueChanged="menuValueChanged"
+                        },
+                        children = {},
+                        value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
+                    }
+
+                    column[#column + 1] = btn
+                end
+
+                ::skip_card::
+            end
+
+            ::skip_player::
 
             groupBody[indexValues[owner][player]].children = column
         end
