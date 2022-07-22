@@ -223,14 +223,22 @@ function refreshTakeoverMenu(owner)
                     local yourStrength = calcStrength(owner, card, false, owner)
                     local theirDefense = calcStrength(player, card, true, owner)
                     local canTake = yourStrength >= theirDefense
+                    local class = canTake and "" or "disabled"
+                    local reselect = canTake and op.takeoverTarget == card.getGUID()
+
+                    -- Disable previously selected target if can no longer take it
+                    if not canTake and op.takeoverTarget == card.getGUID() then
+                        op.takeoverTarget = nil
+                    end
 
                     local btn = {
                         tag="ToggleButton",
                         attributes = {
                             id=owner .. "_" .. card.getGUID(),
                             interactable=canTake,
-                            class=(canTake and "" or "disabled"),
-                            onValueChanged="menuValueChanged"
+                            class=reselect and "selected" or class,
+                            onValueChanged="menuValueChanged",
+                            isOn=reselect,
                         },
                         children = {},
                         value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
