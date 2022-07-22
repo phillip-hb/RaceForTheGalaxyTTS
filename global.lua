@@ -32,7 +32,9 @@ function player(i)
         forcedReady = false,
         lastPlayedCard = nil,
         roundEndDiscardCount = 0,
-        takeoverTarget = nil
+        takeoverSource = nil,
+        takeoverTarget = nil,
+        beingTargetted = false
     }
 end
 
@@ -213,6 +215,10 @@ function onload(saved_data)
     end
 
     updatePhaseTilesHighlight()
+
+    if takeoverPhase then
+        drawTakeoverLines()
+    end
 end
 
 -- ======================
@@ -607,6 +613,7 @@ function resetPlayerState(player)
     data.incomingGood = false
     data.selectedGoods = {}
     data.roundEndDiscardCount = 0
+    data.takeoverSource = nil
     data.takeoverTarget = nil
 end
 
@@ -990,6 +997,8 @@ function checkAllReadyCo()
         if not readyToken.getVar("isReady") then return 1 end
     end
 
+    Global.setVectorLines({})
+
     -- remove misc selected cards if they have discard power
     local discardHappened = false
     local phase = getCurrentPhase()
@@ -1003,8 +1012,8 @@ function checkAllReadyCo()
         while node and node.value do
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
-            local powers = info.activePowers[tostring(phase)]
-            if powers and (powers["DISCARD"] or powers["DISCARD_REDUCE"] or powers["DISCARD_CONQUER_SETTLE"]) then
+            local power = node.power
+            if power and (not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
                 discardCard(card)
                 discardHappened = true
             end
@@ -1077,15 +1086,15 @@ function checkAllReadyCo()
             local hasAttacker = targettedPlayers[player]
             if hasAttacker then
                 for _, attacker in pairs(hasAttacker) do
-                    broadcastToColor("You are being targetted for a takeover by " .. (Player[attacker].steam_name or attacker), player, "White")
+                    playerData[player].beingTargetted = true
+                    broadcastToColor("You are being targetted for a takeover by " .. (Player[attacker].steam_name or attacker) .. "!", player, "Purple")
                 end
-            else
-                updateReadyButtons({player, true})
             end
         end
 
         if takeoverTriggered then
             takeoverPhase = true
+            drawTakeoverLines()
             return 1
         end
     end
@@ -1184,7 +1193,7 @@ function startNewRound()
         wait(1.5)
         broadcastToAll("The game has ended.", "Purple")
     else
-        broadcastToAll("Starting new round.", "White")
+        broadcastToAll("Starting new round.", color(0, 1, 1))
     end
 
     for player, data in pairs(playerData) do
@@ -1265,7 +1274,7 @@ function beginNextPhase()
             startProducePhase()
         end
     elseif currentPhaseIndex == #selectedPhases then
-        broadcastToAll("Round End", "White")
+        broadcastToAll("End of round.", "White")
         wait(1)
         -- Check if any players need to discard cards
         local skipPlayers = {}
@@ -1638,7 +1647,7 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) then
+            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase then
                 goto skip
             end
 
@@ -1744,7 +1753,7 @@ function updateTableauState(player)
     for _, obj in pairs(zone.getObjects()) do
         if obj.hasTag("Slot") then
             obj.clearButtons()
-            if currentPhase == "2" or currentPhase == "3" then
+            if currentPhase == "2" or (currentPhase == "3" and not takeoverPhase) then
                 setVisibleTo(obj, player)
             else
                 obj.setInvisibleTo({})
@@ -1815,7 +1824,6 @@ function updateTableauState(player)
 
     local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
-     -- possibleTableauActions[player] = {}
 
     -- Auto cancel certain cards
     if currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0 and not p.incomingGood
@@ -1842,7 +1850,8 @@ function updateTableauState(player)
 
             if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
-            elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] then
+            elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] or
+                    takeoverPhase and p.takeoverSource == card.getGUID() then
                 card.highlightOn("Yellow")
             end
 
@@ -1859,62 +1868,72 @@ function updateTableauState(player)
                     end
                 end
             elseif currentPhase == "3" and ap then
-                -- Create buttons for active powers
-                if selectedCard or miscActiveNode then
-                    for name, power in pairs(ap) do
-                        local powerName = ""
-                        local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
-                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
-
-                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
-                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
-                            goto skip_power
+                if takeoverPhase then
+                    if p.beingTargetted then
+                    else
+                        if p.takeoverSource == card.getGUID() then
+                            card.clearButtons()
+                            createStrengthLabel(player, card, false)
                         end
-                        if not used then
-                            if miscSelectedCount <= 0 then
-                                if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                end
-                            elseif not miscSelectedCardsTable[card.getGUID()] then
-                                -- check for compatible chains
-                                local key = concatPowerName(power)
-                                if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
-                                    powerName = power.name
-                                end
-                            end
-                        end
-
-                        if powerName ~= "" and not miscSelected and not used then
-                            dontAutoPass = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected then
-                            dontAutoPass = true
-                            createCancelButton(card)
-
-                            if requiresConfirm[fullName] then
-                                createConfirmButton(card)
-                            end
-                        end
-
-                        ::skip_power::
                     end
                 else
-                    for name, power in pairs(ap) do
-                        -- make buttons for takeover powers
-                        if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
-                            dontAutoPass = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected then
-                            dontAutoPass = true
-                            createCancelButton(card)
+                    -- Create buttons for active powers
+                    if selectedCard or miscActiveNode then
+                        for name, power in pairs(ap) do
+                            local powerName = ""
+                            local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
+                            local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
+
+                            if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                                miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
+                                goto skip_power
+                            end
+                            if not used then
+                                if miscSelectedCount <= 0 then
+                                    if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
+                                        powerName = name
+                                    elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
+                                        powerName = name
+                                    elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
+                                        powerName = name
+                                    elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
+                                        powerName = name
+                                    elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
+                                        powerName = name
+                                    end
+                                elseif not miscSelectedCardsTable[card.getGUID()] then
+                                    -- check for compatible chains
+                                    local key = concatPowerName(power)
+                                    if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
+                                        powerName = power.name
+                                    end
+                                end
+                            end
+
+                            if powerName ~= "" and not miscSelected and not used then
+                                dontAutoPass = true
+                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                            elseif miscSelected then
+                                dontAutoPass = true
+                                createCancelButton(card)
+
+                                if requiresConfirm[fullName] then
+                                    createConfirmButton(card)
+                                end
+                            end
+
+                            ::skip_power::
+                        end
+                    else
+                        for name, power in pairs(ap) do
+                            -- make buttons for takeover powers
+                            if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
+                                dontAutoPass = true
+                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                            elseif miscSelected then
+                                dontAutoPass = true
+                                createCancelButton(card)
+                            end
                         end
                     end
                 end
@@ -2172,6 +2191,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+        p.takeoverSource = obj.getGUID()
         p.takeoverTarget = nil
         refreshTakeoverMenu(player, "TAKEOVER_MILITARY")
     end
@@ -2194,6 +2214,7 @@ function cancelPowerClick(obj, player, rightClick)
         p.selectedGoods = {}
     elseif useTakeovers and not p.miscSelectedCards.value then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
+        p.takeoverSource = nil
         p.takeoverTarget = nil
     end
 
@@ -2413,71 +2434,79 @@ function updateHelpText(playerColor)
             setHelpText(playerColor, "▼ Develop: may play a development.")
         end
     elseif currentPhase == 3 then
-        if p.selectedCard then
-            local card = getObjectFromGUID(p.selectedCard)
-            local info = card_db[card.getName()]
-
-            -- Check for special settle power modifiers
-            local reduceZero = false
-            local reduceZeroName = ""
-            local doMilitary = info.flags["MILITARY"]
-            local payMilitary = false
-            local payMilitaryStr = 0
-            local militaryDiscount = 0
-            local node = p.miscSelectedCards
-
-            while node and node.value do
-                local miscCard = getObjectFromGUID(node.value)
-                local miscPowers = card_db[miscCard.getName()].activePowers["3"]
-                if miscPowers then
-                    if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
-                        reduceZero = true
-                        reduceZeroName = miscCard.getName()
-                    elseif miscPowers["PAY_MILITARY"] then
-                        payMilitary = true
-                        payMilitaryStr = miscPowers["PAY_MILITARY"].strength
-                    elseif miscPowers["MILITARY_HAND"] then
-                        local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
-                        return
-                    elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
-                        doMilitary = true
-                        militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
-                    end
-                end
-                node = node.next
-            end
-
-            if doMilitary and not payMilitary then
-                local def = info.cost - militaryDiscount
-                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
+        if takeoverPhase then
+            if p.beingTargetted then
             else
-                if reduceZero then
-                    setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
-                else
-                    local payDiscount = 0
-                    if payMilitary then
-                        payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
-                    end
-                    local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
-                    setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
-                end
+                setHelpText(playerColor, "Waiting for other players.")
             end
         else
-            if planningTakeover(playerColor) then
-                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.tempMilitary .. ")")
-                return
-            end
+            
+            if p.selectedCard then
+                local card = getObjectFromGUID(p.selectedCard)
+                local info = card_db[card.getName()]
 
-            if placeTwoPhase then
-                if not p.powersSnapshot["PLACE_TWO"] then
-                    setHelpText(playerColor, "Waiting for other players.")
+                -- Check for special settle power modifiers
+                local reduceZero = false
+                local reduceZeroName = ""
+                local doMilitary = info.flags["MILITARY"]
+                local payMilitary = false
+                local payMilitaryStr = 0
+                local militaryDiscount = 0
+                local node = p.miscSelectedCards
+
+                while node and node.value do
+                    local miscCard = getObjectFromGUID(node.value)
+                    local miscPowers = card_db[miscCard.getName()].activePowers["3"]
+                    if miscPowers then
+                        if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
+                            reduceZero = true
+                            reduceZeroName = miscCard.getName()
+                        elseif miscPowers["PAY_MILITARY"] then
+                            payMilitary = true
+                            payMilitaryStr = miscPowers["PAY_MILITARY"].strength
+                        elseif miscPowers["MILITARY_HAND"] then
+                            local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                            setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                            return
+                        elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
+                            doMilitary = true
+                            militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
+                        end
+                    end
+                    node = node.next
+                end
+
+                if doMilitary and not payMilitary then
+                    local def = info.cost - militaryDiscount
+                    setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
+                        p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
                 else
-                    setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
+                    if reduceZero then
+                        setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
+                    else
+                        local payDiscount = 0
+                        if payMilitary then
+                            payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
+                        end
+                        local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
+                        setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+                    end
                 end
             else
-                setHelpText(playerColor, "▼ Settle: may play a world.")
+                if planningTakeover(playerColor) then
+                    setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.tempMilitary .. ")")
+                    return
+                end
+
+                if placeTwoPhase then
+                    if not p.powersSnapshot["PLACE_TWO"] then
+                        setHelpText(playerColor, "Waiting for other players.")
+                    else
+                        setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
+                    end
+                else
+                    setHelpText(playerColor, "▼ Settle: may play a world.")
+                end
             end
         end
     elseif currentPhase == 4 then

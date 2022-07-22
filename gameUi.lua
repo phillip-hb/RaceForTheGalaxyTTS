@@ -93,6 +93,25 @@ function createGoodsButton(card, label, color)
     })
 end
 
+function createStrengthLabel(player, card, addDefense)
+    local calcCard = card
+    if playerData[player].takeoverTarget then
+        calcCard = getObjectFromGUID(playerData[player].takeoverTarget)
+    end
+
+    card.createButton({
+        click_function = "none",
+        function_owner = Global,
+        width = 0,
+        height = 0,
+        position = {-1.2, 1, 0},
+        rotation = {0, -90, 0},
+        font_size = 150,
+        label = "Military +" .. calcStrength(player, calcCard, addDefense),
+        font_color = "White",
+    })
+end
+
 function highlightOn(o, color, player)
     if o.UI.getXml() == '' then
         o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="' .. player .. '"/>' ..
@@ -228,4 +247,25 @@ function menuValueChanged(player, value, id)
         Global.UI.setAttribute(id, "color", "White")
         playerData[player.color].takeoverTarget = nil
     end
+end
+
+function drawTakeoverLines()
+    local lines = {}
+    for player, data in pairs(playerData) do
+        if data.takeoverSource and data.takeoverTarget then
+            local source = getObjectFromGUID(data.takeoverSource)
+            local target = getObjectFromGUID(data.takeoverTarget)
+
+            local line = {
+                points = {source.getPosition(), target.getPosition()},
+                color = player,
+                thickness = 0.5,
+                rotation = {0, 0, 0}
+            }
+
+            lines[#lines + 1] = line
+        end
+    end
+
+    Global.setVectorLines(lines)
 end
