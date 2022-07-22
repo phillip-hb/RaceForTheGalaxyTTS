@@ -231,6 +231,16 @@ function getName(obj)
      return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
 end
 
+function isTakeoverPower(power)
+    if power.name == "TAKEOVER_IMPERIUM" or power.name == "TAKEOVER_REBEL" then
+        return power.name
+    elseif power.codes["TAKEOVER_MILITARY"] then
+        return "TAKEOVER_MILITARY"
+    end
+
+    return nil
+end
+
 -- converts the raw phase value into corresponding actual phase. Use selectedPhases[currentPhaseIndex] to get the raw value instead.
 function getCurrentPhase()
     local phase = selectedPhases[currentPhaseIndex]
@@ -652,7 +662,7 @@ function planningTakeover(player)
     local node = p.miscSelectedCards
 
     while node and node.value do
-        if node.power.codes["TAKEOVER_MILITARY"] then
+        if isTakeoverPower(node.power) then
             return true
         end
         node = node.next
@@ -1954,7 +1964,7 @@ function updateTableauState(player)
                 elseif ap and not takeoverPhase then
                     for name, power in pairs(ap) do
                         -- make buttons for takeover powers
-                        if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
+                        if useTakeovers and isTakeoverPower(power) and not miscSelected then
                             dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
                         elseif miscSelected then
@@ -2214,12 +2224,13 @@ function usePowerClick(obj, player, rightClick, powerIndex)
          node.next = {value = obj.getGUID(), power=power, next = nil}
     end
 
-    if useTakeovers and power.codes["TAKEOVER_MILITARY"] then
+    local takeoverName = isTakeoverPower(power)
+    if useTakeovers and takeoverName ~= nil then
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
         p.takeoverSource = obj.getGUID()
         p.takeoverPower = power
         p.takeoverTarget = nil
-        refreshTakeoverMenu(player, "TAKEOVER_MILITARY")
+        refreshTakeoverMenu(player, takeoverName)
     end
 
     queueUpdate(player, true)

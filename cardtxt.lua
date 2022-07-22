@@ -1715,6 +1715,8 @@ activePowers = {
           DISCARD_CONQUER_SETTLE = "Discard from tableau to place normal world as military world.",
           PAY_MILITARY = "Place military world as normal world.",
           MILITARY_HAND = "Discard from hand for bonus military.",
+          TAKEOVER_IMPERIUM = "Takeover military world from IMPERIUM tableau.",
+          TAKEOVER_REBEL = "Takeover REBEL military world."
      },
      ["4"] = {
           TRADE_ACTION = "Sell a good.",
