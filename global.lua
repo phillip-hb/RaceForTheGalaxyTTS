@@ -131,24 +131,6 @@ drawDeck_GUID = ""
 discardPile = nil
 vpBag = nil
 
-defaultVectorLines = {{
-        points={{-2.79, 1.49, -8.34},{2.77, 1.49, -8.34},{2.77, 1.49, -11.66},{-2.79, 1.49, -11.66}},
-        color="Yellow", thickness=0.1, loop=true
-    },
-    {
-        points={{8.31, 1.49, -2.79},{8.31, 1.49, 2.78},{11.70, 1.49, 2.78},{11.70, 1.49, -2.79}},
-        color="Green", thickness=0.1, loop=true
-    },
-    {
-        points={{2.83, 1.49, 8.27},{-2.78, 1.49, 8.27},{-2.78, 1.49, 11.70},{2.83, 1.49, 11.70},},
-        color="Blue", thickness=0.1, loop=true
-    },
-    {
-        points={{-8.31, 1.49, 2.78},{-8.31, 1.49, -2.78},{-11.67, 1.49, -2.78},{-11.67, 1.49, 2.78}},
-        color="Red", thickness=0.1, loop=true
-    }
-}
-
 -- GUIDS of cards that may have possible actions to perform
 possibleTableauActions = {["Yellow"] = {}, ["Red"] = {}, ["Blue"] = {}, ["Green"] = {}}
 
@@ -237,7 +219,7 @@ function onload(saved_data)
     if takeoverPhase then
         drawTakeoverLines()
     else
-        Global.setVectorLines(defaultVectorLines)
+        Global.setVectorLines(getDefaultVectorLines())
     end
 end
 
@@ -1018,7 +1000,7 @@ function checkAllReadyCo()
         if not readyToken.getVar("isReady") then return 1 end
     end
 
-    Global.setVectorLines(defaultVectorLines)
+    Global.setVectorLines(getDefaultVectorLines())
 
     -- remove misc selected cards if they have discard power
     local discardHappened = false
@@ -1270,6 +1252,7 @@ function beginNextPhase()
     currentPhaseIndex = currentPhaseIndex + 1
     for player, data in pairs(playerData) do
         resetPlayerState(player)
+        updateReadyButtons({player, false})
     end
     updatePhaseTilesHighlight()
 

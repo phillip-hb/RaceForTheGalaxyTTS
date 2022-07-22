@@ -274,7 +274,7 @@ function menuValueChanged(player, value, id)
 end
 
 function drawTakeoverLines()
-    local lines = defaultVectorLines
+    local lines = getDefaultVectorLines()
     for player, data in pairs(playerData) do
         if data.takeoverSource and data.takeoverTarget then
             local source = getObjectFromGUID(data.takeoverSource)
@@ -292,4 +292,23 @@ function drawTakeoverLines()
     end
 
     Global.setVectorLines(lines)
+end
+
+function getDefaultVectorLines()
+    return {{
+        points={{-2.79, 1.49, -8.34},{2.77, 1.49, -8.34},{2.77, 1.49, -11.66},{-2.79, 1.49, -11.66}},
+        color="Yellow", thickness=0.1, loop=true
+    },
+    {
+        points={{8.31, 1.49, -2.79},{8.31, 1.49, 2.78},{11.70, 1.49, 2.78},{11.70, 1.49, -2.79}},
+        color="Green", thickness=0.1, loop=true
+    },
+    {
+        points={{2.83, 1.49, 8.27},{-2.78, 1.49, 8.27},{-2.78, 1.49, 11.70},{2.83, 1.49, 11.70},},
+        color="Blue", thickness=0.1, loop=true
+    },
+    {
+        points={{-8.31, 1.49, 2.78},{-8.31, 1.49, -2.78},{-11.67, 1.49, -2.78},{-11.67, 1.49, 2.78}},
+        color="Red", thickness=0.1, loop=true
+    }}
 end
