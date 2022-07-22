@@ -1747,7 +1747,7 @@ function updateTableauState(player)
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
         obj.clearButtons()
-        
+
         if obj.hasTag("Slot") then
             if currentPhase == "2" or (currentPhase == "3" and not takeoverPhase) then
                 setVisibleTo(obj, player)
@@ -1867,69 +1867,67 @@ function updateTableauState(player)
                 if takeoverPhase then
                     if p.beingTargeted and p.beingTargeted[card.getGUID()] then
                         createStrengthLabel(player, card, true)
-                    else
-                        if p.takeoverSource == card.getGUID() then
-                            createStrengthLabel(player, card, false)
-                        end
+                    elseif p.takeoverSource == card.getGUID() then
+                        createStrengthLabel(player, card, false)
                     end
-                elseif ap then
-                    -- Create buttons for active powers
-                    if selectedCard or miscActiveNode then
-                        for name, power in pairs(ap) do
-                            local powerName = ""
-                            local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
-                            local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
+                end
 
-                            if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
-                                miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
-                                goto skip_power
-                            end
-                            if not used then
-                                if miscSelectedCount <= 0 then
-                                    if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
-                                        powerName = name
-                                    elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and selectedInfo.flags["MILITARY"] then
-                                        powerName = name
-                                    elseif name == "DISCARD_CONQUER_SETTLE" and not selectedInfo.flags["MILITARY"] then
-                                        powerName = name
-                                    elseif ap["PAY_MILITARY"] and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
-                                        powerName = name
-                                    elseif ap["MILITARY_HAND"] and selectedInfo.flags["MILITARY"] then
-                                        powerName = name
-                                    end
-                                elseif not miscSelectedCardsTable[card.getGUID()] then
-                                    -- check for compatible chains
-                                    local key = concatPowerName(power)
-                                    if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
-                                        powerName = power.name
-                                    end
-                                end
-                            end
+                -- Create buttons for active powers
+                if ap and (selectedCard or miscActiveNode or p.beingTargeted) then
+                    for name, power in pairs(ap) do
+                        local powerName = ""
+                        local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
 
-                            if powerName ~= "" and not miscSelected and not used then
-                                dontAutoPass = true
-                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                            elseif miscSelected then
-                                dontAutoPass = true
-                                createCancelButton(card)
-
-                                if requiresConfirm[fullName] then
-                                    createConfirmButton(card)
-                                end
-                            end
-
-                            ::skip_power::
+                        if power.codes["AGAINST_REBEL"] and not selectedInfo.flags["REBEL"] or 
+                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
+                            goto skip_power
                         end
-                    else
-                        for name, power in pairs(ap) do
-                            -- make buttons for takeover powers
-                            if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
-                                dontAutoPass = true
-                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                            elseif miscSelected then
-                                dontAutoPass = true
-                                createCancelButton(card)
+                        if not used then
+                            if miscSelectedCount <= 0 then
+                                if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
+                                    powerName = name
+                                elseif name == "DISCARD_CONQUER_SETTLE" and selectedInfo and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["PAY_MILITARY"] and selectedInfo and selectedInfo.goods ~= "ALIEN" and selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif ap["MILITARY_HAND"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
+                                    powerName = name
+                                end
+                            elseif not miscSelectedCardsTable[card.getGUID()] then
+                                -- check for compatible chains
+                                local key = concatPowerName(power)
+                                if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
+                                    powerName = power.name
+                                end
                             end
+                        end
+
+                        if powerName ~= "" and not miscSelected and not used then
+                            dontAutoPass = true
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                        elseif miscSelected then
+                            dontAutoPass = true
+                            createCancelButton(card)
+
+                            if requiresConfirm[fullName] or takeoverPhase and requiresConfirm[name] then
+                                createConfirmButton(card)
+                            end
+                        end
+
+                        ::skip_power::
+                    end
+                elseif not takeoverPhase then
+                    for name, power in pairs(ap) do
+                        -- make buttons for takeover powers
+                        if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
+                            dontAutoPass = true
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                        elseif miscSelected then
+                            dontAutoPass = true
+                            createCancelButton(card)
                         end
                     end
                 end
@@ -2232,7 +2230,7 @@ function confirmPowerClick(obj, player, rightClick)
         local n = 0
         power = node.power
         if power.name == "MILITARY_HAND" then
-            local marked = discardMarkedCards(player, true)
+            local marked = discardMarkedCards(player, not takeoverPhase)
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
         end
