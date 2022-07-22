@@ -220,8 +220,8 @@ function refreshTakeoverMenu(owner)
                 end
 
                 if info.type == 1 and info.flags["MILITARY"] then
-                    local yourStrength = calcStrength(owner, card, false)
-                    local theirDefense = calcStrength(player, card, true)
+                    local yourStrength = calcStrength(owner, card, false, owner)
+                    local theirDefense = calcStrength(player, card, true, owner)
                     local canTake = yourStrength >= theirDefense
 
                     local btn = {
@@ -251,11 +251,14 @@ function refreshTakeoverMenu(owner)
     Global.UI.setXmlTable(xml)
 end
 
-function calcStrength(player, card, addDefense)
+function calcStrength(player, card, addDefense, activePlayer)
     local p = playerData[player]
     local info = card_db[card.getName()]
 
-    local value = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
+    local value = p.powersSnapshot["EXTRA_MILITARY"]
+    if activePlayer == player then
+        value = value + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
+    end
 
     -- Check for bonus military
     if info.goods then
@@ -274,6 +277,9 @@ function calcStrength(player, card, addDefense)
 
     if addDefense then
         value = value + info.cost + (p.powersSnapshot["TAKEOVER_DEFENSE"] or 0)
+        if activePlayer == nil then
+            value = value + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
+        end
     elseif p.takeoverPower and p.takeoverPower.name == "TAKEOVER_IMPERIUM" then
         value = value + p.powersSnapshot["REBEL_MILITARY_WORLD_COUNT"] * p.takeoverPower.strength
     end
