@@ -1515,9 +1515,11 @@ function capturePowersSnapshot(player, phase)
     local ignore2ndDevelop = false
     local ignore2ndSettle = false
     local chromoCount = 0
+    local rebelMilitaryWorldCount = 0
     local militaryWorldCount = 0
     local tradeChromoBonus = false
     local perMilitary = false
+    local takeoverDefense = false
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
@@ -1567,6 +1569,8 @@ function capturePowersSnapshot(player, phase)
                         elseif results[appendName] then
                             results[appendName] = results[appendName] + power.strength
                         end
+                    elseif name == "TAKEOVER_DEFENSE" then
+                        takeoverDefense = true
                     end
 
                     -- Do some manipulations for special cases
@@ -1616,6 +1620,9 @@ function capturePowersSnapshot(player, phase)
 
         if info.flags["MILITARY"] then
             militaryWorldCount = militaryWorldCount + 1
+            if info.flags["REBEL"] then
+                rebelMilitaryWorldCount = rebelMilitaryWorldCount + 1
+            end
         end
 
         ::next_card::
@@ -1627,6 +1634,10 @@ function capturePowersSnapshot(player, phase)
 
     if perMilitary then
         results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + militaryWorldCount
+    end
+
+    if takeoverDefense then
+        results["TAKEOVER_DEFENSE"] = rebelMilitaryWorldCount * 2 + (militaryWorldCount - rebelMilitaryWorldCount)
     end
     
     -- Track special cases
@@ -2085,12 +2096,12 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    -- if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
-    --     p.forcedReady = true
-    --     if Player[player].seated then
-    --         updateReadyButtons({player, true})
-    --     end
-    -- end
+    if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+        p.forcedReady = true
+        if Player[player].seated then
+            updateReadyButtons({player, true})
+        end
+    end
 end
 
 function markUsed(player, card, power, n)

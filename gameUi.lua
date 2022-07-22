@@ -268,7 +268,7 @@ function calcStrength(player, card, addDefense)
     end
 
     if addDefense then
-        value = value + info.cost
+        value = value + info.cost + (p.powersSnapshot["TAKEOVER_DEFENSE"] or 0)
     end
 
     return value
