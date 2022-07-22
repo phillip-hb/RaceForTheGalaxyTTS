@@ -1896,7 +1896,7 @@ function updateTableauState(player)
                                 elseif ap["MILITARY_HAND"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
                                     powerName = name
                                 end
-                            elseif not miscSelectedCardsTable[card.getGUID()] then
+                            elseif not miscSelectedCardsTable[card.getGUID()] and not takeoverPhase then
                                 -- check for compatible chains
                                 local key = concatPowerName(power)
                                 if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
@@ -1919,7 +1919,7 @@ function updateTableauState(player)
 
                         ::skip_power::
                     end
-                elseif not takeoverPhase then
+                elseif ap and not takeoverPhase then
                     for name, power in pairs(ap) do
                         -- make buttons for takeover powers
                         if useTakeovers and power.codes["TAKEOVER_MILITARY"] and not miscSelected then
@@ -2233,6 +2233,10 @@ function confirmPowerClick(obj, player, rightClick)
             local marked = discardMarkedCards(player, not takeoverPhase)
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
+        elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+            n = 1
+            p.tempMilitary = p.tempMilitary + power.strength
+            discardCard(obj)
         end
 
         if n == 0 then return end
