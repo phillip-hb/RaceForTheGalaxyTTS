@@ -177,8 +177,11 @@ function displayVpHexOn(o, value)
     end
 end
 
-function refreshTakeoverMenu(owner, takeoverPower)
+function refreshTakeoverMenu(owner)
+    if not Global.UI.getAttribute("takeoverMenu_" .. owner, "active") then return end
+
     local players = {"Yellow", "Red", "Blue", "Green"}
+    local op = playerData[owner]
 
     -- The main index value is to determine which of the UI windows to edit, and the player index determines column based on player seating.
     local indexValues = {
@@ -202,6 +205,7 @@ function refreshTakeoverMenu(owner, takeoverPower)
             column[1] = panel
 
             local p = playerData[player]
+            local takeoverPower = isTakeoverPower(op.takeoverPower)
 
             if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] <= 0 or 
                 takeoverPower == "TAKEOVER_IMPERIUM" and not p.powersSnapshot["IMPERIUM"] then
@@ -251,7 +255,7 @@ function calcStrength(player, card, addDefense)
     local p = playerData[player]
     local info = card_db[card.getName()]
 
-    local value = p.powersSnapshot["EXTRA_MILITARY"]
+    local value = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
 
     -- Check for bonus military
     if info.goods then

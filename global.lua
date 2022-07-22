@@ -1663,15 +1663,15 @@ function capturePowersSnapshot(player, phase)
         end
     end
 
-    if placeTwoPhase or takeoverPhase then
-        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + p.tempMilitary
-    end
-
     p.powersSnapshot = results
 
     local statTracker = getObjectFromGUID(statTracker_GUID[p.index])
     if statTracker then
-        statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"]})
+        local xtra = 0
+        if placeTwoPhase or takeoverPhase then
+            xtra = p.tempMilitary
+        end
+        statTracker.call("updateLabel", {"military", results["EXTRA_MILITARY"] + xtra})
     end
 end
 
@@ -2240,12 +2240,18 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     end
 
     local takeoverName = isTakeoverPower(power)
-    if useTakeovers and takeoverName ~= nil then
-        Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
-        p.takeoverSource = obj.getGUID()
-        p.takeoverPower = power
-        p.takeoverTarget = nil
-        refreshTakeoverMenu(player, takeoverName)
+    if useTakeovers and currentPhase == "3" then
+        if takeoverName ~= nil then
+            Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+            p.takeoverSource = obj.getGUID()
+            p.takeoverPower = power
+            p.takeoverTarget = nil
+        end
+
+        if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+            p.powersSnapshot["BONUS_MILITARY"] = p.powersSnapshot["BONUS_MILITARY"] + power.strength
+        end
+        refreshTakeoverMenu(player)
     end
 
     queueUpdate(player, true)
@@ -2264,10 +2270,16 @@ function cancelPowerClick(obj, player, rightClick)
         p.selectedCard = nil
         p.selectedCardPower = ""
         p.selectedGoods = {}
-    elseif useTakeovers and not p.miscSelectedCards.value then
-        Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
-        p.takeoverSource = nil
-        p.takeoverTarget = nil
+    elseif useTakeovers and getCurrentPhase() == 3 then
+        if not p.miscSelectedCards.value then
+            Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
+            p.takeoverSource = nil
+            p.takeoverTarget = nil
+        end
+
+        -- temporarily set this value for now to refresh takeover menu
+        capturePowersSnapshot(player, "3")
+        refreshTakeoverMenu(player)
     end
 
     queueUpdate(player, true)
@@ -2291,6 +2303,7 @@ function confirmPowerClick(obj, player, rightClick)
             local marked = discardMarkedCards(player, not takeoverPhase)
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
+            refreshTakeoverMenu(player)
         elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             n = 1
             p.tempMilitary = p.tempMilitary + power.strength
@@ -2550,7 +2563,7 @@ function updateHelpText(playerColor)
                 end
             else
                 if planningTakeover(playerColor) then
-                    setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.tempMilitary .. ")")
+                    setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
                     return
                 end
 
