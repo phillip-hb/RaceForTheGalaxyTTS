@@ -63,6 +63,8 @@ compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,},
     ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
     ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
+    ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
+    ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
 }
 
@@ -1051,6 +1053,9 @@ function checkAllReadyCo()
             if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
                 discardCard(card)
                 discardHappened = true
+                if power.name == 'DISCARD' and power.codes["EXTRA_MILITARY"] then
+                    p.tempMilitary = p.tempMilitary + power.strength
+                end
             end
             node = node.next
         end
@@ -1598,7 +1603,9 @@ function capturePowersSnapshot(player, phase)
                     end
                 end
 
-                results[name] = results[name] + power.strength
+                if name ~= "BONUS_MILITARY" then
+                    results[name] = results[name] + power.strength
+                end
 
                 if name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
                     tradeChromoBonus = true
@@ -2930,17 +2937,16 @@ function resolveTakeovers()
             local sourceStr = calcStrength(player, targetCard, false)
             local targetStr = calcStrength(getOwner(targetCard), targetCard, true)
 
+            -- Discard one time use takeover cards
+            if p.takeoverPower.name == "DISCARD" then
+                discardCard(sourceCard)
+                wait(0.05)
+            end
+
             -- Takeover successfull
             if not taken[targetCard.getGUID()] and sourceStr >= targetStr then
                 broadcastToAll((Player[player].steam_name or player) .. "'s takeover of \"" .. targetCard.getName() ..'" was successful!', player)
                 taken[targetCard.getGUID()] = true
-
-                -- Discard one time use cards
-                if p.takeoverPower.name == "DISCARD" then
-                    discardCard(sourceCard)
-                    wait(0.05)
-                end
-
                 -- Take control of the target card
                 attemptPlayCard(targetCard, player, true)
                 takeoverSuccess = true

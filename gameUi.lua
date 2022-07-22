@@ -256,7 +256,7 @@ function calcStrength(player, card, addDefense, activePlayer)
     local info = card_db[card.getName()]
 
     local value = p.powersSnapshot["EXTRA_MILITARY"]
-    if activePlayer == player then
+    if activePlayer == player or activePlayer == nil then
         value = value + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
     end
 
