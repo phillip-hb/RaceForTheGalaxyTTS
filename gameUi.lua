@@ -28,15 +28,34 @@ function createCancelButtonOnCard(card)
     })
 end
 
+function createCardBottomButton(card, text, func)
+    local slot = getCardSlot(card)
+    slot.createButton({
+        click_function = func,
+        function_owner = Global,
+        label = text,
+        font_size = 150,
+        width = 900,
+        height = 220,
+        position = {0, 0, .63},
+        scale = {0.5, 1, 0.4}
+    })
+end
+
 function createConfirmButton(card)
-    card.createButton({
+    local slot = getCardSlot(card)
+
+    if not slot then return end
+
+    slot.createButton({
         click_function = "confirmPowerClick",
         function_owner = Global,
         label = "Confirm",
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, 1.85},
+        position = {0, 0, .63},
+        scale = {0.5, 1, 0.4}
     })
 end
 
@@ -64,14 +83,19 @@ function createUsePowerButton(card, powerIndex, powersCount, tooltip, color)
 end
 
 function createCancelButton(card)
-    card.createButton({
+    local slot = getCardSlot(card)
+
+    if not slot then return end
+
+    slot.createButton({
         click_function = "cancelPowerClick",
         function_owner = Global,
         label = "Cancel",
         font_size = 150,
         width = 900,
         height = 220,
-        position = {0, 0, -1.85},
+        position = {0, 0, -.63},
+        scale = {0.5, 1, 0.4},
         tooltip = "Cancel power.",
     })
 end
