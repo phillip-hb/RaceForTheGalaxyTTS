@@ -1961,7 +1961,7 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
-                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index]
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index] >= power.strength
 
                         if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
@@ -2339,8 +2339,12 @@ function confirmPowerClick(obj, player, rightClick)
         power = node.power
         if power.name == "MILITARY_HAND" then
             local marked = discardMarkedCards(player, not takeoverPhase)
+            local usedAmount = 0
+            if p.cardsAlreadyUsed[obj.getGUID()] and p.cardsAlreadyUsed[obj.getGUID()][power.name .. power.index] then
+                usedAmount = p.cardsAlreadyUsed[obj.getGUID()][power.name .. power.index]
+            end
             n = #marked
-            p.tempMilitary = p.tempMilitary + math.min(n, power.strength)
+            p.tempMilitary = p.tempMilitary + math.min(n, power.strength - usedAmount)
             refreshTakeoverMenu(player)
         elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             n = 1
@@ -2570,7 +2574,11 @@ function updateHelpText(playerColor)
                         payMilitaryStr = miscPowers["PAY_MILITARY"].strength
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                        local usedAmount = 0
+                        if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index] then
+                            usedAmount = p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index]
+                        end
+                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded + usedAmount .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
                         return
                     elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
                         doMilitary = true
