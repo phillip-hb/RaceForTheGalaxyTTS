@@ -38,7 +38,7 @@ function toggleState(obj, _, rightClick)
      end
 
      isReady = not isReady
-     Global.call("updateReadyButtons", {player, isReady})
+     Global.call("updateReadyButtons", {player, isReady, true})
 end
 
 function setToggleState(ready)

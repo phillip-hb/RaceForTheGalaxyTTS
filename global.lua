@@ -965,7 +965,7 @@ function gameStart(params)
      broadcastToAll("Determine your starting hand.", "White")
 end
 
-function playerReadyClicked(playerColor, forced)
+function playerReadyClicked(playerColor, forced, playSound)
     local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
@@ -1010,6 +1010,9 @@ function playerReadyClicked(playerColor, forced)
         end
     end
 
+    if playSound then
+        sound.AssetBundle.playTriggerEffect(3)
+    end
     startLuaCoroutine(Global, "checkAllReadyCo")
 end
 
@@ -1018,6 +1021,10 @@ end
 function updateReadyButtons(params)
     local player = params[1]
     local state = params[2]
+    local playSound = false
+    if #params >= 3 then
+        playSound = params[3]
+    end
     local i = playerData[player].index
     local token = getObjectFromGUID(readyTokens_GUID[i])
     if token then token.call("setToggleState", state) end
@@ -1025,7 +1032,7 @@ function updateReadyButtons(params)
     if token then token.call("setToggleState", state) end
 
     if params[2] then
-        playerReadyClicked(player, true)
+        playerReadyClicked(player, true, playSound)
     end
 end
 
@@ -2026,7 +2033,7 @@ function updateTableauState(player)
                         if power.codes["CONSUME_TWO"] then
                             baseAmount[power.index] = 2
                         elseif name == "CONSUME_ALL" then
-                            baseAmount[power.index] = goodsCount["TOTAL"]
+                            baseAmount[power.index] = math.max(1, goodsCount["TOTAL"])
                         elseif name == "CONSUME_3_DIFF" then
                             baseAmount[power.index] = uniqueCount < 3 and 100 or 3
                         elseif name == "CONSUME_N_DIFF" then
@@ -2171,10 +2178,17 @@ function usePowerClick3(obj, player, button) usePowerClick(obj, player, button, 
 
 function usePowerClick(obj, player, rightClick, powerIndex)
     if rightClick then return end
+    if getOwner(obj) ~= player then
+        broadcastToColor("You cannot use cards from another player's tableau.", player, "White")
+        return
+    end
+
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
+
+    p.handCountSnapshot = countCardsInHand(player, true)
 
     if currentPhase == "4" or currentPhase == "5" then
         p.selectedCard = obj.getGUID()
@@ -2251,6 +2265,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     if not p.miscSelectedCards then p.miscSelectedCards = {} end
 
     local power = getActivePower(obj.getName(), currentPhase, powerIndex)
+
     if not p.miscSelectedCards.value then
          p.miscSelectedCards = {value = obj.getGUID(), power=power, next = nil}
     else
@@ -2277,6 +2292,11 @@ end
 
 function cancelPowerClick(obj, player, rightClick)
     if rightClick then return end
+    if getOwner(obj) ~= player then
+        broadcastToColor("You cannot use cards from another player's tableau.", player, "White")
+        return
+    end
+
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
@@ -2360,6 +2380,10 @@ end
 
 function goodSelectClick(slot, player, rightClick)
     if rightClick then return end
+    if getOwner(slot) ~= player then
+        broadcastToColor("You cannot use cards from another player's tableau.", player, "White")
+        return
+    end
 
     local parentCard = getCard(slot)
 
@@ -2564,8 +2588,14 @@ function updateHelpText(playerColor)
                 end
             elseif doMilitary and not payMilitary then
                 local def = info.cost - militaryDiscount
+                local specialtyBonus = 0
+                if info.goods and p.powersSnapshot[info.goods .. "_BONUS_MILITARY"] then
+                    specialtyBonus = p.powersSnapshot[info.goods .. "_BONUS_MILITARY"]
+                elseif info.flags["REBEL"] and p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"] then
+                    specialtyBonus = p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"]
+                end
                 setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
+                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary + specialtyBonus .. "/" .. def .. ")")
             else
                 if reduceZero then
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
@@ -2628,7 +2658,8 @@ function updateHelpText(playerColor)
             if p.selectedCardPower:sub(1,8) == "WINDFALL" or (p.selectedCardPower == "DISCARD_HAND" and power["DISCARD_HAND"].codes["WINDFALL_ANY"] and paidCost) then
                 setHelpText(playerColor, "▲ Produce: produce on windfall world.")
             elseif p.selectedCardPower == "DISCARD_HAND" then
-                setHelpText(playerColor, "▼ Produce: discard card to use power.")
+                local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                setHelpText(playerColor, "▼ Produce: discard to use power. (" .. discardCount .. "/1)")
             end
         else
             setHelpText(playerColor, "▲ Produce: use powers.")

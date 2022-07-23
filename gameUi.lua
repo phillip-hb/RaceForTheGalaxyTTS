@@ -138,7 +138,7 @@ end
 
 function highlightOn(o, color, player)
     if o.UI.getXml() == '' then
-        o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="' .. player .. '"/>' ..
+        o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="Black|' .. player .. '"/>' ..
 [[
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
     <Image image="hex" preserveAspect="true"/>
@@ -148,7 +148,7 @@ function highlightOn(o, color, player)
     else
         o.UI.setAttributes("highlight",{
             active = true,
-            visibility = player,
+            visibility = "Black|" .. player,
             color = color
         })
     end
@@ -178,7 +178,8 @@ function displayVpHexOn(o, value)
 end
 
 function refreshTakeoverMenu(owner)
-    if not Global.UI.getAttribute("takeoverMenu_" .. owner, "active") then return end
+    local active = Global.UI.getAttribute("takeoverMenu_" .. owner, "active")
+    if string.lower(active) == "false" then return end
 
     local players = {"Yellow", "Red", "Blue", "Green"}
     local op = playerData[owner]
