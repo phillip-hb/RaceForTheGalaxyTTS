@@ -82,7 +82,7 @@ helpDisplay_GUID = {"f9c4ee", "5a39e2", "515d9a", "1dbea0"}
 statTracker_GUID = {"3b078d", "2ed5dd", "dc9bac", "8865a8"}
 advanced2pCards_GUID = {"f4313a", "eead6a", "3ee2da", "09a79a"}
 
-disableInteract_GUID = {presentedPhaseCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID}
+disableInteract_GUID = {presentedPhaseCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID}
 
 vpPoolBag_GUID = "c2e459"
 vpInfBag_GUID = "5719f7"
@@ -179,7 +179,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            if obj then obj.interactable = false end
+            --if obj then obj.interactable = false end
         end
     end
 
@@ -196,6 +196,9 @@ function onload(saved_data)
     for i=1, #tableauZone_GUID do
         tableauZoneMap[tableauZone_GUID[i]] = true
     end
+
+    sound = getObjectFromGUID("416393")
+    sound.interactable = false
 
     for color, data in pairs(playerData) do
         local index = data.index
@@ -649,6 +652,7 @@ function resetPlayerState(player)
     data.incomingGood = false
     data.selectedGoods = {}
     data.roundEndDiscardCount = 0
+    data.tempMilitary = 0
     data.takeoverSource = nil
     data.takeoverPower = nil
     data.takeoverTarget = nil
@@ -961,7 +965,7 @@ function gameStart(params)
      broadcastToAll("Determine your starting hand.", "White")
 end
 
-function playerReadyClicked(playerColor)
+function playerReadyClicked(playerColor, forced)
     local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
@@ -1021,7 +1025,7 @@ function updateReadyButtons(params)
     if token then token.call("setToggleState", state) end
 
     if params[2] then
-        playerReadyClicked(player)
+        playerReadyClicked(player, true)
     end
 end
 
@@ -1132,6 +1136,7 @@ function checkAllReadyCo()
         end
 
         if takeoverTriggered then
+            sound.AssetBundle.playTriggerEffect(1)
             takeoverPhase = true
             drawTakeoverLines()
             return 1
@@ -1152,6 +1157,7 @@ function checkAllReadyCo()
     end
 
     if placeTwoTriggered then
+        sound.AssetBundle.playTriggerEffect(1)
         return 1
     end
 
@@ -1233,8 +1239,10 @@ function startNewRound()
         gameDone = true
         wait(1.5)
         broadcastToAll("The game has ended.", "Purple")
+        sound.AssetBundle.playTriggerEffect(4)
     else
         broadcastToAll("Starting new round.", color(0, 1, 1))
+        sound.AssetBundle.playTriggerEffect(2)
     end
 
     for player, data in pairs(playerData) do
@@ -1303,6 +1311,7 @@ function beginNextPhase()
     if currentPhaseIndex <= #selectedPhases - 1 then
         local phase = getCurrentPhase()
         broadcastToAll(phaseText[selectedPhases[currentPhaseIndex]], "White")
+        sound.AssetBundle.playTriggerEffect(0)
 
         if phase == 1 then
             startExplorePhase()
@@ -1363,8 +1372,10 @@ function checkEndGame()
                 end
             end
 
-            if p.powersSnapshot["GAME_END_14"] and count >= 14 or not p.powersSnapshot["GAME_END_14"] and count >= 12 then
-                broadcastToAll((Player[player].steam_name or player) .. " has played " .. count .. " cards in their tableau.", player)
+            local limit = 12
+            if p.powersSnapshot["GAME_END_14"] then limit = 14 end
+            if count >= limit then
+                broadcastToAll((Player[player].steam_name or player) .. " has played " .. limit .. " cards in their tableau.", player)
                 gameEndMessage = true
             end
         end

@@ -27,6 +27,16 @@ function onload()
      createButtons()
 
      refreshButtonHighlights()
+
+     local players = {"Yellow", "Red", "Blue", "Green"}
+     local hideFrom = {}
+     for _, target in pairs(players) do
+          if target ~= player then
+               hideFrom[#hideFrom + 1] = target
+          end
+     end
+
+     self.setInvisibleTo(hideFrom)
 end
 
 function createButtons()
