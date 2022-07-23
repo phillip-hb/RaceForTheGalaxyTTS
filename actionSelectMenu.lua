@@ -206,9 +206,7 @@ function selectPhaseCo()
 
      local sp = selectedActionCardTile.getSnapPoints()
      local rot = self.getRotation()
-
      local objs = actionZone.getObjects()
-
      local targetSnapIndex = 1
 
      if adv2p then
@@ -257,34 +255,6 @@ function returnSelectedActionCard(name)
      end
 end
 
--- function rearrangeActionCards()
---      local adv2p = Global.getVar("advanced2p")
---      local spStartIndex = adv2p and 1 or 2
-
---      local phaseCardNames = adv2p and Global.getVar("phaseCardNamesAdv2p") or Global.getVar("phaseCardNames")
---      local phaseCardSpIndex = {}
-
---      for i=1, #phaseCardNames do
---           phaseCardSpIndex[phaseCardNames[i]] = spStartIndex + (i-1)
---      end
-
---      local sp = phaseTable.getSnapPoints()
-
---      for _, obj in pairs(actionZone.getObjects()) do
---           if obj.type == "Deck" then
---                local n = #obj.getObjects()
---                for i=1, n do
---                     local card = obj.takeObject()
---                     local spIndex = phaseCardSpIndex[getName(card)]
---                     placeCardAtSnapPoint(card, phaseTable, sp[spIndex], false)
---                end
---           elseif obj.type == "Card" then
---                local spIndex = phaseCardSpIndex[getName(obj)]
---                placeCardAtSnapPoint(obj, phaseTable, sp[spIndex], false)
---           end
---      end
--- end
-
 function placeCardAtSnapPoint(card, spOwner, sp, faceDown)
      local rot = spOwner.getRotation()
 
@@ -292,9 +262,7 @@ function placeCardAtSnapPoint(card, spOwner, sp, faceDown)
           rot[i] = rot[i] + sp.rotation[i]
      end
 
-     if faceDown then
-          rot[3] = 180
-     end
+     if faceDown then rot[3] = 180 end
 
      local pos = spOwner.positionToWorld(sp.position)
      card.setPositionSmooth({pos[1], pos[2] + 0.15, pos[3]})

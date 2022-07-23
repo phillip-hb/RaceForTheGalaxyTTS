@@ -1530,7 +1530,7 @@ function capturePowersSnapshot(player, phase)
         local info = card_db[card.getName()]
 
         -- Place two triggered, skip the action card power and the last played card's powers
-        if placeTwoPhase and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
+        if (placeTwoPhase or takeoverPhase) and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
             goto next_card
         end
 
@@ -2510,79 +2510,77 @@ function updateHelpText(playerColor)
             setHelpText(playerColor, "▼ Develop: may play a development.")
         end
     elseif currentPhase == 3 then
-        if takeoverPhase then
-            if p.beingTargetted then
+        if p.selectedCard or p.beingTargeted then
+            local card = getObjectFromGUID(p.selectedCard)
+            local info = card and card_db[card.getName()] or nil
+
+            -- Check for special settle power modifiers
+            local reduceZero = false
+            local reduceZeroName = ""
+            local doMilitary = info and info.flags["MILITARY"]
+            local payMilitary = false
+            local payMilitaryStr = 0
+            local militaryDiscount = 0
+            local node = p.miscSelectedCards
+
+            while node and node.value do
+                local miscCard = getObjectFromGUID(node.value)
+                local miscPowers = card_db[miscCard.getName()].activePowers["3"]
+                if miscPowers then
+                    if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
+                        reduceZero = true
+                        reduceZeroName = miscCard.getName()
+                    elseif miscPowers["PAY_MILITARY"] then
+                        payMilitary = true
+                        payMilitaryStr = miscPowers["PAY_MILITARY"].strength
+                    elseif miscPowers["MILITARY_HAND"] then
+                        local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                        return
+                    elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
+                        doMilitary = true
+                        militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
+                    end
+                end
+                node = node.next
+            end
+
+            if takeoverPhase then
+                if p.beingTargeted then
+                    setHelpText(playerColor, "Settle: defend against takeover.")
+                else
+                    setHelpText(playerColor, "Settle: waiting for other players.")
+                end
+            elseif doMilitary and not payMilitary then
+                local def = info.cost - militaryDiscount
+                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
+                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
             else
-                setHelpText(playerColor, "Waiting for other players.")
+                if reduceZero then
+                    setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
+                else
+                    local payDiscount = 0
+                    if payMilitary then
+                        payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
+                    end
+                    local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
+                    setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+                end
             end
         else
-            
-            if p.selectedCard then
-                local card = getObjectFromGUID(p.selectedCard)
-                local info = card_db[card.getName()]
+            if planningTakeover(playerColor) then
+                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
+                return
+            end
 
-                -- Check for special settle power modifiers
-                local reduceZero = false
-                local reduceZeroName = ""
-                local doMilitary = info.flags["MILITARY"]
-                local payMilitary = false
-                local payMilitaryStr = 0
-                local militaryDiscount = 0
-                local node = p.miscSelectedCards
-
-                while node and node.value do
-                    local miscCard = getObjectFromGUID(node.value)
-                    local miscPowers = card_db[miscCard.getName()].activePowers["3"]
-                    if miscPowers then
-                        if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
-                            reduceZero = true
-                            reduceZeroName = miscCard.getName()
-                        elseif miscPowers["PAY_MILITARY"] then
-                            payMilitary = true
-                            payMilitaryStr = miscPowers["PAY_MILITARY"].strength
-                        elseif miscPowers["MILITARY_HAND"] then
-                            local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                            setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
-                            return
-                        elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
-                            doMilitary = true
-                            militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
-                        end
-                    end
-                    node = node.next
-                end
-
-                if doMilitary and not payMilitary then
-                    local def = info.cost - militaryDiscount
-                    setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
-                        p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. "/" .. def .. ")")
+            if placeTwoPhase then
+                if not p.powersSnapshot["PLACE_TWO"] then
+                    setHelpText(playerColor, "Settle: waiting for other players.")
                 else
-                    if reduceZero then
-                        setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
-                    else
-                        local payDiscount = 0
-                        if payMilitary then
-                            payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
-                        end
-                        local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
-                        setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
-                    end
+                    setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
                 end
             else
-                if planningTakeover(playerColor) then
-                    setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
-                    return
-                end
-
-                if placeTwoPhase then
-                    if not p.powersSnapshot["PLACE_TWO"] then
-                        setHelpText(playerColor, "Waiting for other players.")
-                    else
-                        setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
-                    end
-                else
-                    setHelpText(playerColor, "▼ Settle: may play a world.")
-                end
+                setHelpText(playerColor, "▼ Settle: may play a world.")
             end
         end
     elseif currentPhase == 4 then
@@ -2632,7 +2630,7 @@ function updateHelpText(playerColor)
         if cardsInHand > maxHandSize then
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
-            setHelpText(playerColor, "Waiting for other players.")
+            setHelpText(playerColor, "Round End: waiting for other players.")
         end
     end
 end
