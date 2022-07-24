@@ -179,6 +179,7 @@ end
 
 function refreshTakeoverMenu(owner)
     local active = Global.UI.getAttribute("takeoverMenu_" .. owner, "active")
+
     if string.lower(active) == "false" then return end
 
     local players = {"Yellow", "Red", "Blue", "Green"}
@@ -194,17 +195,15 @@ function refreshTakeoverMenu(owner)
 
     local xml = Global.UI.getXmlTable()
     local mainPanelBody = xml[indexValues[owner].main]
-    local groupBody = mainPanelBody.children[1].children[4].children[1].children
+    local groupBody = mainPanelBody.children[1].children[3].children[1].children[1].children
 
     for _, player in pairs(players) do
         if player ~= owner then
+            local textElement = mainPanelBody.children[1].children[2].children[1].children[indexValues[owner][player]].children[1]
+            textElement.value = Player[player].steam_name or player
+            textElement.attributes.color = player
+            
             local column = {}
-
-            -- Name box
-            local nametext = {tag="Text", attributes={class="name",color=player}, value=Player[player].steam_name or player}
-            local panel = {tag="Panel", attributes={class="namebox"}, children={nametext}}
-            column[1] = panel
-
             local p = playerData[player]
             local takeoverPower = isTakeoverPower(op.takeoverPower)
 

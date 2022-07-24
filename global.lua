@@ -2284,7 +2284,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             p.powersSnapshot["BONUS_MILITARY"] = p.powersSnapshot["BONUS_MILITARY"] + power.strength
         end
-        refreshTakeoverMenu(player)
+        Wait.frames(function() refreshTakeoverMenu(player) end, 1)
     end
 
     queueUpdate(player, true)
