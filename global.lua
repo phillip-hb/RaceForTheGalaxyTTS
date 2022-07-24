@@ -1159,7 +1159,6 @@ function checkAllReadyCo()
     end
 
     if gameStarted and currentPhaseIndex == -1 then
-        currentPhaseIndex = 0
         startNewRound()
         return 1
     end
@@ -1226,7 +1225,6 @@ function checkAllReadyCo()
 end
 
 function startNewRound()
-    currentPhaseIndex = 0
     selectedPhases = {}
     resetPhaseTiles()
 
@@ -1235,10 +1233,12 @@ function startNewRound()
         wait(1.5)
         broadcastToAll("The game has ended.", "Purple")
         sound.AssetBundle.playTriggerEffect(4)
-    else
+    elseif currentPhaseIndex ~= 0 then
         broadcastToAll("Starting new round.", color(0, 1, 1))
         sound.AssetBundle.playTriggerEffect(2)
     end
+    
+    currentPhaseIndex = 0
 
     for player, data in pairs(playerData) do
         resetPlayerState(player)

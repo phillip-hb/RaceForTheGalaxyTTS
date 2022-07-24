@@ -28,7 +28,7 @@ function onload(saved_data)
           height = 800,
           rotation = {0, 0, 180},
           color = color(0, 0, 0, 0),
-          tooltip = "Ready"
+          tooltip = "Not Ready"
      })
 end
 
