@@ -2275,16 +2275,16 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     local takeoverName = isTakeoverPower(power)
     if useTakeovers and currentPhase == "3" then
         if takeoverName ~= nil then
-            Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
             p.takeoverSource = obj.getGUID()
             p.takeoverPower = power
             p.takeoverTarget = nil
+            Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
         end
 
         if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             p.powersSnapshot["BONUS_MILITARY"] = p.powersSnapshot["BONUS_MILITARY"] + power.strength
         end
-        Wait.frames(function() refreshTakeoverMenu(player) end, 1)
+        refreshTakeoverMenu(player)
     end
 
     queueUpdate(player, true)
@@ -2317,7 +2317,7 @@ function cancelPowerClick(obj, player, rightClick)
 
         -- temporarily set this value for now to refresh takeover menu
         capturePowersSnapshot(player, "3")
-        refreshTakeoverMenu(player)
+        Wait.frames(function() refreshTakeoverMenu(player) end, 1)
     end
 
     queueUpdate(player, true)

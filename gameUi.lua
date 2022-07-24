@@ -178,12 +178,10 @@ function displayVpHexOn(o, value)
 end
 
 function refreshTakeoverMenu(owner)
-    local active = Global.UI.getAttribute("takeoverMenu_" .. owner, "active")
-
-    if string.lower(active) == "false" then return end
-
     local players = {"Yellow", "Red", "Blue", "Green"}
     local op = playerData[owner]
+
+    if not op.takeoverPower then return end
 
     -- The main index value is to determine which of the UI windows to edit, and the player index determines column based on player seating.
     local indexValues = {
@@ -196,9 +194,11 @@ function refreshTakeoverMenu(owner)
     local xml = Global.UI.getXmlTable()
     local mainPanelBody = xml[indexValues[owner].main]
     local groupBody = mainPanelBody.children[1].children[3].children[1].children[1].children
+    local largestCount = 0
 
     for _, player in pairs(players) do
         if player ~= owner then
+            local btnCount = 0
             local textElement = mainPanelBody.children[1].children[2].children[1].children[indexValues[owner][player]].children[1]
             textElement.value = Player[player].steam_name or player
             textElement.attributes.color = player
@@ -244,6 +244,7 @@ function refreshTakeoverMenu(owner)
                         value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
                     }
 
+                    btnCount = btnCount + 1
                     column[#column + 1] = btn
                 end
 
@@ -253,8 +254,12 @@ function refreshTakeoverMenu(owner)
             ::skip_player::
 
             groupBody[indexValues[owner][player]].children = column
+            if btnCount > largestCount then largestCount = btnCount end
         end
     end
+
+    -- need to readjust height of the toggle group to fit all the buttons
+    --mainPanelBody.children[1].children[3].children[1].attributes.height = 48 * largestCount
 
     Global.UI.setXmlTable(xml)
 end
