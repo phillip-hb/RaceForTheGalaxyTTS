@@ -741,12 +741,21 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     end
 
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
-
+        local p = playerData[player_color]
+        if enforceRules then
+            local rot = object.getRotation()
+            if p.canReady and flip == 180 then
+                object.setRotation({rot[1], rot[2], 0})
+                return
+            end
+        end
 
         if flip == 180 then
             object.addTag("Discard")
+            updateReadyButtons({player_color, false})
         elseif flip == 0 then
             object.removeTag("Discard")
+            updateReadyButtons({player_color, false})
         end
 
         updateHelpText(player_color)
@@ -1118,9 +1127,11 @@ function checkAllReadyCo()
         end
 
         -- discard all face down cards in hand
-        local n = #discardMarkedCards(player)
-        if currentPhaseIndex == #selectedPhases then
-            p.roundEndDiscardCount = n
+        if currentPhaseIndex ~= 0 then
+            local n = #discardMarkedCards(player)
+            if currentPhaseIndex == #selectedPhases then
+                p.roundEndDiscardCount = n
+            end
         end
         p.selectedCard = nil
     end
@@ -2537,8 +2548,8 @@ function updateHelpText(playerColor)
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
             local discardTarget = powers["DISCARD"]
-            setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
             if discarded >= discardTarget then p.canReady = true end
+            setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Select your start world.")
         end
