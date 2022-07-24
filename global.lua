@@ -46,7 +46,6 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 gameDone = false
-readyWait = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -953,17 +952,10 @@ function gameStart(params)
         end
     end
 
-    readyWait = true
-    Wait.time(function() readyWait = false end, 1.5)
     broadcastToAll("Determine your starting hand.", "White")
 end
 
 function playerReadyClicked(playerColor, forced, playSound)
-    if readyWait then
-        updateReadyButtons({playerColor, false})
-        return
-    end
-
     local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
@@ -1035,8 +1027,6 @@ function updateReadyButtons(params)
 end
 
 function checkAllReadyCo()
-    if readyWait then return 1 end
-
     -- Check if all players are ready to move on to next step of game
     local players = getSeatedPlayersWithHands()
 
@@ -1044,9 +1034,6 @@ function checkAllReadyCo()
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
         if not readyToken.getVar("isReady") then return 1 end
     end
-
-    readyWait = true
-    Wait.time(function() readyWait = false end, 1.5)
 
     Global.setVectorLines(getDefaultVectorLines())
 
