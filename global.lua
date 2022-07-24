@@ -643,7 +643,10 @@ end
 
 function resetPlayerState(playerColor)
     local index = playerData[playerColor].index
+    local incomingGood = playerData[playerColor].incomingGood
+
     playerData[playerColor] = player(index)
+    playerData[playerColor].incomingGood = incomingGood
 end
 
 -- Check to see if player is planning to do a takeover
@@ -2111,14 +2114,16 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if p.usedPower and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+    if p.usedPower and not p.incomingGood and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
         end
     end
 
-    p.usedPower = false
+    if not p.incomingGood then
+        p.usedPower = false
+    end
 end
 
 function markUsed(player, card, power, n)
