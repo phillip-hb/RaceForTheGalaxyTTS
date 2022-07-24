@@ -180,7 +180,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            --if obj then obj.interactable = false end
+            if obj then obj.interactable = false end
         end
     end
 
@@ -1895,8 +1895,8 @@ function updateTableauState(player)
     p.mustConsumeCount = 0
 
     -- Auto cancel certain cards
-    if currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0 and not p.incomingGood
-        or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0 then
+    if not p.incomingGood and p.usedPower and (currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0
+        or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0) then
         selectedCard = nil
         selectedInfo = nil
         p.selectedCard = nil
@@ -1910,7 +1910,11 @@ function updateTableauState(player)
         local info = card_db[card.getName()]
 
         if selectedCard == card then
-            highlightOn(card, "rgb(0,1,0)", player)
+            if card.hasTag("Action Card") then
+                card.highlightOn(color(0,1,0))
+            else
+                highlightOn(card, "rgb(0,1,0)", player)
+            end
         end
 
         if not card.hasTag("Action Card") then
