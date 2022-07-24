@@ -34,7 +34,8 @@ function player(i)
         takeoverSource = nil,
         takeoverPower = nil,
         takeoverTarget = nil,
-        beingTargeted = nil
+        beingTargeted = nil,
+        usedPower = false
     }
 end
 
@@ -640,23 +641,9 @@ function dealTo(n, player)
     end
 end
 
-function resetPlayerState(player)
-    local data = playerData[player]
-    data.powersSnapshot = {}
-    data.selectedCard = nil
-    data.selectedCardPower = ""
-    data.miscSelectedCards = {}
-    data.lastPlayedCard = nil
-    data.paidCost = {}
-    data.forcedReady = false
-    data.incomingGood = false
-    data.selectedGoods = {}
-    data.roundEndDiscardCount = 0
-    data.tempMilitary = 0
-    data.takeoverSource = nil
-    data.takeoverPower = nil
-    data.takeoverTarget = nil
-    data.beingTargeted = nil
+function resetPlayerState(playerColor)
+    local index = playerData[playerColor].index
+    playerData[playerColor] = player(index)
 end
 
 -- Check to see if player is planning to do a takeover
@@ -1214,9 +1201,7 @@ function checkAllReadyCo()
         end
 
         selectedPhases[#selectedPhases + 1] = 100
-
         table.sort(selectedPhases)
-
         currentPhaseIndex = -1000
 
         wait(1.25)
@@ -1254,6 +1239,7 @@ function startNewRound()
 
     for player, data in pairs(playerData) do
         resetPlayerState(player)
+        updateReadyButtons({player, false})
         queueUpdate(player, true)
     end
 
@@ -1364,6 +1350,7 @@ function beginNextPhase()
     end
 
     for player, data in pairs(playerData) do
+        data.usedPower = true
         queueUpdate(player, true)
     end
 end
@@ -1453,7 +1440,6 @@ function startSettlePhase()
         data.miscSelectedCards = {}
 
         capturePowersSnapshot(player, "3")
-
         updateHandState(player)
         updateHelpText(player)
     end
@@ -2125,12 +2111,14 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+    if p.usedPower and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
         end
     end
+
+    p.usedPower = false
 end
 
 function markUsed(player, card, power, n)
@@ -2143,6 +2131,7 @@ function markUsed(player, card, power, n)
     p.selectedCard = nil
     p.selectedCardPower = ""
     p.miscSelectedCards = {}
+    p.usedPower = true
 
     queueUpdate(player, true)
 end
