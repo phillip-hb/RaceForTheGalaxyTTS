@@ -35,7 +35,8 @@ function player(i)
         takeoverPower = nil,
         takeoverTarget = nil,
         beingTargeted = nil,
-        usedPower = false
+        usedPower = false,
+        canReady = false
     }
 end
 
@@ -46,6 +47,7 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 gameDone = false
+enforceRules = true
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -150,6 +152,7 @@ function onSave()
     saved_data.takeoverPhase = takeoverPhase
     saved_data.useTakeovers = useTakeovers
     saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
+    saved_data.enforceRules = enforceRules
     return JSON.encode(saved_data)
 end
 
@@ -171,7 +174,11 @@ function onload(saved_data)
         takeoverPhase = data.takeoverPhase or false
         useTakeovers = data.useTakeovers or false
         queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
+        enforceRules = data.enforceRules
     end
+
+    rulesBtn = getObjectFromGUID("fe78ab")
+    Wait.frames(function() rulesBtn.call("changeEnforceRulesButtonLabel", enforceRules) end, 1)
 
     card_db = loadData(0)
 
@@ -452,6 +459,12 @@ function getOwner(card)
     return nil
 end
 
+function toggleEnforceRulesClick(obj, player)
+    enforceRules = not enforceRules
+    rulesBtn.call("changeEnforceRulesButtonLabel", enforceRules)
+    broadcastToAll("Enforce rules has been turned " .. (enforceRules and "ON." or "OFF."), "Purple")
+end
+
 -- returns number of cards discarded from hand
 function discardMarkedCards(player, markForDiscard)
     if markForDiscard == nil then markForDiscard = false end
@@ -647,6 +660,7 @@ function resetPlayerState(playerColor)
 
     playerData[playerColor] = player(index)
     playerData[playerColor].incomingGood = incomingGood
+    playerData[playerColor].canReady = false
 end
 
 -- Check to see if player is planning to do a takeover
@@ -727,6 +741,8 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     end
 
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
+
+
         if flip == 180 then
             object.addTag("Discard")
         elseif flip == 0 then
@@ -960,7 +976,17 @@ function playerReadyClicked(playerColor, forced, playSound)
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
 
-    if currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
+    if currentPhaseIndex < 0 and enforceRules then
+        if not p.selectedCard then
+            broadcastToColor("You must select a start world.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        elseif not p.canReady then
+            broadcastToColor("Please discard the required number of cards.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
+    elseif currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
         if advanced2p then
             broadcastToColor("You must select 2 action cards!", playerColor, "White")
         else
@@ -1237,7 +1263,7 @@ function startNewRound()
         broadcastToAll("Starting new round.", color(0, 1, 1))
         sound.AssetBundle.playTriggerEffect(2)
     end
-    
+
     currentPhaseIndex = 0
 
     for player, data in pairs(playerData) do
@@ -2505,11 +2531,14 @@ function updateHelpText(playerColor)
     local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
 
+    p.canReady = false
+
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
             local discardTarget = powers["DISCARD"]
             setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
+            if discarded >= discardTarget then p.canReady = true end
         else
             setHelpText(playerColor, "▼ Select your start world.")
         end
