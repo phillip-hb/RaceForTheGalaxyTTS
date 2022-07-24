@@ -46,6 +46,7 @@ updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
 gameEndMessage = false
 gameDone = false
+readyWait = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -919,43 +920,50 @@ end
 -- ======================
 
 function gameStart(params)
-     gameStarted = true
-     currentPhaseIndex = -1
-     advanced2p = params.advanced2p
-     useTakeovers = params.takeovers
+    gameStarted = true
+    currentPhaseIndex = -1
+    advanced2p = params.advanced2p
+    useTakeovers = params.takeovers
 
-     trySetAdvanced2pMode()
+    trySetAdvanced2pMode()
 
-     for _, data in pairs(phaseTilePlacement) do
-          local tile = componentsBag.takeObject({
-               guid = data[1],
-               position = data[2],
-               rotation = {0, 180, 180},
-               smooth = false
-          })
+    for _, data in pairs(phaseTilePlacement) do
+        local tile = componentsBag.takeObject({
+            guid = data[1],
+            position = data[2],
+            rotation = {0, 180, 180},
+            smooth = false
+        })
 
-          tile.setLock(true)
-          tile.interactable = false
-     end
+        tile.setLock(true)
+        tile.interactable = false
+    end
 
-     for player, data in pairs(playerData) do
-          local i = data.index
-          data.handCountSnapshot = 6
+    for player, data in pairs(playerData) do
+        local i = data.index
+        data.handCountSnapshot = 6
 
-          if advanced2p == false then
-               local cards = getObjectsWithTag("Adv2p")
-               for _, card in pairs(cards) do
-                    componentsBag.putObject(card)
-               end
-          else
-               getObjectFromGUID(actionSelectorMenu_GUID[i]).rotate({0, 0, 180})
-          end
-     end
+        if advanced2p == false then
+            local cards = getObjectsWithTag("Adv2p")
+            for _, card in pairs(cards) do
+                componentsBag.putObject(card)
+            end
+        else
+            getObjectFromGUID(actionSelectorMenu_GUID[i]).rotate({0, 0, 180})
+        end
+    end
 
-     broadcastToAll("Determine your starting hand.", "White")
+    readyWait = true
+    Wait.time(function() readyWait = false end, 1.5)
+    broadcastToAll("Determine your starting hand.", "White")
 end
 
 function playerReadyClicked(playerColor, forced, playSound)
+    if readyWait then
+        updateReadyButtons({playerColor, false})
+        return
+    end
+
     local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
@@ -1027,6 +1035,8 @@ function updateReadyButtons(params)
 end
 
 function checkAllReadyCo()
+    if readyWait then return 1 end
+
     -- Check if all players are ready to move on to next step of game
     local players = getSeatedPlayersWithHands()
 
@@ -1034,6 +1044,9 @@ function checkAllReadyCo()
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
         if not readyToken.getVar("isReady") then return 1 end
     end
+
+    readyWait = true
+    Wait.time(function() readyWait = false end, 1.5)
 
     Global.setVectorLines(getDefaultVectorLines())
 
