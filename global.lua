@@ -741,21 +741,26 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     end
 
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
-        local p = playerData[player_color]
-        if enforceRules then
-            local rot = object.getRotation()
-            if p.canReady and flip == 180 then
-                object.setRotation({rot[1], rot[2], 0})
-                return
+        if player_color then
+            local p = playerData[player_color]
+            if enforceRules then
+                local rot = object.getRotation()
+                local currentPhase = getCurrentPhase()
+                if flip == 180 and (currentPhaseIndex == 0 or p.canReady or
+                    currentPhase == 2 and not p.selectedCard or
+                    currentPhase == 3 and not p.selectedCard)then
+                    object.setRotation({rot[1], rot[2], 0})
+                    return
+                end
             end
         end
 
         if flip == 180 then
             object.addTag("Discard")
-            updateReadyButtons({player_color, false})
+            if player_color then updateReadyButtons({player_color, false}) end
         elseif flip == 0 then
             object.removeTag("Discard")
-            updateReadyButtons({player_color, false})
+            if player_color then updateReadyButtons({player_color, false}) end
         end
 
         updateHelpText(player_color)
@@ -1005,6 +1010,12 @@ function playerReadyClicked(playerColor, forced, playSound)
         updateReadyButtons({playerColor, false})
         return
     elseif currentPhase == 2 or currentPhase == 3 then
+        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) then
+            broadcastToColor("Please fully pay the cost of the card.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
+
         local node = p.miscSelectedCards
         while node and node.next do
             node = node.next
@@ -2522,6 +2533,12 @@ function cardCancelClick(object, player, rightClick)
      object.removeTag("Selected")
      highlightOff(object)
 
+     for _, obj in pairs(Player[player].getHandObjects(1)) do
+        if obj.is_face_down then
+            obj.flip()
+        end
+     end
+
      updateReadyButtons({player, false})
 
      queueUpdate(player, true)
@@ -2534,6 +2551,8 @@ function setHelpText(player, text)
 end
 
 function updateHelpText(playerColor)
+    if not playerColor then return end
+
     local p = playerData[playerColor]
     local i = p.index
     local powers = p.powersSnapshot
@@ -2582,6 +2601,7 @@ function updateHelpText(playerColor)
                 node = node.next
             end
 
+            if discarded >= discardTarget then p.canReady = true end
             setHelpText(playerColor, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Develop: may play a development.")
