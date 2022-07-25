@@ -1010,8 +1010,13 @@ function playerReadyClicked(playerColor, forced, playSound)
         updateReadyButtons({playerColor, false})
         return
     elseif currentPhase == 2 or currentPhase == 3 then
-        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) then
-            broadcastToColor("Please fully pay the cost of the card.", playerColor, "White")
+        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) or (not p.canReady and currentPhase == 3) then
+            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
+            if currentPhase == 3 and info.flags["MILITARY"] then
+                broadcastToColor("You do not have enough Military.", playerColor, "White")
+            else
+                broadcastToColor("Please discard the required number of cards.", playerColor, "White")
+            end
             updateReadyButtons({playerColor, false})
             return
         end
@@ -2660,10 +2665,12 @@ function updateHelpText(playerColor)
                 elseif info.flags["REBEL"] and p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"] then
                     specialtyBonus = p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"]
                 end
-                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] +
-                    p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary + specialtyBonus .. "/" .. def .. ")")
+                local totalMil = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary + specialtyBonus
+                if totalMil >= def then p.canReady = true end
+                setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. totalMil .. "/" .. def .. ")")
             else
                 if reduceZero then
+                    p.canReady = true
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
                     local payDiscount = 0
@@ -2671,6 +2678,7 @@ function updateHelpText(playerColor)
                         payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
                     end
                     local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
+                    if discarded >= discardTarget then p.canReady = true end
                     setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
                 end
             end
