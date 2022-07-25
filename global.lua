@@ -37,7 +37,8 @@ function player(i)
         beingTargeted = nil,
         usedPower = false,
         canReady = false,
-        canFlip = false
+        canFlip = false,
+        recordedCards = {}
     }
 end
 
@@ -675,12 +676,15 @@ function dealTo(n, player)
 end
 
 function resetPlayerState(playerColor)
-    local index = playerData[playerColor].index
-    local incomingGood = playerData[playerColor].incomingGood
+    local p = playerData[playerColor]
+    local index = p.index
+    local incomingGood = p.incomingGood
+    local recordedCards = p.recordedCards
 
     playerData[playerColor] = player(index)
     playerData[playerColor].incomingGood = incomingGood
     playerData[playerColor].canReady = false
+    playerData[playerColor].recordedCards = recordedCards
 end
 
 -- Check to see if player is planning to do a takeover
@@ -732,10 +736,6 @@ end
 -- ======================
 
 function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
-    if object.hasTag("Action Card") then
-        return false
-    end
-
     local inHandZone = false
 
     local zones = object.getZones()
@@ -1807,7 +1807,7 @@ function updateHandState(playerColor)
             end
         elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
             (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase then
+            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
                 goto skip
             end
 
@@ -1866,6 +1866,8 @@ function updateTableauState(player)
     local uniques = {}
     local dontAutoPass = false
     local selectedUniqueGoods = {}
+
+    p.recordedCards = {}
 
     -- Change tableau image if needed
     local tableau = getObjectFromGUID(tableau_GUID[p.index])
@@ -2017,6 +2019,7 @@ function updateTableauState(player)
     -- refresh state on all cards in tableau
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
+        p.recordedCards[card.getName()] = true
 
         if selectedCard == card then
             if card.hasTag("Action Card") then
@@ -2581,6 +2584,11 @@ function cardSelectClick(object, player, rightClick)
     if object.hasTag("Slot") then object = getCard(object) end
 
     local p = playerData[player]
+
+    if enforceRules and p.recordedCards[object.getName()] then
+        broadcastToColor("You cannot play a card you already have in your tableau.", player, "White")
+        return
+    end
 
     p.selectedCard = object.getGUID()
     p.handCountSnapshot = countCardsInHand(player, true)
