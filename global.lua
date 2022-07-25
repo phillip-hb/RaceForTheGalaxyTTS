@@ -350,22 +350,36 @@ function tryProduceAt(player, card)
 end
 
 function getVpChips(player, n)
-     if not vpBag then
-          vpBag = getObjectFromGUID(vpPoolBag_GUID)
-     end
+    if not vpBag then
+        vpBag = getObjectFromGUID(vpPoolBag_GUID)
+        if not vpBag then
+            vpBag = getObjectFromGUID(vpInfBag_GUID)
+        end
+    end
 
-     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
 
-     for i=1, n do
-          if vpBag.type == "Bag" and #vpBag.getObjects() <= 0 then
-               vpBag = getObjectFromGUID(vpInfBag_GUID)
-          end
+    for i=1, n do
+        if vpBag.type == "Bag" and #vpBag.getObjects() <= 0 then
+            replaceVpBag()
+        end
 
-          vpBag.takeObject({
-               position = tableau.positionToWorld({-1.4, 2, -0.8}),
-               rotation = tableau.getRotation()
-          })
-     end
+        vpBag.takeObject({
+            position = tableau.positionToWorld({-1.4, 2, -0.8}),
+            rotation = tableau.getRotation()
+        })
+    end
+end
+
+function replaceVpBag()
+    if not vpBag then
+        vpBag = getObjectFromGUID(vpPoolBag_GUID)
+    end
+
+    local oldBag = vpBag
+    vpBag = getObjectFromGUID(vpInfBag_GUID)
+    vpBag.setPositionSmooth(oldBag.getPosition())
+    componentsBag.putObject(oldBag)
 end
 
 function getCardActions(phase, card)
@@ -1029,7 +1043,7 @@ function playerReadyClicked(playerColor, forced, playSound)
             return
         end
 
-        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) or (not p.canReady and currentPhase == 3) then
+        if enforceRules and p.selectedCard and not p.canReady then
             local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
             local payMilitary = false
             local node = p.miscSelectedCards
@@ -2785,7 +2799,9 @@ function updateHelpText(playerColor)
                 setHelpText(playerColor, "▲ Produce: produce on windfall world.")
             elseif p.selectedCardPower == "DISCARD_HAND" then
                 local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                p.canFlip = true
+                if discardCount < 1 then
+                    p.canFlip = true
+                end
                 setHelpText(playerColor, "▼ Produce: discard to use power. (" .. discardCount .. "/1)")
             end
         else
