@@ -380,8 +380,10 @@ function replaceVpBag()
     end
 
     local oldBag = vpBag
+    local bagPos = oldBag.getPosition()
     vpBag = getObjectFromGUID(vpInfBag_GUID)
-    vpBag.setPositionSmooth(oldBag.getPosition())
+    vpBag.setRotation({0, 0, 0})    -- need to set this else the token in the bag will not move
+    vpBag.setPosition(bagPos)
     componentsBag.putObject(oldBag)
 end
 
@@ -729,9 +731,9 @@ end
 -- Event functions
 -- ======================
 
-function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
+function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     if object.hasTag("Action Card") then
-        return
+        return false
     end
 
     local inHandZone = false
@@ -750,12 +752,12 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
             not object.hasTag("Explore Highlight") and getCurrentPhase() == 1) and
             inHandZone and flip == 180 then
         local rot = object.getRotation()
-        object.setRotation({rot[1], rot[2], 0})
-        return
+        --object.setRotation({rot[1], rot[2], 0})
+        return false
     elseif object.hasTag("Marked") and inHandZone and flip == 0 then
         local rot = object.getRotation()
-        object.setRotation({rot[1], rot[2], 180})
-        return
+        --object.setRotation({rot[1], rot[2], 180})
+        return false
     end
 
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
@@ -763,8 +765,8 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
             local p = playerData[player_color]
             if enforceRules and (not p.canFlip or p.canReady) and flip == 180 then
                 local rot = object.getRotation()
-                object.setRotation({rot[1], rot[2], 0})
-                return
+                --object.setRotation({rot[1], rot[2], 0})
+                return false
             end
         end
 
@@ -778,6 +780,8 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
 
         updateHelpText(player_color)
     end
+
+    return true
 end
 
 function onObjectLeaveZone(zone, object)
@@ -2832,6 +2836,7 @@ function updateHelpText(playerColor)
             if discarded >= discardTarget then p.canReady = true end
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
+            p.canReady = true
             setHelpText(playerColor, "Round End: waiting for other players.")
         end
     end
