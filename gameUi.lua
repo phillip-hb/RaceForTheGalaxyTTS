@@ -101,7 +101,7 @@ function createCancelButton(card)
 end
 
 function createGoodsButton(card, label, color)
-    local offset = {0.28, 5, 0.13}
+    local offset = {0.28, 6, 0.13}
     local slot = getCardSlot(card)
 
     slot.createButton({

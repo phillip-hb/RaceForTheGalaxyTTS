@@ -36,7 +36,8 @@ function player(i)
         takeoverTarget = nil,
         beingTargeted = nil,
         usedPower = false,
-        canReady = false
+        canReady = false,
+        canFlip = false
     }
 end
 
@@ -518,9 +519,9 @@ function attemptPlayCard(card, player, fromTakeover)
             local pos = tableau.positionToWorld(sp[i].position)
             local rot = tableau.getRotation()
             if not fromTakeover then
-                card.setPosition(add(pos, {0, 0.02, 0}))
+                card.setPosition(add(pos, {0, 0.04, 0}))
             else
-                card.setPositionSmooth(add(pos, {0, 0.02, 0}))
+                card.setPositionSmooth(add(pos, {0, 0.4, 0}))
             end
             card.setRotation({rot[1], rot[2], 0})
             card.removeTag("Selected")
@@ -743,15 +744,10 @@ function onObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
         if player_color then
             local p = playerData[player_color]
-            if enforceRules then
+            if enforceRules and (not p.canFlip or p.canReady) and flip == 180 then
                 local rot = object.getRotation()
-                local currentPhase = getCurrentPhase()
-                if flip == 180 and (currentPhaseIndex == 0 or p.canReady or
-                    currentPhase == 2 and not p.selectedCard or
-                    currentPhase == 3 and not p.selectedCard)then
-                    object.setRotation({rot[1], rot[2], 0})
-                    return
-                end
+                object.setRotation({rot[1], rot[2], 0})
+                return
             end
         end
 
@@ -1009,18 +1005,13 @@ function playerReadyClicked(playerColor, forced, playSound)
 
         updateReadyButtons({playerColor, false})
         return
-    elseif currentPhase == 2 or currentPhase == 3 then
-        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) or (not p.canReady and currentPhase == 3) then
-            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
-            if currentPhase == 3 and info.flags["MILITARY"] then
-                broadcastToColor("You do not have enough Military.", playerColor, "White")
-            else
-                broadcastToColor("Please discard the required number of cards.", playerColor, "White")
-            end
+    elseif currentPhase == 1 then
+        if enforceRules and not p.canReady then
+            broadcastToColor("Please discard the required number of cards.", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
         end
-
+    elseif currentPhase == 2 or currentPhase == 3 then
         local node = p.miscSelectedCards
         while node and node.next do
             node = node.next
@@ -1037,6 +1028,23 @@ function playerReadyClicked(playerColor, forced, playSound)
             updateReadyButtons({playerColor, false})
             return
         end
+
+        if enforceRules and p.selectedCard and (not p.canReady and currentPhase == 2) or (not p.canReady and currentPhase == 3) then
+            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
+            local payMilitary = false
+            local node = p.miscSelectedCards
+            while node and node.value do -- check for some flags
+                if node.power.name == "PAY_MILITARY" then payMilitary = true end
+                node = node.next
+            end
+            if currentPhase == 3 and info.flags["MILITARY"] and not payMilitary then
+                broadcastToColor("You do not have enough Military.", playerColor, "White")
+            else
+                broadcastToColor("Please discard the required number of cards.", playerColor, "White")
+            end
+            updateReadyButtons({playerColor, false})
+            return
+        end
     elseif currentPhase == 4 or currentPhase == 5 then
         if p.selectedCard then
             local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
@@ -1049,6 +1057,16 @@ function playerReadyClicked(playerColor, forced, playSound)
                 end
             end
         end
+
+        if enforceRules and not p.canReady then
+            broadcastToColor("You have remaining powers to use.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
+    elseif currentPhase == 100 and enforceRules and not p.canReady then
+        broadcastToColor("Please discard the required number of cards.", playerColor, "White")
+        updateReadyButtons({playerColor, false})
+        return
     end
 
     if playSound then
@@ -1827,8 +1845,11 @@ function updateTableauState(player)
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
     local dontAutoPass = false
-
     local selectedUniqueGoods = {}
+
+    if currentPhase == "4" or currentPhase == "5" then
+        p.canReady = true
+    end
 
     for card in allCardsInTableau(player) do
         card.clearButtons()
@@ -1919,6 +1940,7 @@ function updateTableauState(player)
                             price = price + parentPassive["TRADE_THIS"].strength
                         end
 
+                        p.canReady = false
                         createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[parentData.goods])
                         obj.memo = price
                     elseif ap then -- using normal consume powers
@@ -1936,6 +1958,7 @@ function updateTableauState(player)
 
                         if makeButton then
                             dontAutoPass = true
+                            p.canReady = false
                             createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
                         end
                     end
@@ -2097,10 +2120,12 @@ function updateTableauState(player)
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
                             dontAutoPass = true
+                            if not optionalPowers[name] then p.canReady = false end
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
+                    p.canReady = false
                     dontAutoPass = true
                     createCancelButton(card)
                     local powerIndex = info.activePowers[currentPhase][p.selectedCardPower].index
@@ -2133,8 +2158,10 @@ function updateTableauState(player)
                             goto skip
                         end
 
+                        if not optionalPowers[name] then p.canReady = false end
+
                         dontAutoPass = true
-                        createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                        createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
 
                         ::skip::
                     end
@@ -2153,11 +2180,13 @@ function updateTableauState(player)
                         local targetGood = p.selectedCardPower:sub(10, p.selectedCardPower:len())
                         if targetGood == "ANY" or targetGood == info.goods or power.codes["WINDFALL_ANY"] then
                             dontAutoPass = true
+                            p.canReady = false
                             createGoodsButton(card, "▼", color(1, 1, 1, 0.9))
                         end
                     end
 
                     if selectedCard == card and not paidCost then
+                        p.canReady = false
                         dontAutoPass = true
                         createCancelButton(selectedCard)
 
@@ -2171,7 +2200,7 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if p.usedPower and not p.incomingGood and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard and not p.incomingGood then
+    if p.usedPower and not p.incomingGood and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
@@ -2371,6 +2400,12 @@ function cancelPowerClick(obj, player, rightClick)
         Wait.frames(function() refreshTakeoverMenu(player) end, 1)
     end
 
+    for _, obj in pairs(Player[player].getHandObjects(1)) do
+        if obj.is_face_down then
+            obj.flip()
+        end
+     end
+
     queueUpdate(player, true)
 end
 
@@ -2566,11 +2601,15 @@ function updateHelpText(playerColor)
     local discarded = handCount - cardsInHand
     local currentPhase = getCurrentPhase()
 
-    p.canReady = false
+    if currentPhase ~= 4 and currentPhase ~= 5 then
+        p.canReady = false
+    end
+    p.canFlip = false
 
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
+            p.canFlip = true
             local discardTarget = powers["DISCARD"]
             if discarded >= discardTarget then p.canReady = true end
             setHelpText(playerColor, "Determine starting hand. (discard " .. discarded .. "/" .. discardTarget .. ")")
@@ -2579,12 +2618,15 @@ function updateHelpText(playerColor)
         end
     -- end of round
     elseif currentPhaseIndex > #selectedPhases then
+        p.canFlip = true
     -- start of round
     elseif currentPhaseIndex == 0 then
         setHelpText(playerColor, "▲ Select an action.")
     -- explore
     elseif currentPhase == 1 then
+        p.canFlip = true
         local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
+        if discarded >= discardTarget then p.canReady = true end
         setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
     elseif currentPhase == 2 then
         if p.selectedCard then
@@ -2607,6 +2649,7 @@ function updateHelpText(playerColor)
             end
 
             if discarded >= discardTarget then p.canReady = true end
+            p.canFlip = true
             setHelpText(playerColor, "Develop: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "▼ Develop: may play a development.")
@@ -2641,6 +2684,10 @@ function updateHelpText(playerColor)
                         if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index] then
                             usedAmount = p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index]
                         end
+                        if discarded + usedAmount < miscPowers["MILITARY_HAND"].strength then
+                            p.canFlip = true
+                        end
+
                         setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded + usedAmount .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
                         return
                     elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
@@ -2679,6 +2726,7 @@ function updateHelpText(playerColor)
                     end
                     local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
                     if discarded >= discardTarget then p.canReady = true end
+                    p.canFlip = true
                     setHelpText(playerColor, "Settle: cost " .. discardTarget .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
                 end
             end
@@ -2715,6 +2763,10 @@ function updateHelpText(playerColor)
                 local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
                 local appendStr = ". (" .. discardCount .. "/" .. power.times .. ")"
 
+                if discardCount < power.times then
+                    p.canFlip = true
+                end
+
                 setHelpText(playerColor, "▼ Consume: discard to " .. reward .. appendStr)
             else
                 setHelpText(playerColor, "▲ Consume: select goods to consume.")
@@ -2733,6 +2785,7 @@ function updateHelpText(playerColor)
                 setHelpText(playerColor, "▲ Produce: produce on windfall world.")
             elseif p.selectedCardPower == "DISCARD_HAND" then
                 local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                p.canFlip = true
                 setHelpText(playerColor, "▼ Produce: discard to use power. (" .. discardCount .. "/1)")
             end
         else
@@ -2744,6 +2797,8 @@ function updateHelpText(playerColor)
         discarded = cardsInHand - countCardsInHand(playerColor, false)
 
         if cardsInHand > maxHandSize then
+            p.canFlip = true
+            if discarded >= discardTarget then p.canReady = true end
             setHelpText(playerColor, "Enforce hand size. (discard " .. discarded .. "/" .. discardTarget .. ")")
         else
             setHelpText(playerColor, "Round End: waiting for other players.")
