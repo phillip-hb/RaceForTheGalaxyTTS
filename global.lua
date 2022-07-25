@@ -46,6 +46,9 @@ playerOrder = {"Yellow", "Red", "Blue", "Green"}
 queueUpdateState = {Yellow=false, Red=false, Blue=false, Green=false}
 updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
+playmat12 = "http://cloud-3.steamusercontent.com/ugc/1867319584733434168/76E4F818BB730F1F8713043E8000EC832B60EE87/"
+playmat14 = "http://cloud-3.steamusercontent.com/ugc/1930373378495832995/BB2FCAE46BF72CF143C028808B787EB109064297/"
+
 gameEndMessage = false
 gameDone = false
 enforceRules = true
@@ -1850,7 +1853,6 @@ function updateTableauState(player)
     local p = playerData[player]
     local i = playerData[player].index
     local zone = getObjectFromGUID(tableauZone_GUID[i])
-    local powersSnapshot = p.powersSnapshot
     local selectedCard = getObjectFromGUID(p.selectedCard)
     local selectedInfo = selectedCard and card_db[selectedCard.getName()] or nil
     local currentPhase = tostring(getCurrentPhase())
@@ -1860,6 +1862,19 @@ function updateTableauState(player)
     local uniques = {}
     local dontAutoPass = false
     local selectedUniqueGoods = {}
+
+    -- Change tableau image if needed
+    local tableau = getObjectFromGUID(tableau_GUID[p.index])
+    local tableauInfo = tableau.getCustomObject()
+    if p.powersSnapshot["GAME_END_14"] and tableauInfo.image ~= playmat14 then
+        tableauInfo.image = playmat14
+        tableau.setCustomObject(tableauInfo)
+        tableau.reload()
+    elseif not p.powersSnapshot["GAME_END_14"] and tableauInfo.image ~= playmat12 then
+        tableauInfo.image = playmat12
+        tableau.setCustomObject(tableauInfo)
+        tableau.reload()
+    end
 
     if currentPhase == "4" or currentPhase == "5" then
         p.canReady = true
