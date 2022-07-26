@@ -10,6 +10,7 @@ placeTwoPhase = false
 takeoverPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
+expansionLevel = 0
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
 
@@ -89,6 +90,7 @@ smallReadyTokens_GUID = {"dd182c", "ab5795", "37d9aa", "476374"}
 helpDisplay_GUID = {"f9c4ee", "5a39e2", "515d9a", "1dbea0"}
 statTracker_GUID = {"3b078d", "2ed5dd", "dc9bac", "8865a8"}
 advanced2pCards_GUID = {"f4313a", "eead6a", "3ee2da", "09a79a"}
+prestigeButton_GUID = {"a276bc", "b5027c", "09bbe0", "77721b"}
 
 disableInteract_GUID = {presentedPhaseCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID}
 
@@ -133,8 +135,8 @@ phaseIndex = {["Explore"] = 1, ["Develop"] = 2, ["Settle"] = 3, ["Consume"] = 4,
 phaseIndexAdv2p = {["Explore"] = 1, ["Develop"] = 2, ["DevelopAdv2p"] = 3, ["Settle"] = 4, ["SettleAdv2p"] = 5, ["Consume"] = 6, ["Produce"] = 7}
 phaseText = {"Phase I: Explore", "Phase II: Develop", "Phase III: Settle", "Phase IV: Consume", "Phase V: Produce"}
 phaseTextAdv2p = {"Phase I: Explore", "Phase II: Develop 1", "Phase II: Develop 2", "Phase III: Settle 1", "Phase III: Settle 2", "Phase IV: Consume", "Phase V: Produce"}
-phaseCardNames = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Settle", "Consume ($)", "Consume (x2)", "Produce"}
-phaseCardNamesAdv2p = {"Explore (+5)", "Explore (+1,+1)", "Develop", "DevelopAdv2p", "Settle", "SettleAdv2p", "Consume ($)", "Consume (x2)", "Produce"}
+phaseCardNames = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Settle", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
+phaseCardNamesAdv2p = {"Explore (+5)", "Explore (+1,+1)", "Develop", "DevelopAdv2p", "Settle", "SettleAdv2p", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
 twoPlayerAdvancedMode = false
 
 goodsSnapPointOffset = {-0.6, 0.1, 0.4}
@@ -158,6 +160,7 @@ function onSave()
     saved_data.useTakeovers = useTakeovers
     saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
     saved_data.enforceRules = enforceRules
+    saved_data.expansionLevel = expansionLevel
     return JSON.encode(saved_data)
 end
 
@@ -180,6 +183,7 @@ function onload(saved_data)
         useTakeovers = data.useTakeovers or false
         queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
         enforceRules = data.enforceRules
+        expansionLevel = data.expansionLevel
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -970,6 +974,7 @@ function gameStart(params)
     currentPhaseIndex = -1
     advanced2p = params.advanced2p
     useTakeovers = params.takeovers
+    expansionLevel = params.expansionLevel
 
     trySetAdvanced2pMode()
 
@@ -989,6 +994,23 @@ function gameStart(params)
         local i = data.index
         data.handCountSnapshot = 6
 
+        -- remove prestige search card
+        if expansionLevel < 3 then
+            local cards = getObjectsWithTag("PrestigeSearch")
+            for _, card in pairs(cards) do
+                componentsBag.putObject(card)
+            end
+        else
+            -- add the prestige search button to menu
+            local menu = getObjectFromGUID(actionSelectorMenu_GUID[i])
+            local btn = componentsBag.takeObject({guid = prestigeButton_GUID[i]})
+            btn.setPosition(menu.positionToWorld({10, 0, 0}))
+            btn.setRotation(menu.getRotation())
+            btn.setLock(true)
+            btn.interactable = false
+        end
+
+        -- remove 2p adv cards
         if advanced2p == false then
             local cards = getObjectsWithTag("Adv2p")
             for _, card in pairs(cards) do

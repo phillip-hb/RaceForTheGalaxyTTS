@@ -11,17 +11,23 @@ function onload()
      selectedActionCardZone = getObjectFromGUID(selectedActionCardZone_GUID)
 
      buttonIndex = {}
-     local i = 0
-     for _, entry in ipairs(Global.getVar("phaseCardNames")) do
-          buttonIndex[entry] = i
-          i = i + 1
-     end
-
      adv2pButtonIndex = {}
-     local i = 14
-     for _, entry in ipairs(Global.getVar("phaseCardNamesAdv2p")) do
-          adv2pButtonIndex[entry] = i
-          i = i + 1
+
+     if prestigeSearch then
+          buttonIndex["Phase / Search"] = 0
+          adv2pButtonIndex["Phase / Search"] = 1
+     else
+          local i = 0
+          for _, entry in ipairs(Global.getVar("phaseCardNames")) do
+               buttonIndex[entry] = i
+               i = i + 1
+          end
+
+          local i = 14
+          for _, entry in ipairs(Global.getVar("phaseCardNamesAdv2p")) do
+               adv2pButtonIndex[entry] = i
+               i = i + 1
+          end
      end
 
      createButtons()
@@ -50,7 +56,7 @@ function createButtons()
           "V: Produce"
      }
 
-     tooltips2pAdv = {
+     local tooltips2pAdv = {
           "I: Explore (+5)",
           "I: Explore (+1,+1)",
           "II: Develop",
@@ -84,13 +90,25 @@ function createButtons()
           "produceClick"
      }
 
+     local startx = -5.73
+     local startx2p = 7.63
+
+     if prestigeSearch then
+          tooltips = {"Prestige / Search"}
+          tooltips2pAdv = tooltips
+          clickFunc = {"prestigeSearchClick"}
+          clickFunc2pAdv = clickFunc
+          startx = 0
+          startx2p = 0
+     end
+
      for i=1, #tooltips do
           self.createButton({
                click_function = clickFunc[i],
                function_owner = self,
                width = 600,
                height = 600,
-               position = {-5.73 + (i-1) * 1.905, 0.11, 0},
+               position = {startx + (i-1) * 1.905, 0.11, 0},
                color = color(0, 0, 0, 0),
                tooltip = tooltips[i]
           })
@@ -103,7 +121,7 @@ function createButtons()
                width = 0,
                height = 0,
                font_size = 120,
-               position = {-5.73 + (i-1) * 1.905, 0.11, -0.1},
+               position = {startx + (i-1) * 1.905, 0.11, -0.1},
                rotation = {0, 0, 180},
                color = color(0, 0, 0, 0),
                label = "■",
@@ -119,7 +137,7 @@ function createButtons()
                function_owner = self,
                width = 600,
                height = 600,
-               position = {7.63 - (i-1) * 1.895, 0, 0},
+               position = {startx2p - (i-1) * 1.895, 0, 0},
                rotation = {0, 0, 180},
                color = color(0, 0, 0, 0),
                tooltip = tooltips2pAdv[i]
@@ -134,7 +152,7 @@ function createButtons()
                width = 0,
                height = 0,
                font_size = 120,
-               position = {7.63 - (i-1) * 1.895, 0, -0.1},
+               position = {startx2p - (i-1) * 1.895, 0, -0.1},
                rotation = {0, 0, 180},
                color = color(0, 0, 0, 0),
                label = "■",
@@ -190,6 +208,11 @@ function produceClick()
      startLuaCoroutine(self, "selectPhaseCo")
 end
 
+function prestigeSearchClick()
+     targetActionCardName = "Prestige / Search"
+     startLuaCoroutine(self, "selectPhaseCo")
+end
+
 function selectPhaseCo()
      if Global.getVar("gameStarted") == false or Global.getVar("currentPhaseIndex") ~= 0 then
           return 1
@@ -202,8 +225,6 @@ function selectPhaseCo()
           -- Check to see if action was already selected. If so, just return it back to selection area
           if checkIfSelected(targetName) then
                returnSelectedActionCard(targetName)
-               wait(0.01)
-               --rearrangeActionCards()
                return 1
           end
      else
@@ -211,8 +232,6 @@ function selectPhaseCo()
      end
 
      wait(0.01)
-
-     --rearrangeActionCards()
 
      local sp = selectedActionCardTile.getSnapPoints()
      local rot = self.getRotation()
@@ -328,6 +347,11 @@ function refreshButtonHighlights()
      if adv2p then
           startInd = btnIndexOffset * 2 + adv2pBtnIndexOffset
           endInd = (btnIndexOffset + adv2pBtnIndexOffset) * 2 - 1
+     end
+
+     if prestigeSearch then 
+          startInd = 0
+          endInd = 0
      end
 
      for i=startInd, endInd do
