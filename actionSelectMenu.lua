@@ -1,5 +1,6 @@
 require("util")
 
+prestigeButton_GUID = {['b5027c']=1,['77721b']=1,['a276bc']=1,['09bbe0']=1}
 targetActionCardName = ""
 selectedActions = {}
 btnIndexOffset = 7
@@ -12,6 +13,8 @@ function onload()
 
      buttonIndex = {}
      adv2pButtonIndex = {}
+
+     if prestigeButton_GUID[self.getGUID()] then prestigeSearch = true end
 
      if prestigeSearch then
           btnIndexOffset = 1
