@@ -1003,11 +1003,16 @@ function gameStart(params)
         else
             -- add the prestige search button to menu
             local menu = getObjectFromGUID(actionSelectorMenu_GUID[i])
-            local btn = componentsBag.takeObject({guid = prestigeButton_GUID[i]})
-            btn.setPosition(menu.positionToWorld({10, 0, 0}))
-            btn.setRotation(menu.getRotation())
-            btn.setLock(true)
-            btn.interactable = false
+            local btn = componentsBag.takeObject({
+                guid = prestigeButton_GUID[i],
+                position = menu.positionToWorld({10.05, 0, 0}),
+                rotation = menu.getRotation(),
+                smooth = false,
+                callback_function = function(x)
+                    x.setLock(true)
+                    x.interactable = false
+                end
+            })
         end
 
         -- remove 2p adv cards

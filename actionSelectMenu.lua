@@ -14,8 +14,10 @@ function onload()
      adv2pButtonIndex = {}
 
      if prestigeSearch then
-          buttonIndex["Phase / Search"] = 0
-          adv2pButtonIndex["Phase / Search"] = 1
+          btnIndexOffset = 1
+          adv2pBtnIndexOffset = 2
+          buttonIndex["Prestige / Search"] = 0
+          adv2pButtonIndex["Prestige / Search"] = 1
      else
           local i = 0
           for _, entry in ipairs(Global.getVar("phaseCardNames")) do
@@ -350,8 +352,8 @@ function refreshButtonHighlights()
      end
 
      if prestigeSearch then 
-          startInd = 0
-          endInd = 0
+          startInd = 1
+          endInd = 1
      end
 
      for i=startInd, endInd do
@@ -362,17 +364,22 @@ function refreshButtonHighlights()
      end
 
      for _, obj in pairs(selectedActionCardZone.getObjects()) do
-          if adv2p then
-          end
+          if obj.hasTag("Action Card") then
+               local ind = adv2pButtonIndex[getName(obj)]
 
-          local ind = adv2pButtonIndex[getName(obj)]
+               if ind then
+                    local name = getName(obj)
+                    local index = adv2p and adv2pButtonIndex[name] + adv2pBtnIndexOffset or buttonIndex[name] + btnIndexOffset
 
-          if ind then
-               local name = getName(obj)
-               self.editButton({
-                    index = adv2p and adv2pButtonIndex[name] + adv2pBtnIndexOffset or buttonIndex[name] + btnIndexOffset,
-                    color = color(0,0,0,0.8)
-               })
+                    if prestigeSearch and obj.hasTag("PrestigeSearch") then
+                         index = 1
+                    end
+
+                    self.editButton({
+                         index = index,
+                         color = color(0,0,0,0.8)
+                    })
+               end
           end
      end
 end
