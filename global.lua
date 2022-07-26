@@ -99,6 +99,7 @@ vpPoolBag_GUID = "c2e459"
 vpInfBag_GUID = "5719f7"
 drawZone_GUID = "32297e"
 discardZone_GUID = "fe5c37"
+prestigeBag_GUID = "f3bcc8"
 
 handZoneOwner = {
      ["7556a6"] = "Yellow",
@@ -382,6 +383,20 @@ function getVpChips(player, n)
     end
 end
 
+function getPrestigeChips(player, n)
+    local bag = getObjectFromGUID(prestigeBag_GUID)
+
+    if not bag then return end
+
+    local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    for i=1, n do
+        bag.takeObject({
+            position = tableau.positionToWorld({-1.8, 2, -0.8}),
+            rotation = tableau.getRotation()
+        })
+    end
+end
+
 function replaceVpBag()
     if not vpBag then
         vpBag = getObjectFromGUID(vpPoolBag_GUID)
@@ -556,7 +571,8 @@ function attemptPlayCard(card, player, fromTakeover)
             highlightOff(card)
             playerData[player].lastPlayedCard = card.getGUID()
 
-            local isWindfall = card_db[card.getName()].flags["WINDFALL"]
+            local info = card_db[card.getName()]
+            local isWindfall = info.flags["WINDFALL"]
 
             -- if windfall, place a goods on top
             if isWindfall and not fromTakeover then
@@ -565,6 +581,11 @@ function attemptPlayCard(card, player, fromTakeover)
                 goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
                 goods.setRotationSmooth({rot[1], rot[2], 180})
                 playerData[player].incomingGood = true
+            end
+
+            -- place prestige
+            if expansionLevel >= 3 and info.flags["PRESTIGE"] then
+                getPrestigeChips(player, 1)
             end
 
             return
@@ -2886,6 +2907,7 @@ function updateVp(player)
     local zone = getObjectFromGUID(tableauZone_GUID[i])
 
     local vpChipCount = 0
+    local prestigeCount = 0
     local flatVp = 0
     local devVp = 0
     local goodsCount = 0
@@ -2906,6 +2928,8 @@ function updateVp(player)
                 flatVp = flatVp + 5
             elseif obj.hasTag("First Goal") or obj.hasTag("Tied Chip")then
                 flatVp = flatVp + 3
+            elseif obj.hasTag("Prestige") then
+                prestigeCount = prestigeCount + math.max(1, obj.getQuantity())
             end
         elseif obj.type == "Card" and not obj.hasTag("Action Card") then
             if obj.is_face_down and obj.getDescription() ~= "" then -- the card is a good
@@ -3055,7 +3079,7 @@ function updateVp(player)
 
     local statTracker = getObjectFromGUID(statTracker_GUID[i])
     if statTracker then
-         statTracker.call("updateLabel", {"vp", flatVp + vpChipCount + devVp})
+         statTracker.call("updateLabel", {"vp", flatVp + vpChipCount + prestigeCount + devVp})
     end
 end
 
