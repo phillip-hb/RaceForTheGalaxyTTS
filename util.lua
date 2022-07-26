@@ -129,3 +129,27 @@ function concatPowerName(power)
     end
     return value
 end
+
+function uiSetVisibilityToPlayer(id, playerColor, visible)
+    local attr = UI.getAttribute(id, "visibility")
+    if visible then
+         attr = attr .. "|" .. playerColor
+    else
+         local newAttr = ""
+         tokens = split(attr, "|")
+
+         for i=1, #tokens do
+              if tokens[i] ~= playerColor then
+                   newAttr = newAttr .. tokens[i] .. "|"
+              end
+         end
+
+         if newAttr == "" then
+              attr = "Brown"
+         else
+              attr = newAttr:sub(1, newAttr:len() - 1)
+         end
+    end
+
+    UI.setAttribute(id, "visibility", attr)
+end

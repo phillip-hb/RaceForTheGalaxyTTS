@@ -331,12 +331,18 @@ end
 function onObjectEnterZone(zone, obj)
      if zone == selectedActionCardZone then
           refreshButtonHighlights()
+          if obj.hasTag("PrestigeSearch") then
+               uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
+          end
      end
 end
 
 function onObjectLeaveZone(zone, obj)
      if zone == selectedActionCardZone then
           refreshButtonHighlights()
+          if obj.hasTag("PrestigeSearch") then
+               uiSetVisibilityToPlayer("prestigeSearchMenu", player, false)
+          end
      end
 end
 
