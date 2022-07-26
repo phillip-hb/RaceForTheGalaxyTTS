@@ -30,6 +30,7 @@ function player(i)
         paidCost = {},
         tempMilitary = 0,
         incomingGood = false,
+        incomingPrestige = false,
         forcedReady = false,
         lastPlayedCard = nil,
         roundEndDiscardCount = 0,
@@ -354,6 +355,7 @@ function tryProduceAt(player, card)
         card.memo = placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), card.getRotation()[2], player)
 
         if powers and powers["DRAW_IF"] then dealTo(powers["DRAW_IF"].strength, player) end
+        if powers and powers["PRESTIGE_IF"] then getPrestigeChips(player, powers["PRESTIGE_IF"].strength) end
 
         return true
     end
@@ -377,8 +379,9 @@ function getVpChips(player, n)
         end
 
         vpBag.takeObject({
-            position = tableau.positionToWorld({-1.4, 2, -0.8}),
-            rotation = tableau.getRotation()
+            position = tableau.positionToWorld({-1.4, .2, -0.8}),
+            rotation = tableau.getRotation(),
+            smooth = false
         })
     end
 end
@@ -391,9 +394,13 @@ function getPrestigeChips(player, n)
     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
     for i=1, n do
         bag.takeObject({
-            position = tableau.positionToWorld({-1.8, 2, -0.8}),
+            position = tableau.positionToWorld({-1.8, 0.2, -0.8}),
             rotation = tableau.getRotation()
         })
+    end
+
+    if n > 0 then
+        playerData[player].incomingPrestige = true
     end
 end
 
@@ -547,10 +554,12 @@ function attemptPlayCard(card, player, fromTakeover)
 
         -- found empty spot
         if hits[1].hit_object.hasTag("Slot") then
+            local p = playerData[player]
+
             -- trigger certain power bonuses based on phase
             if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
                 local phase = getCurrentPhase()
-                local powers = playerData[player].powersSnapshot
+                local powers = p.powersSnapshot
                 if powers["DRAW_AFTER"] then
                     dealTo(powers["DRAW_AFTER"], player)
                 end
@@ -569,7 +578,7 @@ function attemptPlayCard(card, player, fromTakeover)
             card.removeTag("Selected")
             card.setLock(true)
             highlightOff(card)
-            playerData[player].lastPlayedCard = card.getGUID()
+            p.lastPlayedCard = card.getGUID()
 
             local info = card_db[card.getName()]
             local isWindfall = info.flags["WINDFALL"]
@@ -580,11 +589,13 @@ function attemptPlayCard(card, player, fromTakeover)
             elseif isWindfall and fromTakeover and goods then
                 goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
                 goods.setRotationSmooth({rot[1], rot[2], 180})
-                playerData[player].incomingGood = true
+                p.incomingGood = true
             end
 
             -- place prestige
-            if expansionLevel >= 3 and info.flags["PRESTIGE"] then
+            if expansionLevel >= 3 and info.flags["PRESTIGE"] or 
+                info.type == 2 and info.cost == 6 and p.powersSnapshot["PRESTIGE_SIX"] or
+                info.type == 2 and info.flags["REBEL"] and p.powersSnapshot["PRESTIGE_REBEL"] then
                 getPrestigeChips(player, 1)
             end
 
@@ -610,8 +621,8 @@ function placeGoodsAt(position, yRotation, player)
      local card = drawCard()
 
      if card then
-          card.setPositionSmooth(add(position, {0, 1.5, 0}))
-          card.setRotationSmooth({0, yRotation, 180})
+          card.setPosition(add(position, {0, 0.2, 0}))
+          card.setRotation({0, yRotation, 180})
           playerData[player].incomingGood = true
      else
           -- shouldn't ever happen, but just in case
@@ -707,12 +718,14 @@ function resetPlayerState(playerColor)
     local p = playerData[playerColor]
     local index = p.index
     local incomingGood = p.incomingGood
+    local incomingPrestige = p.incomingPrestige
     local recordedCards = p.recordedCards
 
     playerData[playerColor] = player(index)
     playerData[playerColor].incomingGood = incomingGood
     playerData[playerColor].canReady = false
     playerData[playerColor].recordedCards = recordedCards
+    playerData[playerColor].incomingPrestige = incomingPrestige
 end
 
 -- Check to see if player is planning to do a takeover
@@ -2057,8 +2070,9 @@ function updateTableauState(player)
     p.mustConsumeCount = 0
 
     -- Auto cancel certain cards
-    if not p.incomingGood and p.usedPower and (currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0
-        or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0) then
+    if not p.incomingGood and not p.incomingPrestige and p.usedPower and
+            (currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0
+            or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0) then
         selectedCard = nil
         selectedInfo = nil
         p.selectedCard = nil
@@ -2287,7 +2301,9 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if p.usedPower and not p.incomingGood and (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and not p.forcedReady and dontAutoPass == false and not selectedCard then
+    if p.usedPower and (not p.incomingGood or not p.incomingPrestige) and
+            (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and
+            not p.forcedReady and dontAutoPass == false and not selectedCard then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
@@ -2606,6 +2622,7 @@ function goodSelectClick(slot, player, rightClick)
                 if power.codes["GET_CARD"] then dealTo(power.strength, player) end
                 if power.codes["GET_2_CARD"] then dealTo(power.strength * 2, player) end
                 if power.codes["GET_3_CARD"] then dealTo(power.strength * 3, player) end
+                if power.codes["GET_PRESTIGE"] then getPrestigeChips(player, power.strength) end
             end
 
             for guid, selected in pairs(p.selectedGoods) do
