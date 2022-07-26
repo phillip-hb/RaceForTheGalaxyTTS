@@ -10,6 +10,7 @@ placeTwoPhase = false
 takeoverPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
+searchPhase = false
 expansionLevel = 0
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
@@ -161,6 +162,7 @@ function onSave()
     saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
     saved_data.enforceRules = enforceRules
     saved_data.expansionLevel = expansionLevel
+    saved_data.searchPhase = searchPhase
     return JSON.encode(saved_data)
 end
 
@@ -184,6 +186,7 @@ function onload(saved_data)
         queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
         enforceRules = data.enforceRules
         expansionLevel = data.expansionLevel
+        searchPhase = data.searchPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
