@@ -61,6 +61,9 @@ playmat14 = "http://cloud-3.steamusercontent.com/ugc/1930373378495832995/BB2FCAE
 gameEndMessage = false
 gameDone = false
 enforceRules = true
+delayNextPhase = false
+delayNextPhaseTime = 0
+transitionNextPhase = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -384,11 +387,16 @@ function getVpChips(player, n)
             replaceVpBag()
         end
 
-        vpBag.takeObject({
-            position = tableau.positionToWorld({-1.4, .2, -0.8}),
-            rotation = tableau.getRotation(),
-            smooth = false
+        local token = vpBag.takeObject({
+            rotation = tableau.getRotation()
         })
+
+        token.setPositionSmooth(tableau.positionToWorld({-1.4, 2, -0.8}), false, true)
+    end
+
+    if n > 0 then
+        delayNextPhase = true
+        delayNextPhaseTime = os.clock()
     end
 end
 
@@ -399,11 +407,15 @@ function getPrestigeChips(player, n)
 
     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
     for i=1, n do
-        bag.takeObject({
-            position = tableau.positionToWorld({-1.8, 0.2, -0.8}),
+        local token = bag.takeObject({
             rotation = tableau.getRotation(),
-            smooth = false
         })
+        token.setPositionSmooth(tableau.positionToWorld({-1.8, 2, -0.8}), false, true)
+    end
+
+    if n > 0 then
+        delayNextPhase = true
+        delayNextPhaseTime = os.clock()
     end
 end
 
@@ -637,12 +649,14 @@ function placeGoodsAt(position, yRotation, player)
      local card = drawCard()
 
      if card then
-          card.setPosition(add(position, {0, 0.2, 0}))
+          card.setPositionSmooth(add(position, {0, 0.2, 0}))
           card.setRotation({0, yRotation, 180})
           playerData[player].incomingGood = true
+          delayNextPhase = true
+          delayNextPhaseTime = os.clock()
      else
           -- shouldn't ever happen, but just in case
-          broadcastToAll("No cards detected in draw or discard pile", "Red")
+          broadcastToAll("Error: No cards detected in draw or discard pile", color(1,0,0))
      end
 
      return card
@@ -1087,6 +1101,11 @@ function playerReadyClicked(playerColor, forced, playSound)
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
 
+    if transitionNextPhase then
+        updateReadyButtons({playerColor, false})
+        return
+    end
+
     if currentPhaseIndex < 0 and enforceRules then
         if not p.selectedCard then
             broadcastToColor("You must select a start world.", playerColor, "White")
@@ -1210,6 +1229,9 @@ function checkAllReadyCo()
         if not readyToken.getVar("isReady") then return 1 end
     end
 
+    transitionNextPhase = true
+    Wait.time(function() transitionNextPhase = false end, 3)
+
     Global.setVectorLines(getDefaultVectorLines())
 
     local prestigeBag = getObjectFromGUID(prestigeBag_GUID)
@@ -1238,22 +1260,24 @@ function checkAllReadyCo()
         end
 
         -- remove used prestige
-        for k, v in pairs(p.prestigeChips) do
-            local chips = getObjectFromGUID(k)
-            if chips.getQuantity() < 0 then
-                prestigeBag.putObject(chips)
-                p.consumedPrestige = p.consumedPrestige - 1
-            else
-                -- stack of chips
-                for i=1, chips.getQuantity() do
-                    prestigeBag.putObject(chips.takeObject())
+        if p.consumedPrestige > 0 then
+            for k, v in pairs(p.prestigeChips) do
+                local chips = getObjectFromGUID(k)
+                if chips.getQuantity() < 0 then
+                    prestigeBag.putObject(chips)
                     p.consumedPrestige = p.consumedPrestige - 1
+                else
+                    -- stack of chips
+                    for i=1, chips.getQuantity() do
+                        prestigeBag.putObject(chips.takeObject())
+                        p.consumedPrestige = p.consumedPrestige - 1
 
-                    if p.consumedPrestige <= 0 then break end
+                        if p.consumedPrestige <= 0 then break end
+                    end
                 end
-            end
 
-            if p.consumedPrestige <= 0 then break end
+                if p.consumedPrestige <= 0 then break end
+            end
         end
 
         if p.consumedPrestige > 0 then
@@ -1336,6 +1360,7 @@ function checkAllReadyCo()
             sound.AssetBundle.playTriggerEffect(1)
             takeoverPhase = true
             drawTakeoverLines()
+            transitionNextPhase = false
             return 1
         end
     else
@@ -1355,12 +1380,21 @@ function checkAllReadyCo()
 
     if placeTwoTriggered then
         sound.AssetBundle.playTriggerEffect(1)
+        transitionNextPhase = false
         return 1
     end
 
     if gameStarted and currentPhaseIndex == -1 then
         startNewRound()
+        transitionNextPhase = false
         return 1
+    end
+
+    -- delay time if needed to process moving cards or tokens
+    if delayNextPhase then
+        delayNextPhase = false
+        local delayTime = math.max(1.5 - (os.clock() - delayNextPhaseTime), 0)
+        wait(delayTime)
     end
 
     if currentPhaseIndex == 0 then  -- All players have selected an action
@@ -1421,6 +1455,7 @@ function checkAllReadyCo()
             beginNextPhase()
         end
     end
+    transitionNextPhase = false
     return 1
 end
 
@@ -1976,52 +2011,56 @@ function updateHandState(playerColor)
 
         obj.clearButtons()
 
-        if not phase and currentPhaseIndex < 0 then   -- Opening hand
-            if obj.hasTag("Explore Highlight") then
-                if p.selectedCard then
-                    obj.highlightOff()
-                    if p.selectedCard ~= obj.getGUID() then
-                        highlightOn(obj, "Brown", playerColor)
+        if transitionNextPhase then
+            
+        else
+            if not phase and currentPhaseIndex < 0 then   -- Opening hand
+                if obj.hasTag("Explore Highlight") then
+                    if p.selectedCard then
+                        obj.highlightOff()
+                        if p.selectedCard ~= obj.getGUID() then
+                            highlightOn(obj, "Brown", playerColor)
+                        else
+                            createCancelButtonOnCard(obj)
+                        end
                     else
-                        createCancelButtonOnCard(obj)
+                        createSelectButtonOnCard(obj)
+                        obj.highlightOn("Orange")
+                        highlightOff(obj)
                     end
-                else
-                    createSelectButtonOnCard(obj)
-                    obj.highlightOn("Orange")
-                    highlightOff(obj)
                 end
+            elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
+                (phase == 3 and info and info.type == 1) then
+                if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
+                    goto skip
+                end
+
+                if not p.selectedCard then
+                    createSelectButtonOnCard(obj)
+                elseif p.selectedCard == obj.getGUID() then
+                    createCancelButtonOnCard(obj)
+                end
+
+                ::skip::
             end
-        elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
-            (phase == 3 and info and info.type == 1) then
-            if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
-                goto skip
+
+            if phase == 1 and p.powersSnapshot["DISCARD_ANY"] ~= nil and not obj.hasTag("Explore Highlight") then
+                obj.addTag("Explore Highlight")
             end
 
-            if not p.selectedCard then
-                createSelectButtonOnCard(obj)
-            elseif p.selectedCard == obj.getGUID() then
-                createCancelButtonOnCard(obj)
+            -- Explore orange highlight
+            if phase == 1 and obj.hasTag("Explore Highlight") then
+                obj.highlightOn("Orange")
+            elseif currentPhaseIndex == 0 or phase and phase ~= 1 and obj.hasTag("Explore Highlight") then
+                obj.highlightOff()
+                obj.removeTag("Explore Highlight")
             end
 
-            ::skip::
-        end
-
-        if phase == 1 and p.powersSnapshot["DISCARD_ANY"] ~= nil and not obj.hasTag("Explore Highlight") then
-            obj.addTag("Explore Highlight")
-        end
-
-        -- Explore orange highlight
-        if phase == 1 and obj.hasTag("Explore Highlight") then
-            obj.highlightOn("Orange")
-        elseif currentPhaseIndex == 0 or phase and phase ~= 1 and obj.hasTag("Explore Highlight") then
-            obj.highlightOff()
-            obj.removeTag("Explore Highlight")
-        end
-
-        if obj.hasTag("Selected") then
-            highlightOn(obj, "rgb(0,1,0,1)", playerColor)
-        elseif obj.hasTag("Marked") then
-            highlightOn(obj, "Red", playerColor)
+            if obj.hasTag("Selected") then
+                highlightOn(obj, "rgb(0,1,0,1)", playerColor)
+            elseif obj.hasTag("Marked") then
+                highlightOn(obj, "Red", playerColor)
+            end
         end
     end
 
@@ -2126,6 +2165,10 @@ function updateTableauState(player)
             end
         end
 
+        if transitionNextPhase then
+            goto skip
+        end
+
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
             if parentData.flags["WINDFALL"] and not getGoods(obj) then
@@ -2209,6 +2252,8 @@ function updateTableauState(player)
             p.prestigeChips[obj.getGUID()] = obj.getGUID()
             p.prestigeCount = p.prestigeCount + math.max(1, obj.getQuantity())
         end
+
+        ::skip::
     end
 
     local uniqueCount = tableLength(uniques)
@@ -2939,8 +2984,11 @@ function updateHelpText(playerColor)
     p.canFlip = false
     p.canConfirm = true
 
+    if transitionNextPhase then
+        setHelpText(playerColor, "")
+        return
     -- opening hand
-    if gameStarted and currentPhaseIndex == -1 then
+    elseif gameStarted and currentPhaseIndex == -1 then
         if p.selectedCard then
             p.canFlip = true
             local discardTarget = powers["DISCARD"]
