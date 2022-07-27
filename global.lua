@@ -1614,6 +1614,7 @@ function beginNextPhase()
             p.handCountSnapshot = n
             if n > maxHandSize then
                 mustDiscard = true
+                transitionNextPhase = false
                 broadcastToAll((Player[player].steam_name or player) .. " must discard down to " .. maxHandSize .. " cards.", player)
             else
                 skipPlayers[player] = true
@@ -1624,6 +1625,7 @@ function beginNextPhase()
             startNewRound()
         else
             for player, skip in pairs(skipPlayers) do
+                playerData[player].canReady = true
                 updateReadyButtons({player, true})
             end
         end
@@ -2929,6 +2931,7 @@ function cardSelectClick(object, player, rightClick)
     p.handCountSnapshot = countCardsInHand(player, true)
     p.selectedGoods = {}
     object.addTag("Selected")
+    updateReadyButtons({player, false})
 
     queueUpdate(player, true)
 end
