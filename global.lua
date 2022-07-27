@@ -1203,7 +1203,7 @@ function checkAllReadyCo()
 
     Global.setVectorLines(getDefaultVectorLines())
 
-    -- remove misc selected cards if they have discard power
+    local prestigeBag = getObjectFromGUID(prestigeBag_GUID)
     local discardHappened = false
     local phase = getCurrentPhase()
 
@@ -1213,6 +1213,7 @@ function checkAllReadyCo()
 
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
 
+        -- remove misc selected cards if they have discard power
         while node and node.value do
             local card = getObjectFromGUID(node.value)
             local info = card_db[card.getName()]
@@ -1225,6 +1226,30 @@ function checkAllReadyCo()
                 end
             end
             node = node.next
+        end
+
+        -- remove used prestige
+        for k, v in pairs(p.prestigeChips) do
+            local chips = getObjectFromGUID(k)
+            if chips.getQuantity() < 0 then
+                prestigeBag.putObject(chips)
+                p.consumedPrestige = p.consumedPrestige - 1
+            else
+                -- stack of chips
+                for i=1, chips.getQuantity() do
+                    prestigeBag.putObject(chips.takeObject())
+                    p.consumedPrestige = p.consumedPrestige - 1
+
+                    if p.consumedPrestige <= 0 then break end
+                end
+            end
+
+            if p.consumedPrestige <= 0 then break end
+        end
+
+        if p.consumedPrestige > 0 then
+            broadcastToAll("Error: " .. (Player[player].steam_name or player) .. " spent non-existing Prestige.", color(1,0,0))
+            p.consumedPrestige = 0
         end
     end
 
