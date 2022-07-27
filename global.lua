@@ -30,7 +30,6 @@ function player(i)
         paidCost = {},
         tempMilitary = 0,
         incomingGood = false,
-        incomingPrestige = false,
         forcedReady = false,
         lastPlayedCard = nil,
         roundEndDiscardCount = 0,
@@ -41,6 +40,7 @@ function player(i)
         usedPower = false,
         canReady = false,
         canFlip = false,
+        canConfirm = false,
         recordedCards = {}
     }
 end
@@ -65,6 +65,7 @@ goodsHighlightColor = {
      ["RARE"] = color(0.709, 0.407, 0.129),
      ["GENE"] = color(0.278, 0.760, 0.141),
      ["ALIEN"] = color(0.933, 0.909, 0.105),
+     ["ANY"] = "White"
 }
 optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1}
 
@@ -395,12 +396,9 @@ function getPrestigeChips(player, n)
     for i=1, n do
         bag.takeObject({
             position = tableau.positionToWorld({-1.8, 0.2, -0.8}),
-            rotation = tableau.getRotation()
+            rotation = tableau.getRotation(),
+            smooth = false
         })
-    end
-
-    if n > 0 then
-        playerData[player].incomingPrestige = true
     end
 end
 
@@ -593,9 +591,10 @@ function attemptPlayCard(card, player, fromTakeover)
             end
 
             -- place prestige
+            local currentPhase = getCurrentPhase()
             if expansionLevel >= 3 and info.flags["PRESTIGE"] or 
                 info.type == 2 and info.cost == 6 and p.powersSnapshot["PRESTIGE_SIX"] or
-                info.type == 2 and info.flags["REBEL"] and p.powersSnapshot["PRESTIGE_REBEL"] then
+                ((currentPhase == 2 and info.type == 2) or (currentPhase == 3 and info.type == 1)) and info.flags["REBEL"] and p.powersSnapshot["PRESTIGE_REBEL"] then
                 getPrestigeChips(player, 1)
             end
 
@@ -718,14 +717,12 @@ function resetPlayerState(playerColor)
     local p = playerData[playerColor]
     local index = p.index
     local incomingGood = p.incomingGood
-    local incomingPrestige = p.incomingPrestige
     local recordedCards = p.recordedCards
 
     playerData[playerColor] = player(index)
     playerData[playerColor].incomingGood = incomingGood
     playerData[playerColor].canReady = false
     playerData[playerColor].recordedCards = recordedCards
-    playerData[playerColor].incomingPrestige = incomingPrestige
 end
 
 -- Check to see if player is planning to do a takeover
@@ -1687,6 +1684,7 @@ function capturePowersSnapshot(player, phase)
     local militaryWorldCount = 0
     local tradeChromoBonus = false
     local perMilitary = false
+    local perChromo = false
     local takeoverDefense = false
 
     for card in allCardsInTableau(player) do
@@ -1762,6 +1760,9 @@ function capturePowersSnapshot(player, phase)
                         if power.codes["PER_MILITARY"] then
                             perMilitary = true
                         end
+                        if power.codes["PER_CHROMO"] then
+                            perChromo = true
+                        end
                         goto skip
                     end
                 end
@@ -1785,6 +1786,8 @@ function capturePowersSnapshot(player, phase)
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
             elseif mil and mil.codes["PER_MILITARY"] then
                 perMilitary = true
+            elseif mil and mil.codes["PER_CHROMO"] then
+                perChromo = true
             end
         end
 
@@ -1808,6 +1811,10 @@ function capturePowersSnapshot(player, phase)
 
     if perMilitary then
         results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + militaryWorldCount
+    end
+
+    if perChromo then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + chromoCount
     end
 
     if takeoverDefense then
@@ -2005,7 +2012,14 @@ function updateTableauState(player)
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
             if parentData.flags["WINDFALL"] and not getGoods(obj) then
-                windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
+                if parentData.goods == "ANY" then
+                    windfallCount["NOVELTY"] = windfallCount["NOVELTY"] + 1
+                    windfallCount["RARE"] = windfallCount["RARE"] + 1
+                    windfallCount["GENE"] = windfallCount["GENE"] + 1
+                    windfallCount["ALIEN"] = windfallCount["ALIEN"] + 1
+                else
+                    windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
+                end
                 windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
             end
         elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then  -- facedown goods on tableau
@@ -2017,14 +2031,21 @@ function updateTableauState(player)
             elseif parentData.goods then
                 obj.highlightOn(goodsHighlightColor[parentData.goods])
 
-                goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
+                if parentData.goods == "ANY" then
+                    goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
+                    goodsCount["RARE"] = goodsCount["RARE"] + 1
+                    goodsCount["GENE"] = goodsCount["GENE"] + 1
+                    goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
+                else
+                    goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
+                end
                 uniques[parentData.goods] = 1
                 goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
 
                 -- create buttons on cards based on action
                 if currentPhase == "4" and selectedCard then
                     local ap = selectedInfo.activePowers[currentPhase]
-                    if p.selectedCardPower == "TRADE_ACTION" then
+                    if p.selectedCardPower == "TRADE_ACTION" and not (parentData.passivePowers["4"] and parentData.passivePowers["4"]["NO_TRADE"]) then
                         -- calculating cost to sell card
                         local power = ap[p.selectedCardPower]
                         local price = 0
@@ -2051,6 +2072,10 @@ function updateTableauState(player)
                             makeButton = true
                         end
 
+                        if not makeButton and p.selectedCardPower and p.selectedCardPower:sub(1,7) == "CONSUME" and parentData.goods == "ANY" then
+                            makeButton = true
+                        end
+
                         if power.codes["CONSUME_THIS"] and selectedCard ~= parentCard then
                             makeButton = false
                         end
@@ -2070,7 +2095,7 @@ function updateTableauState(player)
     p.mustConsumeCount = 0
 
     -- Auto cancel certain cards
-    if not p.incomingGood and not p.incomingPrestige and p.usedPower and
+    if not p.incomingGood and p.usedPower and
             (currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0
             or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0) then
         selectedCard = nil
@@ -2200,7 +2225,7 @@ function updateTableauState(player)
                             goodslimit = goodsCount[name:sub(9, name:len())]
                         end
 
-                        if power.codes["CONSUME_TWO"] then
+                        if power.name ~= "DISCARD_HAND" and power.codes["CONSUME_TWO"] then
                             baseAmount[power.index] = 2
                         elseif name == "CONSUME_ALL" then
                             baseAmount[power.index] = math.max(1, goodsCount["TOTAL"])
@@ -2222,7 +2247,8 @@ function updateTableauState(player)
                         if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
+                            local prefix = optionalPowers[name] and "(Optional) " or ""
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
@@ -2246,6 +2272,7 @@ function updateTableauState(player)
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         local windfallCountTarget = windfallCount[targetGood]
                         local open = getGoods(card)
+                        local prefix = optionalPowers[name] and "(Optional) " or ""
 
                         if power.codes["NOT_THIS"] and not open then
                             windfallCountTarget = windfallCountTarget - 1
@@ -2262,7 +2289,8 @@ function updateTableauState(player)
                         if not optionalPowers[name] then p.canReady = false end
 
                         dontAutoPass = true
-                        createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
+
+                        createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
 
                         ::skip::
                     end
@@ -2301,7 +2329,7 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if p.usedPower and (not p.incomingGood or not p.incomingPrestige) and
+    if p.usedPower and not p.incomingGood and
             (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and
             not p.forcedReady and dontAutoPass == false and not selectedCard then
         p.forcedReady = true
@@ -2558,6 +2586,10 @@ function confirmPowerClick(obj, player, rightClick)
             end
         end
     elseif p.selectedCardPower == "DISCARD_HAND" then
+        if enforceRules and not p.canConfirm then
+            broadcastToColor("Please discard the required number of cards.", player, "White")
+            return
+        end
         local times = math.min(power.times, #discardMarkedCards(player))
         if times == 0 then return end
         if power.codes["GET_VP"] then
@@ -2565,6 +2597,9 @@ function confirmPowerClick(obj, player, rightClick)
         end
         if power.codes["GET_CARD"] then
             dealTo(power.strength, player)
+        end
+        if power.codes["GET_PRESTIGE"] then
+            getPrestigeChips(player, times)
         end
     end
 
@@ -2713,7 +2748,9 @@ function updateHelpText(playerColor)
     if currentPhase ~= 4 and currentPhase ~= 5 then
         p.canReady = false
     end
+
     p.canFlip = false
+    p.canConfirm = true
 
     -- opening hand
     if gameStarted and currentPhaseIndex == -1 then
@@ -2867,13 +2904,21 @@ function updateHelpText(playerColor)
                 local power = info.activePowers["4"][p.selectedCardPower]
                 if power.codes["GET_VP"] then reward = "get VP"
                 elseif power.codes["GET_CARD"] then reward = "draw card"
+                elseif power.codes["GET_PRESTIGE"] then reward = "get prestige"
                 end
 
                 local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                local appendStr = ". (" .. discardCount .. "/" .. power.times .. ")"
+                local times = power.times
+                if power.codes["CONSUME_TWO"] then
+                    times = 2
+                end
+                local appendStr = ". (" .. discardCount .. "/" .. times .. ")"
 
-                if discardCount < power.times then
+                if discardCount < times then
                     p.canFlip = true
+                    if power.codes["CONSUME_TWO"] then
+                        p.canConfirm = false
+                    end
                 end
 
                 setHelpText(playerColor, "▼ Consume: discard to " .. reward .. appendStr)
@@ -3083,6 +3128,9 @@ function updateVp(player)
         end
         if dev.vpFlags["TOTAL_MILITARY"] then
             vp = vp + baseMilitary * dev.vpFlags["TOTAL_MILITARY"]
+        end
+        if dev.vpFlags["NEGATIVE_MILITARY"] and baseMilitary < 0 then
+            vp = vp + math.abs(baseMilitary) * dev.vpFlags["NEGATIVE_MILITARY"]
         end
         if dev.vpFlags["KIND_GOOD"] and uniqueWorldsCount > 0 then
             local amt = {1,3,6,10}
