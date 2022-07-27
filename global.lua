@@ -42,6 +42,7 @@ function player(i)
         canReady = false,
         canFlip = false,
         canConfirm = false,
+        beforeExplore = false,
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
@@ -606,7 +607,7 @@ function attemptPlayCard(card, player, fromTakeover)
             -- place prestige
             local currentPhase = getCurrentPhase()
             if expansionLevel >= 3 and 
-                info.flags["PRESTIGE"] or 
+                info.flags["PRESTIGE"] or p.powersSnapshot["PRESTIGE"] or
                 info.type == 2 and info.cost == 6 and p.powersSnapshot["PRESTIGE_SIX"] or
                 info.type == 1 and not info.flags["WINDFALL"] and info.goods and p.powersSnapshot["PRODUCE_PRESTIGE"] or
                 info.type == 1 and usedPayMilitary and p.powersSnapshot["PAY_PRESTIGE"] or
@@ -803,7 +804,7 @@ function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
     -- check to see if the object is in the player's hand zone to prevent mark for deletion
     if (object.hasTag("Selected") or 
             object.hasTag("Explore Highlight") and currentPhaseIndex == -1 or 
-            not object.hasTag("Explore Highlight") and getCurrentPhase() == 1) and
+            not object.hasTag("Explore Highlight") and getCurrentPhase() == 1 and not playerData[player_color].beforeExplore) and
             inHandZone and flip == 180 then
         local rot = object.getRotation()
         --object.setRotation({rot[1], rot[2], 0})
@@ -1020,6 +1021,8 @@ end
 -- ======================
 
 function gameStart(params)
+    playerData = {Yellow=player(1),Red=player(2),Blue=player(3),Green=player(4)}
+
     gameStarted = true
     currentPhaseIndex = -1
     advanced2p = params.advanced2p
@@ -1104,10 +1107,15 @@ function playerReadyClicked(playerColor, forced, playSound)
         updateReadyButtons({playerColor, false})
         return
     elseif currentPhase == 1 then
-        if enforceRules and not p.canReady then
-            broadcastToColor("Please discard the required number of cards.", playerColor, "White")
-            updateReadyButtons({playerColor, false})
-            return
+        if enforceRules then
+            if p.beforeExplore then
+                broadcastToColor("You must confirm the card's power before clicking ready!", playerColor, "White")
+                return
+            elseif not p.canReady then
+                broadcastToColor("Please discard the required number of cards.", playerColor, "White")
+                updateReadyButtons({playerColor, false})
+                return
+            end
         end
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = p.miscSelectedCards
@@ -1650,13 +1658,23 @@ function startExplorePhase()
         local p = playerData[player]
         capturePowersSnapshot(player, "1")
 
-        p.handCountSnapshot = countCardsInHand(player) + p.powersSnapshot["DRAW"]
-
-        for j=1, p.powersSnapshot["DRAW"] do
-            local card = drawCard()
-            card.deal(1, player)
-            card.addTag("Explore Highlight")
+        if p.powersSnapshot["DISCARD_PRESTIGE"] then
+            p.handCountSnapshot = countCardsInHand(player)
+            p.beforeExplore = true
+        else
+            doExploreDraw(player)
         end
+    end
+end
+
+function doExploreDraw(player)
+    local p = playerData[player]
+    p.handCountSnapshot = countCardsInHand(player) + p.powersSnapshot["DRAW"]
+
+    for j=1, p.powersSnapshot["DRAW"] do
+        local card = drawCard()
+        card.deal(1, player)
+        card.addTag("Explore Highlight")
     end
 end
 
@@ -2232,7 +2250,13 @@ function updateTableauState(player)
                 card.highlightOn("Yellow")
             end
 
-            if currentPhase == "2" and ap then
+            if currentPhase == "1" and p.beforeExplore then
+                local powers = info.passivePowers["1"]
+                if powers and powers["DISCARD_PRESTIGE"] then
+                    card.highlightOn("Yellow")
+                    createConfirmButton(card)
+                end
+            elseif currentPhase == "2" and ap then
                 for name, power in pairs(ap) do
                     if selectedCard then
                         if miscSelectedCount <= 0 then
@@ -2663,6 +2687,11 @@ end
 
 function confirmPowerClick(obj, player, rightClick)
     if rightClick then return end
+    if getOwner(obj) ~= player then
+        broadcastToColor("You cannot use cards from another player's tableau.", player, "White")
+        return
+    end
+
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
@@ -2671,7 +2700,17 @@ function confirmPowerClick(obj, player, rightClick)
 
     p.handCountSnapshot = countCardsInHand(player)
 
-    if currentPhase == "2" or currentPhase == "3" then
+    if currentPhase == "1" and p.beforeExplore then
+        -- Discarding cards for prestige from hand before explore
+        local marked = #discardMarkedCards(player)
+        getPrestigeChips(player, marked)
+        p.beforeExplore = false
+        Wait.frames(function()
+            doExploreDraw(player)
+            queueUpdate(player, true)
+        end, 1)
+        return
+    elseif currentPhase == "2" or currentPhase == "3" then
         local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
         local n = 0
         power = node.power
@@ -2918,10 +2957,16 @@ function updateHelpText(playerColor)
         setHelpText(playerColor, "▲ Select an action.")
     -- explore
     elseif currentPhase == 1 then
-        p.canFlip = true
-        local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
-        if discarded >= discardTarget then p.canReady = true end
-        setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+        if p.beforeExplore then
+            local discardTarget = p.powersSnapshot["DISCARD_PRESTIGE"] or 1
+            if discarded < discardTarget then p.canFlip = true end
+            setHelpText(playerColor, "▼ Explore: may discard for prestige. (" .. discarded .. "/" .. discardTarget .. ")")
+        else
+            p.canFlip = true
+            local discardTarget = math.max(0, powers["DRAW"] - powers["KEEP"])
+            if discarded >= discardTarget then p.canReady = true end
+            setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
+        end
     elseif currentPhase == 2 then
         if p.selectedCard then
             local card = getObjectFromGUID(p.selectedCard)

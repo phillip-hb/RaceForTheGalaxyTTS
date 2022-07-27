@@ -1705,7 +1705,6 @@ P:5:DRAW:3:0
 -- key: name, value: tooltip
 activePowers = {
      ["1"] = {
-
      },
      ["2"] = {
           DISCARD_REDUCE = "Discard this card to reduce cost."
