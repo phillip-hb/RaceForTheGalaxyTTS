@@ -1365,7 +1365,7 @@ F:START | START_RED | MILITARY | REBEL
 P:1:DRAW:1:0
 P:2:PRESTIGE_REBEL:1:0
 P:3:EXTRA_MILITARY:1:0
-P:3:EXTRA_MILITARY | IF_IMPERIUM:-2:0
+P:3:IMPERIUM_MILITARY:-2:0
 P:3:PRESTIGE_REBEL:1:0
 
 N:Imperium Capital
@@ -1550,7 +1550,7 @@ E@3:1
 G:GENE
 P:3:CONSUME_GENE | REDUCE:3:0
 P:5:PRODUCE:0:0
-P:5:WINDFALL_GENE | DISCARD:1:0
+P:5:DISCARD_HAND | WINDFALL_GENE:1:0
 
 N:Rebel Council
 T:1:8:8
@@ -1575,7 +1575,7 @@ E@3:1
 #E:0:0:0:1:0
 F:MILITARY | ALIEN | PRESTIGE
 P:3:CONSUME_PRESTIGE | EXTRA_MILITARY:3:1
-P:5:WINDFALL_ALIEN | DISCARD:1:0
+P:5:DISCARD_HAND | WINDFALL_ALIEN:1:0
 
 N:Rebel Sneak Attack
 T:2:2:1
@@ -1716,7 +1716,8 @@ activePowers = {
           PAY_MILITARY = "Place military world as normal world.",
           MILITARY_HAND = "Discard from hand for bonus military.",
           TAKEOVER_IMPERIUM = "Takeover military world from IMPERIUM tableau.",
-          TAKEOVER_REBEL = "Takeover REBEL military world."
+          TAKEOVER_REBEL = "Takeover REBEL military world.",
+          CONSUME_PRESTIGE = "Discard prestige to "
      },
      ["4"] = {
           TRADE_ACTION = "Sell a good.",
