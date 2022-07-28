@@ -46,7 +46,8 @@ function player(i)
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
-        consumedPrestige = 0
+        consumedPrestige = 0,
+        markedConsumedGoods = {}
     }
 end
 
@@ -1148,10 +1149,7 @@ function playerReadyClicked(playerColor, forced, playSound)
             end
         end
     elseif currentPhase == 2 or currentPhase == 3 then
-        local node = p.miscSelectedCards
-        while node and node.next do
-            node = node.next
-        end
+        local node = getLastNode(p.miscSelectedCards)
 
         if node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
@@ -2155,11 +2153,11 @@ function updateTableauState(player)
         p.canReady = true
     end
 
-    for card in allCardsInTableau(player) do
-        card.clearButtons()
-        card.highlightOff()
-        highlightOff(card)
-    end
+    for _, obj in pairs(zone.getObjects()) do
+        obj.clearButtons()
+        obj.highlightOff()
+        highlightOff(obj)
+    end 
 
     for guid, selected in pairs(p.selectedGoods) do
         if selected then
@@ -2199,18 +2197,12 @@ function updateTableauState(player)
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
-        obj.clearButtons()
-
         if obj.hasTag("Slot") then
             if currentPhase == "2" or (currentPhase == "3" and not takeoverPhase) then
                 setVisibleTo(obj, player)
             else
                 obj.setInvisibleTo({})
             end
-        end
-
-        if transitionNextPhase then
-            goto skip
         end
 
         if obj.type == 'Card' and not obj.is_face_down then
@@ -2233,61 +2225,79 @@ function updateTableauState(player)
             if #parentCard.getZones() <= 0 then
                 obj.setDescription("")
             elseif parentData.goods then
+                local activeCard = selectedCard
+                local activeInfo = selectedInfo
+                local selectedCardPower = p.selectedCardPower
                 obj.highlightOn(goodsHighlightColor[parentData.goods])
 
-                if parentData.goods == "ANY" then
-                    goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
-                    goodsCount["RARE"] = goodsCount["RARE"] + 1
-                    goodsCount["GENE"] = goodsCount["GENE"] + 1
-                    goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
-                else
-                    goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
-                end
-                uniques[parentData.goods] = 1
-                goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
+                if not p.markedConsumedGoods[obj.getGUID()] then
+                    if parentData.goods == "ANY" then
+                        goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
+                        goodsCount["RARE"] = goodsCount["RARE"] + 1
+                        goodsCount["GENE"] = goodsCount["GENE"] + 1
+                        goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
+                    else
+                        goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
+                    end
+                    uniques[parentData.goods] = 1
+                    goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
 
-                -- create buttons on cards based on action
-                if currentPhase == "4" and selectedCard then
-                    local ap = selectedInfo.activePowers[currentPhase]
-                    if p.selectedCardPower == "TRADE_ACTION" and not (parentData.passivePowers["4"] and parentData.passivePowers["4"]["NO_TRADE"]) then
-                        -- calculating cost to sell card
-                        local power = ap[p.selectedCardPower]
-                        local price = 0
-                        local bonus = not power.codes["TRADE_NO_BONUS"]
-                        local basePrice = {NOVELTY = 2, RARE = 3, GENE = 4, ALIEN = 5}
-
-                        price = basePrice[parentData.goods] + (bonus and p.powersSnapshot["TRADE_" .. parentData.goods] or 0)
-                        price = price + (bonus and p.powersSnapshot["TRADE_ANY"] or 0)
-
-                        local parentPassive = parentData.passivePowers[currentPhase]
-                        if bonus and parentPassive and parentPassive["TRADE_THIS"] then
-                            price = price + parentPassive["TRADE_THIS"].strength
+                    -- change active selections based on the misc selected cards
+                    if currentPhase == "3" then
+                        activeCard = nil
+                        activeInfo = nil
+                        selectedCardPower = nil
+                        local node = getLastNode(p.miscSelectedCards)
+                        if node.value and node.power.name:sub(1,7) == "CONSUME" and node.power.name ~= "CONSUME_PRESTIGE" then
+                            activeCard = getObjectFromGUID(node.value)
+                            activeInfo = card_db[activeCard.getName()]
+                            selectedCardPower = node.power.name
                         end
+                    end
 
-                        p.canReady = false
-                        createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[parentData.goods])
-                        obj.memo = price
-                    elseif ap then -- using normal consume powers
-                        local makeButton = false
-                        local power = ap[p.selectedCardPower]
+                    -- create buttons on cards based on action
+                    if activeCard then
+                        local ap = activeInfo.activePowers[currentPhase]
+                        if selectedCardPower == "TRADE_ACTION" and not (parentData.passivePowers["4"] and parentData.passivePowers["4"]["NO_TRADE"]) then
+                            -- calculating cost to sell card
+                            local power = ap[selectedCardPower]
+                            local price = 0
+                            local bonus = not power.codes["TRADE_NO_BONUS"]
+                            local basePrice = {NOVELTY = 2, RARE = 3, GENE = 4, ALIEN = 5}
 
-                        if p.selectedCardPower == "CONSUME_ANY" or p.selectedCardPower == "CONSUME_ALL" or p.selectedCardPower == "CONSUME_" .. (parentData.goods or "") or
-                            (((p.selectedCardPower == "CONSUME_3_DIFF" or p.selectedCardPower == "CONSUME_N_DIFF") and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
-                            makeButton = true
-                        end
+                            price = basePrice[parentData.goods] + (bonus and p.powersSnapshot["TRADE_" .. parentData.goods] or 0)
+                            price = price + (bonus and p.powersSnapshot["TRADE_ANY"] or 0)
 
-                        if not makeButton and p.selectedCardPower and p.selectedCardPower:sub(1,7) == "CONSUME" then
-                            makeButton = true
-                        end
+                            local parentPassive = parentData.passivePowers[currentPhase]
+                            if bonus and parentPassive and parentPassive["TRADE_THIS"] then
+                                price = price + parentPassive["TRADE_THIS"].strength
+                            end
 
-                        if power.codes["CONSUME_THIS"] and selectedCard ~= parentCard then
-                            makeButton = false
-                        end
-
-                        if makeButton then
-                            dontAutoPass = true
                             p.canReady = false
-                            createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
+                            createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[parentData.goods])
+                            obj.memo = price
+                        elseif ap then -- using normal consume powers
+                            local makeButton = false
+                            local power = ap[selectedCardPower]
+
+                            if selectedCardPower == "CONSUME_ANY" or selectedCardPower == "CONSUME_ALL" or selectedCardPower == "CONSUME_" .. (parentData.goods or "") or
+                                (((selectedCardPower == "CONSUME_3_DIFF" or selectedCardPower == "CONSUME_N_DIFF") and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
+                                makeButton = true
+                            end
+
+                            -- if not makeButton and p.selectedCardPower and p.selectedCardPower:sub(1,7) == "CONSUME" then
+                            --     makeButton = true
+                            -- end
+
+                            if power.codes["CONSUME_THIS"] and activeCard ~= parentCard then
+                                makeButton = false
+                            end
+
+                            if makeButton then
+                                dontAutoPass = true
+                                p.canReady = false
+                                createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
+                            end
                         end
                     end
                 end
@@ -2296,9 +2306,8 @@ function updateTableauState(player)
             p.prestigeChips[obj.getGUID()] = obj.getGUID()
             p.prestigeCount = p.prestigeCount + math.max(1, obj.getQuantity())
         end
-
-        ::skip::
     end
+    p.prestigeCount = p.prestigeCount - p.consumedPrestige
 
     local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
@@ -2372,7 +2381,6 @@ function updateTableauState(player)
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
                         local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index] >= power.strength
-                        local prestigeRemaining = p.consumedPrestige < p.prestigeCount
 
                         if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
@@ -2387,14 +2395,18 @@ function updateTableauState(player)
                                     powerName = name
                                 elseif name == "DISCARD_CONQUER_SETTLE" and selectedInfo and not selectedInfo.flags["MILITARY"] then
                                     powerName = name
-                                elseif ap["PAY_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] and
+                                elseif name == "PAY_MILITARY" and selectedInfo and selectedInfo.flags["MILITARY"] and
                                         (not next(power.codes) and selectedInfo.goods ~= "ALIEN" or 
                                         power.codes["ALIEN"] and selectedInfo.goods == "ALIEN" or 
                                         power.codes["AGAINST_CHROMO"] and selectedInfo.flags["CHROMO"])  then
                                     powerName = name
-                                elseif ap["MILITARY_HAND"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
+                                elseif name == "MILITARY_HAND" and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
                                     powerName = name
-                                elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] and prestigeRemaining then
+                                elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] and p.prestigeCount > 0 then
+                                    powerName = name
+                                elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and selectedInfo and not selectedInfo.flags["MILITARY"] then
+                                    powerName = name
+                                elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] then
                                     powerName = name
                                 end
                             elseif not miscSelectedCardsTable[card.getGUID()] and not takeoverPhase then
@@ -2409,7 +2421,7 @@ function updateTableauState(player)
                         if powerName ~= "" and not miscSelected and not used then
                             dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected then
+                        elseif miscSelected or (used and (name == "CONSUME_RARE" or name == "CONSUME_GENE")) then
                             dontAutoPass = true
                             createCancelButton(card)
 
@@ -2429,60 +2441,61 @@ function updateTableauState(player)
                         end
                     end
                 end
-            elseif currentPhase == "4" and ap then
+            elseif currentPhase == "4" then
                 local baseAmount = {}
                 local goodslimit = 1
                 local enoughGoods = false
 
-                for i=1, info.activeCount[currentPhase] do
-                    baseAmount[#baseAmount + 1] = 1
+                for name, power in pairs (info.activePowers[currentPhase]) do
+                    baseAmount[name] = 1
                 end
 
-                if #baseAmount > 0 then
+                if next(baseAmount) then
                     for name, power in pairs(info.activePowers[currentPhase]) do
-                        if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "CONSUME_N_DIFF" or name == "TRADE_ACTION" then
-                            goodslimit = goodsCount["TOTAL"]
-                        elseif name:sub(1,7) == "CONSUME" then
-                            goodslimit = goodsCount[name:sub(9, name:len())]
-                        end
+                        if requiresGoods[name] then
+                            if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "CONSUME_N_DIFF" or name == "TRADE_ACTION" then
+                                goodslimit = goodsCount["TOTAL"]
+                            elseif name:sub(1,7) == "CONSUME" then
+                                goodslimit = goodsCount[name:sub(9, name:len())]
+                            end
 
-                        if power.name ~= "DISCARD_HAND" and power.codes["CONSUME_TWO"] then
-                            baseAmount[power.index] = 2
-                        elseif name == "CONSUME_ALL" then
-                            baseAmount[power.index] = math.max(1, goodsCount["TOTAL"])
-                        elseif name == "CONSUME_3_DIFF" then
-                            baseAmount[power.index] = uniqueCount < 3 and 100 or 3
-                        elseif name == "CONSUME_N_DIFF" then
-                            baseAmount[power.index] = math.max(1, uniqueCount)
-                        elseif not requiresGoods[name] then
-                            baseAmount[power.index] = 0
-                        end
+                            if power.name ~= "DISCARD_HAND" and power.codes["CONSUME_TWO"] then
+                                baseAmount[name] = 2
+                            elseif name == "CONSUME_ALL" then
+                                baseAmount[name] = math.max(1, goodsCount["TOTAL"])
+                            elseif name == "CONSUME_3_DIFF" then
+                                baseAmount[name] = uniqueCount < 3 and 100 or 3
+                            elseif name == "CONSUME_N_DIFF" then
+                                baseAmount[name] = math.max(1, uniqueCount)
+                            elseif not requiresGoods[name] then
+                                baseAmount[name] = 0
+                            end
 
-                        goodslimit = math.min(math.max(1, power.times * baseAmount[power.index]), goodslimit)
+                            goodslimit = math.min(math.max(1, power.times * baseAmount[name]), goodslimit)
+                        end
                     end
                 end
 
                 if not selectedCard then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
-                        if (not used or not used[name .. power.index]) and baseAmount[power.index] <= goodslimit then
+                        if (not used or not used[name .. power.index]) and baseAmount[name] <= goodslimit then
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
-                            local prefix = optionalPowers[name] and "(Optional) " or ""
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
+                            local prefix = (currentPhase == "4" and optionalPowers[name]) and "(Optional) " or ""
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], (currentPhase == "4" and optionalPowers[name]) and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
                     p.canReady = false
                     dontAutoPass = true
                     createCancelButton(card)
-                    local powerIndex = info.activePowers[currentPhase][p.selectedCardPower].index
 
                     if requiresConfirm[p.selectedCardPower] then
                         createConfirmButton(selectedCard)
                     end
 
-                    p.mustConsumeCount = math.max(baseAmount[powerIndex], goodslimit)
+                    p.mustConsumeCount = math.max(baseAmount[p.selectedCardPower], goodslimit)
                 end
             elseif currentPhase == "5" then
                 if not selectedCard and ap then
@@ -2700,11 +2713,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         end
     end
 
-    local node = p.miscSelectedCards
-
-    while node and node.next do
-         node = node.next
-    end
+    local node = getLastNode(p.miscSelectedCards)
 
     if not p.miscSelectedCards then p.miscSelectedCards = {} end
 
@@ -2743,13 +2752,21 @@ function cancelPowerClick(obj, player, rightClick)
     end
 
     if obj.hasTag("Slot") then obj = getCard(obj) end
-
     local p = playerData[player]
 
     p.handCountSnapshot = countCardsInHand(player, true)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
-    if getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
+    if getCurrentPhase() == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
+        for goodsGuid, data in pairs(p.markedConsumedGoods) do
+            if data.value == obj.getGUID() then
+                local good = getObjectFromGUID(goodsGuid)
+                p.markedConsumedGoods[goodsGuid] = nil
+                p.cardsAlreadyUsed[obj.getGUID()] = nil
+                if good then displayXOff(good) end
+            end
+        end
+    elseif getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
         p.selectedCard = nil
         p.selectedCardPower = ""
         p.selectedGoods = {}
@@ -2881,20 +2898,36 @@ function goodSelectClick(slot, player, rightClick)
 
     local parentCard = getCard(slot)
 
-    local p = playerData[player]
-    local selectedCard = getObjectFromGUID(p.selectedCard)
-    local selectedInfo = card_db[selectedCard.getName()]
     local currentPhase = tostring(getCurrentPhase())
+    local p = playerData[player]
+    local guid = p.selectedCard
+    local powerName = p.selectedCardPower
+    local node = getLastNode(p.miscSelectedCards)
+
+    if currentPhase == "3" then
+        guid = node.value
+        powerName = node.power.name
+    end
+
+    local selectedCard = getObjectFromGUID(guid)
+    local selectedInfo = card_db[selectedCard.getName()]
+
     local powers = selectedInfo.activePowers[currentPhase]
-    local power = powers[p.selectedCardPower]
+    local power = powers[powerName]
     local powerUsed = false
 
-    if currentPhase == "4" then    -- consume the goods card
+    if (currentPhase == "2" or currentPhase == "3") and node then
         local good = getGoods(parentCard)
+        if good == nil then broadcastToColor("Invalid goods selected.", player, color(1,0,0)) end
 
-        if good == nil then
-            broadcastToColor("Invalid goods selected.", player, "Red")
-        end
+        p.markedConsumedGoods[good.getGUID()] = node
+        displayXOn(good, player)
+        markUsedMisc(player, selectedCard, power, power.strength)
+        queueUpdate(player, true)
+        return
+    elseif currentPhase == "4" then    -- consume the goods card
+        local good = getGoods(parentCard)
+        if good == nil then broadcastToColor("Error: Invalid goods selected.", player, color(1,0,0)) end
 
         -- Toggle selection of goods
         p.selectedGoods[good.getGUID()] = not p.selectedGoods[good.getGUID()]
@@ -2979,30 +3012,36 @@ function cardSelectClick(object, player, rightClick)
 end
 
 function cardCancelClick(object, player, rightClick)
-     if rightClick then return end
+    if rightClick then return end
 
-     if object.hasTag("Slot") then
-          object = getCard(object)
-     end
+    if object.hasTag("Slot") then
+        object = getCard(object)
+    end
 
-     local p = playerData[player]
+    local p = playerData[player]
 
-     p.selectedCard = nil
-     p.selectedCardPower = ""
-     p.miscSelectedCards = {}
+    p.selectedCard = nil
+    p.selectedCardPower = ""
+    p.miscSelectedCards = {}
 
-     object.removeTag("Selected")
-     highlightOff(object)
+    object.removeTag("Selected")
+    highlightOff(object)
 
-     for _, obj in pairs(Player[player].getHandObjects(1)) do
+    for goodsGuid, data in pairs(p.markedConsumedGoods) do
+        local good = getObjectFromGUID(goodsGuid)
+        p.cardsAlreadyUsed[data.value] = nil
+        p.markedConsumedGoods[goodsGuid] = nil
+        if good then displayXOff(good) end
+    end
+
+    for _, obj in pairs(Player[player].getHandObjects(1)) do
         if obj.is_face_down then
             obj.flip()
         end
-     end
+    end
 
-     updateReadyButtons({player, false})
-
-     queueUpdate(player, true)
+    updateReadyButtons({player, false})
+    queueUpdate(player, true)
 end
 
 function setHelpText(player, text)

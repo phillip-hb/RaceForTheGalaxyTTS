@@ -103,7 +103,6 @@ end
 function createGoodsButton(card, label, color)
     local offset = {0.28, 6, 0.13}
     local slot = getCardSlot(card)
-
     slot.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
@@ -140,6 +139,7 @@ function highlightOn(o, color, player)
     if o.UI.getXml() == '' then
         o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="Black|' .. player .. '"/>' ..
 [[
+<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
     <Image image="hex" preserveAspect="true"/>
     <Text id="vp" fontSize="65" fontStyle="Bold"></Text>
@@ -160,20 +160,45 @@ function highlightOff(o)
     end
 end
 
+function displayVpHexOn(o, value)
+    if o.UI.getXml() == '' then
+        o.UI.setXml('<Panel id="highlight" width="220" height="314" active="false"/>' ..
+         '<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>' ..
+         '<Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180"><Image image="hex" preserveAspect="true"/>'..
+         '<Text id="vp" fontSize="65" fontStyle="Bold">' .. value .. '</Text></Panel>')
+    else
+        o.UI.setAttribute("hex", "active", true)
+        o.UI.setValue("vp", value)
+    end
+end
+
 function displayVpHexOff(o)
     if o.UI.getXml() ~= '' then
         o.UI.setAttribute("hex", "active", false)
     end
 end
 
-function displayVpHexOn(o, value)
+function displayXOn(o, player)
     if o.UI.getXml() == '' then
-        o.UI.setXml('<Panel id="highlight" width="220" height="314" active="false"/>' ..
-         '<Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180"><Image image="hex" preserveAspect="true"/>'..
-         '<Text id="vp" fontSize="65" fontStyle="Bold">' .. value .. '</Text></Panel>')
+        o.UI.setXml('<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">✘</Text>' ..
+[[
+<Panel id="highlight" width="220" height="314" active="false"/>
+<Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
+    <Image image="hex" preserveAspect="true"/>
+    <Text id="vp" fontSize="65" fontStyle="Bold"></Text>
+</Panel>
+]])
     else
-        o.UI.setAttribute("hex", "active", true)
-        o.UI.setValue("vp", value)
+        o.UI.setAttributes("x",{
+            active = true,
+            visibility = "Black|" .. player,
+        })
+    end
+end
+
+function displayXOff(o)
+    if o.UI.getXml() ~= '' then
+        o.UI.setAttribute("x", "active", false)
     end
 end
 

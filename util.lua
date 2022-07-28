@@ -121,6 +121,14 @@ function getLinkedListNode(list, value)
     return nil
 end
 
+function getLastNode(list)
+    local node = list
+    while node and node.next do
+        node = node.next
+    end
+    return node
+end
+
 function concatPowerName(power)
     local value = power.name
     if power.name ~= "DISCARD" then return value end
