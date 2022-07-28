@@ -47,7 +47,8 @@ function player(i)
         prestigeChips = {},
         prestigeCount = 0,
         consumedPrestige = 0,
-        markedConsumedGoods = {}
+        markedConsumedGoods = {},
+        markedDiscards = {}
     }
 end
 
@@ -2166,10 +2167,10 @@ function updateTableauState(player)
         p.canReady = true
     end
 
-    for _, obj in pairs(zone.getObjects()) do
-        obj.clearButtons()
-        obj.highlightOff()
-        highlightOff(obj)
+    for card in allCardsInTableau(player) do
+        card.clearButtons()
+        card.highlightOff()
+        highlightOff(card)
     end 
 
     for guid, selected in pairs(p.selectedGoods) do
@@ -2210,6 +2211,7 @@ function updateTableauState(player)
 
     -- count certain cards, highlight goods, etc
     for _, obj in pairs(zone.getObjects()) do
+        obj.clearButtons()
         if obj.hasTag("Slot") then
             if currentPhase == "2" or (currentPhase == "3" and not takeoverPhase) then
                 setVisibleTo(obj, player)
@@ -2322,7 +2324,7 @@ function updateTableauState(player)
             p.prestigeCount = p.prestigeCount + math.max(1, obj.getQuantity())
         end
     end
-    p.prestigeCount = p.prestigeCount - p.consumedPrestige
+    if p.consumedPrestige then p.prestigeCount = p.prestigeCount - p.consumedPrestige end
 
     local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
@@ -2461,8 +2463,10 @@ function updateTableauState(player)
                 local goodslimit = 1
                 local enoughGoods = false
 
-                for name, power in pairs (info.activePowers[currentPhase]) do
-                    baseAmount[name] = 1
+                if info.activePowers[currentPhase] then
+                    for name, power in pairs (info.activePowers[currentPhase]) do
+                        baseAmount[name] = 1
+                    end
                 end
 
                 if next(baseAmount) then
@@ -2491,7 +2495,7 @@ function updateTableauState(player)
                     end
                 end
 
-                if not selectedCard then
+                if not selectedCard and ap then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         if (not used or not used[name .. power.index]) and baseAmount[name] <= goodslimit then
@@ -2843,6 +2847,10 @@ function confirmPowerClick(obj, player, rightClick)
             end
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength - usedAmount)
+
+            for _, card in pairs(marked) do
+                p.markedDiscards[card.getGUID()] = power
+            end
             refreshTakeoverMenu(player)
         elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             n = 1
