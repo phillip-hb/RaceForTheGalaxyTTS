@@ -139,7 +139,7 @@ function highlightOn(o, color, player)
     if o.UI.getXml() == '' then
         o.UI.setXml('<Panel id="highlight" color="' .. color .. '" width="220" height="314" visibility="Black|' .. player .. '"/>' ..
 [[
-<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>
+<Text id="x" fontSize="200" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
     <Image image="hex" preserveAspect="true"/>
     <Text id="vp" fontSize="65" fontStyle="Bold"></Text>
@@ -163,7 +163,7 @@ end
 function displayVpHexOn(o, value)
     if o.UI.getXml() == '' then
         o.UI.setXml('<Panel id="highlight" width="220" height="314" active="false"/>' ..
-         '<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>' ..
+         '<Text id="x" fontSize="200" color="Red" position="0 0 100" rotation="180 0 0" active="false">✘</Text>' ..
          '<Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180"><Image image="hex" preserveAspect="true"/>'..
          '<Text id="vp" fontSize="65" fontStyle="Bold">' .. value .. '</Text></Panel>')
     else
@@ -180,7 +180,7 @@ end
 
 function displayXOn(o, player)
     if o.UI.getXml() == '' then
-        o.UI.setXml('<Text id="x" fontSize="300" color="Red" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">✘</Text>' ..
+        o.UI.setXml('<Text id="x" fontSize="200" color="Red" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">✘</Text>' ..
 [[
 <Panel id="highlight" width="220" height="314" active="false"/>
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">

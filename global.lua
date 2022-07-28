@@ -2112,6 +2112,7 @@ function updateHandState(playerColor)
                 highlightOn(obj, "rgb(0,1,0,1)", playerColor)
             elseif obj.hasTag("Marked") then
                 highlightOn(obj, "Red", playerColor)
+                Wait.frames(function() displayXOn(obj, playerColor) end, 2)
             end
         end
     end
