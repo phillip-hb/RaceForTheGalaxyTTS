@@ -907,6 +907,7 @@ function onObjectLeaveZone(zone, object)
             if object.getScale()[1] < 1 and object.type == "Card" then
                 object.setScale({1, 1, 1})
                 object.setDescription("")
+                displayXOff(object)
 
                 if p.selectedGoods[object.getGUID()] then
                     p.selectedGoods[object.getGUID()] = nil
@@ -1258,16 +1259,27 @@ function checkAllReadyCo()
         -- remove misc selected cards if they have discard power
         while node and node.value do
             local card = getObjectFromGUID(node.value)
-            local info = card_db[card.getName()]
-            local power = node.power
-            if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
-                discardCard(card)
-                discardHappened = true
-                if power.name == 'DISCARD' and power.codes["EXTRA_MILITARY"] then
-                    p.tempMilitary = p.tempMilitary + power.strength
+            if card then
+                local info = card_db[card.getName()]
+                local power = node.power
+                if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
+                    discardCard(card)
+                    discardHappened = true
+                    if power.name == 'DISCARD' and power.codes["EXTRA_MILITARY"] then
+                        p.tempMilitary = p.tempMilitary + power.strength
+                    end
                 end
             end
             node = node.next
+        end
+
+        -- remove marked goods
+        for goodGuid, usedPower in pairs(p.markedConsumedGoods) do
+            local good = getObjectFromGUID(goodGuid)
+            if good then
+                displayXOff(good)
+                discardCard(good)
+            end
         end
 
         -- remove used prestige
@@ -2230,7 +2242,9 @@ function updateTableauState(player)
                 local selectedCardPower = p.selectedCardPower
                 obj.highlightOn(goodsHighlightColor[parentData.goods])
 
-                if not p.markedConsumedGoods[obj.getGUID()] then
+                if p.markedConsumedGoods[obj.getGUID()] then
+                    displayXOn(obj, player)
+                else
                     if parentData.goods == "ANY" then
                         goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
                         goodsCount["RARE"] = goodsCount["RARE"] + 1
@@ -3137,6 +3151,7 @@ function updateHelpText(playerColor)
             local reduceZeroName = ""
             local doMilitary = info and info.flags["MILITARY"]
             local payMilitary = false
+            local payDiscount = 0
             local payMilitaryStr = 0
             local militaryDiscount = 0
             local node = p.miscSelectedCards
@@ -3171,6 +3186,12 @@ function updateHelpText(playerColor)
                 node = node.next
             end
 
+            for goodsGuid, usedPowers in pairs(p.markedConsumedGoods) do
+                if usedPowers.power.codes["REDUCE"] then
+                    payDiscount = payDiscount + usedPowers.power.strength
+                end
+            end
+
             if planningTakeover then
                 setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
                 return
@@ -3198,7 +3219,6 @@ function updateHelpText(playerColor)
                     p.canReady = true
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
-                    local payDiscount = 0
                     if payMilitary then
                         payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
                     end
