@@ -549,6 +549,17 @@ function discardMarkedCards(player, markForDiscard)
     return cards
 end
 
+function giveMarkedCards(player, target)
+    local cards = {}
+    for _, obj in pairs(Player[player].getHandObjects(1)) do
+        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
+            obj.deal(1, target)
+            cards[#cards + 1] = obj
+        end
+    end
+    return cards
+end
+
 -- check zone for any 'Selected' cards and attempt to play them
 function attemptPlayCard(card, player, fromTakeover)
     if type(card) == "table" then
@@ -586,7 +597,7 @@ function attemptPlayCard(card, player, fromTakeover)
             if not fromTakeover then
                 card.setPosition(add(pos, {0, 0.04, 0}))
             else
-                card.setPositionSmooth(add(pos, {0, 0.4, 0}))
+                card.setPositionSmooth(add(pos, {0, 0.04, 0}))
             end
             card.setRotation({rot[1], rot[2], 0})
             card.removeTag("Selected")
@@ -1236,6 +1247,7 @@ function checkAllReadyCo()
 
     local prestigeBag = getObjectFromGUID(prestigeBag_GUID)
     local discardHappened = false
+    local takeDiscard = nil
     local phase = getCurrentPhase()
 
     for _, player in pairs(players) do
@@ -1243,6 +1255,7 @@ function checkAllReadyCo()
         local node = p.miscSelectedCards
 
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
+        if p.powersSnapshot["TAKE_DISCARDS"] and phase == 100 then takeDiscard = player end
 
         -- remove misc selected cards if they have discard power
         while node and node.value do
@@ -1307,7 +1320,7 @@ function checkAllReadyCo()
         end
 
         local p = playerData[player]
-        if not placeTwoPhase and getCurrentPhase() == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
+        if not placeTwoPhase and phase == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
             placeTwo[p.index] = true
             placeTwoPhase = true
             placeTwoTriggered = true
@@ -1315,7 +1328,14 @@ function checkAllReadyCo()
 
         -- discard all face down cards in hand
         if currentPhaseIndex ~= 0 then
-            local n = #discardMarkedCards(player)
+            local n = 0
+
+            if takeDiscard then
+                n = giveMarkedCards(player, takeDiscard)
+            else
+                n = #discardMarkedCards(player)
+            end
+
             if currentPhaseIndex == #selectedPhases then
                 p.roundEndDiscardCount = n
             end
@@ -1326,6 +1346,7 @@ function checkAllReadyCo()
     wait(0.1)
 
     for _, player in pairs(players) do
+        playerData[player].miscSelectedCards = {}
         updateReadyButtons({player, false})
         queueUpdate(player, true)
         playerData[player].beingTargeted = nil
@@ -1354,13 +1375,15 @@ function checkAllReadyCo()
                     broadcastToColor("You are being targeted for a takeover by " .. (Player[player].steam_name or player) .. "!", targetPlayer, "Purple")
                 end
             end
+
+            queueUpdate(player)
         end
 
         if takeoverTriggered then
+            transitionNextPhase = false
             sound.AssetBundle.playTriggerEffect(1)
             takeoverPhase = true
             drawTakeoverLines()
-            transitionNextPhase = false
             return 1
         end
     else
@@ -1376,6 +1399,8 @@ function checkAllReadyCo()
                 updateReadyButtons({player, true})
             end
         end
+
+        queueUpdate(player)
     end
 
     if placeTwoTriggered then
@@ -1835,17 +1860,10 @@ function capturePowersSnapshot(player, phase)
             goto next_card
         end
 
-        if info.flags["DISCARD_TO_12"] then
-            results["DISCARD_TO_12"] = 1
-        end
-
-        if info.flags["GAME_END_14"] then
-            results["GAME_END_14"] = 1
-        end
-
-        if info.flags["IMPERIUM"] then
-            results["IMPERIUM"] = 1
-        end
+        if info.flags["DISCARD_TO_12"] then results["DISCARD_TO_12"] = 1 end
+        if info.flags["GAME_END_14"] then results["GAME_END_14"] = 1 end
+        if info.flags["IMPERIUM"] then results["IMPERIUM"] = 1 end
+        if info.flags["TAKE_DISCARDS"] then results["TAKE_DISCARDS"] = 1 end
 
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
@@ -1980,11 +1998,13 @@ function capturePowersSnapshot(player, phase)
         local list = p.miscSelectedCards
         while list and list.value do
             local card = getObjectFromGUID(list.value)
-            local info = card_db[card.getName()]
+            if card then
+                local info = card_db[card.getName()]
 
-            for name, power in pairs(info.activePowers[phase]) do
-                if name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
-                    results["BONUS_MILITARY"] = results["BONUS_MILITARY"] + power.strength
+                for name, power in pairs(info.activePowers[phase]) do
+                    if name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+                        results["BONUS_MILITARY"] = results["BONUS_MILITARY"] + power.strength
+                    end
                 end
             end
 
@@ -2139,20 +2159,22 @@ function updateTableauState(player)
 
     while list and list.value do
         local card = getObjectFromGUID(list.value)
-        miscSelectedCardsTable[list.value] = list
+        if card then
+            miscSelectedCardsTable[list.value] = list
 
-        local info = card_db[card.getName()]
-        for name, power in pairs(info.activePowers[currentPhase]) do
-            miscPowerSnapshot[name] = power
-        end
+            local info = card_db[card.getName()]
+            for name, power in pairs(info.activePowers[currentPhase]) do
+                miscPowerSnapshot[name] = power
+            end
 
-        if not list.next then
-            miscActiveNode = list
-            miscActiveNodePowerKey = concatPowerName(miscActiveNode.power)
+            if not list.next then
+                miscActiveNode = list
+                miscActiveNodePowerKey = concatPowerName(miscActiveNode.power)
+            end
+            miscSelectedCount = miscSelectedCount + 1
         end
 
         list = list.next
-        miscSelectedCount = miscSelectedCount + 1
     end
 
     -- count certain cards, highlight goods, etc
@@ -2521,9 +2543,8 @@ function updateTableauState(player)
     end
 
     -- Force the player ready when they have nothing left to do
-    if p.usedPower and not p.incomingGood and
-            (currentPhase == "4" or currentPhase == "5" or (currentPhase == "3" and takeoverPhase and not p.beingTargeted)) and
-            not p.forcedReady and dontAutoPass == false and not selectedCard then
+    if (p.usedPower and not p.incomingGood and (currentPhase == "4" or currentPhase == "5") and not p.forcedReady and dontAutoPass == false and not selectedCard) or
+        (not p.incomingGood and not p.forcedReady and dontAutoPass == false and currentPhase == "3" and takeoverPhase and not p.beingTargeted)then
         p.forcedReady = true
         if Player[player].seated then
             updateReadyButtons({player, true})
@@ -2677,17 +2698,18 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     local takeoverName = isTakeoverPower(power)
     if useTakeovers and currentPhase == "3" then
+        refreshTakeoverMenu(player)
         if takeoverName ~= nil then
             p.takeoverSource = obj.getGUID()
             p.takeoverPower = power
             p.takeoverTarget = nil
-            Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+            Wait.frames(function() Global.UI.setAttribute("takeoverMenu_" .. player, "active", true) end, 1)
         end
 
         if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             p.powersSnapshot["BONUS_MILITARY"] = p.powersSnapshot["BONUS_MILITARY"] + power.strength
         end
-        refreshTakeoverMenu(player)
+        --Wait.frames(function() refreshTakeoverMenu(player) end, 1)
     end
 
     queueUpdate(player, true)
@@ -3045,7 +3067,9 @@ function updateHelpText(playerColor)
             setHelpText(playerColor, "▼ Develop: may play a development.")
         end
     elseif currentPhase == 3 then
-        if p.selectedCard or p.beingTargeted then
+        local planningTakeover = planningTakeover(playerColor)
+
+        if p.selectedCard or p.beingTargeted or planningTakeover then
             local card = getObjectFromGUID(p.selectedCard)
             local info = card and card_db[card.getName()] or nil
 
@@ -3088,6 +3112,11 @@ function updateHelpText(playerColor)
                 node = node.next
             end
 
+            if planningTakeover then
+                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
+                return
+            end
+
             if takeoverPhase then
                 if p.beingTargeted then
                     setHelpText(playerColor, "Settle: defend against takeover.")
@@ -3121,11 +3150,6 @@ function updateHelpText(playerColor)
                 end
             end
         else
-            if planningTakeover(playerColor) then
-                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
-                return
-            end
-
             if placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Settle: waiting for other players.")
