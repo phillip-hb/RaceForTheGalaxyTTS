@@ -32,6 +32,13 @@ function split(str, delimiter)
     return fields
 end
 
+function appendList(list, add)
+    for _, item in pairs(add) do
+        list[#list + 1] = item
+    end
+    return list
+end
+
 function tableLength(tbl)
     local count = 0
     for k, v in pairs(tbl) do count = count + 1 end

@@ -48,7 +48,6 @@ function player(i)
         prestigeCount = 0,
         consumedPrestige = 0,
         markedConsumedGoods = {},
-        markedDiscards = {}
     }
 end
 
@@ -277,6 +276,14 @@ function isTakeoverPower(power)
     end
 
     return nil
+end
+
+function cardAlreadyUsedInit()
+    return {
+        strength = 0,
+        markedDiscards = {},
+        markedGoods = {}
+    }
 end
 
 -- converts the raw phase value into corresponding actual phase. Use selectedPhases[currentPhaseIndex] to get the raw value instead.
@@ -532,7 +539,7 @@ function toggleEnforceRulesClick(obj, player)
     broadcastToAll("Enforce rules has been turned " .. (enforceRules and "ON." or "OFF."), "Purple")
 end
 
--- returns number of cards discarded from hand
+-- returns guid of cards discarded as list
 function discardMarkedCards(player, markForDiscard)
     if markForDiscard == nil then markForDiscard = false end
 
@@ -541,10 +548,10 @@ function discardMarkedCards(player, markForDiscard)
         if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
             if markForDiscard and not obj.hasTag("Marked") then
                 obj.addTag("Marked")
-                cards[#cards + 1] = obj
+                cards[#cards + 1] = obj.getGUID()
             elseif not markForDiscard then
                 discardCard(obj)
-                cards[#cards + 1] = obj
+                cards[#cards + 1] = obj.getGUID()
             end
         end
     end
@@ -1754,6 +1761,7 @@ end
 function startDevelopPhase()
     for player, data in pairs(playerData) do
         data.cardsAlreadyUsed = {}
+        data.miscSelectedCards = {}
         capturePowersSnapshot(player, "2")
 
         if data.powersSnapshot["DRAW"] then
@@ -2397,7 +2405,7 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
-                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name .. power.index] >= power.strength
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
 
                         if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
@@ -2498,7 +2506,7 @@ function updateTableauState(player)
                 if not selectedCard and ap then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
-                        if (not used or not used[name .. power.index]) and baseAmount[name] <= goodslimit then
+                        if (not used or not used[name]) and baseAmount[name] <= goodslimit then
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
                             local prefix = (currentPhase == "4" and optionalPowers[name]) and "(Optional) " or ""
@@ -2544,7 +2552,7 @@ function updateTableauState(player)
                             windfallCountTarget = windfallCountTarget - 1
                         end
 
-                        if used and used[name .. power.index] or
+                        if used and used[name] or
                             power.codes["PRODUCE"] and open or 
                             windfallPrefix and targetGood == "ANY" and windfallCount["TOTAL"] <= 0 or
                             windfallPrefix and windfallCountTarget and windfallCountTarget <= 0 then
@@ -2612,27 +2620,34 @@ function markUsed(player, card, power, n)
     local p = playerData[player]
 
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
+    local data = cardAlreadyUsedInit()
+
+    data.strength = data.strength + (n or 1)
 
     p.selectedGoods = {}
-    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
     p.selectedCard = nil
     p.selectedCardPower = ""
     p.miscSelectedCards = {}
     p.usedPower = true
 
-    queueUpdate(player, true)
+    p.cardsAlreadyUsed[card.getGUID()][power.name] = data
+
+    return data
 end
 
 function markUsedMisc(player, card, power, n)
     local p = playerData[player]
 
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
+    local data = p.cardsAlreadyUsed[card.getGUID()][power.name] or cardAlreadyUsedInit()
+
+    data.strength = data.strength + (n or 1)
 
     p.selectedGoods = {}
-    p.cardsAlreadyUsed[card.getGUID()][power.name .. power.index] = n or 1
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, card.getGUID())
+    p.cardsAlreadyUsed[card.getGUID()][power.name] = data
 
-    queueUpdate(player, true)
+    return data
 end
 
 function getActivePower(name, phase, powerIndex)
@@ -2677,11 +2692,13 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                 if p.selectedCardPower == "DRAW" then
                     dealTo(power.strength, player)
                     markUsed(player, obj, power)
+                    queueUpdate(player, true)
                     return
                 elseif p.selectedCardPower == "VP" then
                     local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
                     getVpChips(player, power.strength * vpMultiplier)
                     markUsed(player, obj, power)
+                    queueUpdate(player, true)
                     return
                 end
                 break
@@ -2836,21 +2853,18 @@ function confirmPowerClick(obj, player, rightClick)
         end, 1)
         return
     elseif currentPhase == "2" or currentPhase == "3" then
+        local marked = {}
         local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
         local n = 0
         power = node.power
         if power.name == "MILITARY_HAND" then
-            local marked = discardMarkedCards(player, not takeoverPhase)
+            marked = discardMarkedCards(player, not takeoverPhase)
             local usedAmount = 0
-            if p.cardsAlreadyUsed[obj.getGUID()] and p.cardsAlreadyUsed[obj.getGUID()][power.name .. power.index] then
-                usedAmount = p.cardsAlreadyUsed[obj.getGUID()][power.name .. power.index]
+            if p.cardsAlreadyUsed[obj.getGUID()] and p.cardsAlreadyUsed[obj.getGUID()][power.name] then
+                usedAmount = p.cardsAlreadyUsed[obj.getGUID()][power.name].strength
             end
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength - usedAmount)
-
-            for _, card in pairs(marked) do
-                p.markedDiscards[card.getGUID()] = power
-            end
             refreshTakeoverMenu(player)
         elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             n = 1
@@ -2864,7 +2878,11 @@ function confirmPowerClick(obj, player, rightClick)
 
         if n == 0 then return end
 
-        markUsedMisc(player, obj, power, n)
+        local data = markUsedMisc(player, obj, power, n)
+        if #marked > 0 then
+            data.markedDiscards = appendList(data.markedDiscards, marked)
+        end
+        queueUpdate(player, true)
         return
     elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
@@ -2910,6 +2928,7 @@ function confirmPowerClick(obj, player, rightClick)
     end
 
     markUsed(player, obj, power)
+    queueUpdate(player, true)
 end
 
 function goodSelectClick(slot, player, rightClick)
@@ -3178,8 +3197,8 @@ function updateHelpText(playerColor)
                     elseif miscPowers["MILITARY_HAND"] then
                         local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
                         local usedAmount = 0
-                        if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index] then
-                            usedAmount = p.cardsAlreadyUsed[node.value][node.power.name .. node.power.index]
+                        if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name] then
+                            usedAmount = p.cardsAlreadyUsed[node.value][node.power.name].strength
                         end
                         if discarded + usedAmount < miscPowers["MILITARY_HAND"].strength then
                             p.canFlip = true
