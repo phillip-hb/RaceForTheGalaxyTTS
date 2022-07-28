@@ -2784,13 +2784,13 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     queueUpdate(player, true)
 end
 
-function cancelMarkedCards(player, selectedCard)
+function cancelMarkedCards(player, selectedCardGuid)
     local p = playerData[player]
     if not p then return end
 
     for cardGuid, useData in pairs(p.cardsAlreadyUsed) do
         for powerName, info in pairs(useData) do
-            if info.selectedCard == selectedCard.getGUID() and canCancelAfter[powerName] then
+            if info.selectedCard == selectedCardGuid and canCancelAfter[powerName] then
                 for _, guid in pairs(info.markedDiscards) do
                     local card = getObjectFromGUID(guid)
                     card.setTags({})
@@ -2798,6 +2798,8 @@ function cancelMarkedCards(player, selectedCard)
                     if card.is_face_down then
                         card.flip()
                     end
+
+                    if powerName == "MILITARY_HAND" then p.tempMilitary = p.tempMilitary - 1 end
                 end
 
                 for _, guid in pairs(info.markedGoods) do
@@ -2823,7 +2825,7 @@ function cancelPowerClick(obj, player, rightClick)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if getCurrentPhase() == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
-        cancelMarkedCards(player, obj)
+        cancelMarkedCards(player, p.selectedCard)
         -- for goodsGuid, data in pairs(p.markedConsumedGoods) do
         --     if data.value == obj.getGUID() then
         --         local good = getObjectFromGUID(goodsGuid)
@@ -3092,7 +3094,7 @@ function cardCancelClick(object, player, rightClick)
 
     local p = playerData[player]
 
-    cancelMarkedCards(player, object)
+    cancelMarkedCards(player, object.getGUID())
 
     p.selectedCard = nil
     p.selectedCardPower = ""
