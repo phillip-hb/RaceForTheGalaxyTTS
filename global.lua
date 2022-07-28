@@ -1854,6 +1854,26 @@ function capturePowersSnapshot(player, phase)
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
+        local phase3Ap = info.activePowers["3"]
+
+        -- Check if have takeover powers
+        if not results["TAKEOVER_POWERS"] and phase3Ap then
+            for name, ap in pairs(phase3Ap) do
+                if takeoverPowers[name] then
+                    results["TAKEOVER_POWERS"] = 1
+                    goto out
+                else
+                    for code, _ in pairs(ap.codes) do
+                        if takeoverPowers[code] then
+                            results["TAKEOVER_POWERS"] = 1
+                            goto out
+                        end
+                    end
+                end
+            end
+        end
+
+        ::out::
 
         -- Place two triggered, skip the action card power and the last played card's powers
         if (placeTwoPhase or takeoverPhase) and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then

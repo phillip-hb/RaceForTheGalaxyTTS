@@ -1716,7 +1716,8 @@ activePowers = {
           MILITARY_HAND = "Discard from hand for bonus military.",
           TAKEOVER_IMPERIUM = "Takeover military world from IMPERIUM tableau.",
           TAKEOVER_REBEL = "Takeover REBEL military world.",
-          CONSUME_PRESTIGE = "Discard prestige to "
+          CONSUME_PRESTIGE = "Discard prestige to ",
+          TAKEOVER_PRESTIGE = "Spend prestige to takeover military world."
      },
      ["4"] = {
           TRADE_ACTION = "Sell a good.",
@@ -1756,6 +1757,13 @@ subtooltip = {
      REDUCE_ZERO = "settle normal world (non-Alien) for free.",
      EXTRA_MILITARY = "gain extra military.",
      TAKEOVER_MILITARY = "perform takeover."
+}
+
+takeoverPowers = {
+     ["TAKEOVER_MILITARY"] = 1,
+     ["TAKEOVER_REBEL"] = 1,
+     ["TAKEOVER_IMPERIUM"] = 1,
+     ["TAKEOVER_PRESTIGE"] = 1
 }
 
 function loadData(expansions)
