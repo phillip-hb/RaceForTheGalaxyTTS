@@ -69,6 +69,7 @@ transitionNextPhase = false
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
     ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
+canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
      ["RARE"] = color(0.709, 0.407, 0.129),
@@ -280,6 +281,7 @@ end
 
 function cardAlreadyUsedInit()
     return {
+        selectedCard = nil,
         strength = 0,
         markedDiscards = {},
         markedGoods = {}
@@ -2405,7 +2407,7 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
-                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
 
                         if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
                             miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
@@ -2446,7 +2448,7 @@ function updateTableauState(player)
                         if powerName ~= "" and not miscSelected and not used then
                             dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected or (used and (name == "CONSUME_RARE" or name == "CONSUME_GENE")) then
+                        elseif miscSelected or (used and canCancelAfter[name]) then
                             dontAutoPass = true
                             createCancelButton(card)
 
@@ -2622,6 +2624,7 @@ function markUsed(player, card, power, n)
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
     local data = cardAlreadyUsedInit()
 
+    data.selectedCard = p.selectedCard
     data.strength = data.strength + (n or 1)
 
     p.selectedGoods = {}
@@ -2641,6 +2644,7 @@ function markUsedMisc(player, card, power, n)
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
     local data = p.cardsAlreadyUsed[card.getGUID()][power.name] or cardAlreadyUsedInit()
 
+    data.selectedCard = p.selectedCard
     data.strength = data.strength + (n or 1)
 
     p.selectedGoods = {}
@@ -2780,6 +2784,31 @@ function usePowerClick(obj, player, rightClick, powerIndex)
     queueUpdate(player, true)
 end
 
+function cancelMarkedCards(player, selectedCard)
+    local p = playerData[player]
+    if not p then return end
+
+    for cardGuid, useData in pairs(p.cardsAlreadyUsed) do
+        for powerName, info in pairs(useData) do
+            if info.selectedCard == selectedCard.getGUID() and canCancelAfter[powerName] then
+                for _, guid in pairs(info.markedDiscards) do
+                    local card = getObjectFromGUID(guid)
+                    card.setTags({})
+                    highlightOff(card)
+                    if card.is_face_down then
+                        card.flip()
+                    end
+                end
+
+                for _, guid in pairs(info.markedGoods) do
+                end
+
+                p.cardsAlreadyUsed[cardGuid] = nil
+            end
+        end
+    end
+end
+
 function cancelPowerClick(obj, player, rightClick)
     if rightClick then return end
     if getOwner(obj) ~= player then
@@ -2794,14 +2823,15 @@ function cancelPowerClick(obj, player, rightClick)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if getCurrentPhase() == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
-        for goodsGuid, data in pairs(p.markedConsumedGoods) do
-            if data.value == obj.getGUID() then
-                local good = getObjectFromGUID(goodsGuid)
-                p.markedConsumedGoods[goodsGuid] = nil
-                p.cardsAlreadyUsed[obj.getGUID()] = nil
-                if good then displayXOff(good) end
-            end
-        end
+        cancelMarkedCards(player, obj)
+        -- for goodsGuid, data in pairs(p.markedConsumedGoods) do
+        --     if data.value == obj.getGUID() then
+        --         local good = getObjectFromGUID(goodsGuid)
+        --         p.markedConsumedGoods[goodsGuid] = nil
+        --         p.cardsAlreadyUsed[obj.getGUID()] = nil
+        --         if good then displayXOff(good) end
+        --     end
+        -- end
     elseif getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
         p.selectedCard = nil
         p.selectedCardPower = ""
@@ -3062,6 +3092,8 @@ function cardCancelClick(object, player, rightClick)
 
     local p = playerData[player]
 
+    cancelMarkedCards(player, object)
+
     p.selectedCard = nil
     p.selectedCardPower = ""
     p.miscSelectedCards = {}
@@ -3069,12 +3101,12 @@ function cardCancelClick(object, player, rightClick)
     object.removeTag("Selected")
     highlightOff(object)
 
-    for goodsGuid, data in pairs(p.markedConsumedGoods) do
-        local good = getObjectFromGUID(goodsGuid)
-        p.cardsAlreadyUsed[data.value] = nil
-        p.markedConsumedGoods[goodsGuid] = nil
-        if good then displayXOff(good) end
-    end
+    -- for goodsGuid, data in pairs(p.markedConsumedGoods) do
+    --     local good = getObjectFromGUID(goodsGuid)
+    --     p.cardsAlreadyUsed[data.value] = nil
+    --     p.markedConsumedGoods[goodsGuid] = nil
+    --     if good then displayXOff(good) end
+    -- end
 
     for _, obj in pairs(Player[player].getHandObjects(1)) do
         if obj.is_face_down then
