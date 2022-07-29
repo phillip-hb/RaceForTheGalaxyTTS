@@ -28,6 +28,21 @@ function createCancelButtonOnCard(card)
     })
 end
 
+function createSelectWorldButton(card)
+    local slot = getCardSlot(card)
+    slot.createButton({
+        click_function = "worldSelectClick",
+        function_owner = self,
+        position = {0.16, 3, -0.38},
+        width = 560,
+        height = 350,
+        font_size = 150,
+        color = color(0, 1, 1, 0.5),
+        scale = {0.5, 1, 0.3},
+        tooltip = 'Select "' .. card.getName() .. '"'
+    })
+end
+
 function createCardBottomButton(card, text, func)
     local slot = getCardSlot(card)
     slot.createButton({

@@ -1720,7 +1720,8 @@ activePowers = {
           CONSUME_PRESTIGE = "Discard prestige to ",
           TAKEOVER_PRESTIGE = "Spend prestige to takeover military world.",
           CONSUME_RARE = "Consume Rare good.",
-          CONSUME_GENE = "Consume Genes good."
+          CONSUME_GENE = "Consume Genes good.",
+          UPGRADE_WORLD = "Replace a world on tableau."
      },
      ["4"] = {
           TRADE_ACTION = "Sell a good.",
