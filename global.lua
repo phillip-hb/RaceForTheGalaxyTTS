@@ -47,7 +47,7 @@ function player(i)
         prestigeChips = {},
         prestigeCount = 0,
         consumedPrestige = 0,
-        markedConsumedGoods = {},
+        markedGoods = {},
     }
 end
 
@@ -87,7 +87,7 @@ compatible = {
     ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1},
+    ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1,["CONSUME_GENE"]=1},
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -282,6 +282,7 @@ end
 function cardAlreadyUsedInit()
     return {
         selectedCard = nil,
+        triggerCard = nil,
         strength = 0,
         markedDiscards = {},
         markedGoods = {}
@@ -1246,7 +1247,7 @@ function checkAllReadyCo()
 
     for _, player in pairs(players) do
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
-        if not readyToken.getVar("isReady") then return 1 end
+        if readyToken and not readyToken.getVar("isReady") then return 1 end
     end
 
     transitionNextPhase = true
@@ -1284,8 +1285,8 @@ function checkAllReadyCo()
         end
 
         -- remove marked goods
-        for goodGuid, usedPower in pairs(p.markedConsumedGoods) do
-            local good = getObjectFromGUID(goodGuid)
+        for guid, v in pairs(p.markedGoods) do
+            local good = getObjectFromGUID(guid)
             if good then
                 displayXOff(good)
                 discardCard(good)
@@ -1669,6 +1670,7 @@ function beginNextPhase()
         if not mustDiscard then
             startNewRound()
         else
+            sound.AssetBundle.playTriggerEffect(1)
             for player, skip in pairs(skipPlayers) do
                 playerData[player].canReady = true
                 updateReadyButtons({player, true})
@@ -1882,19 +1884,17 @@ function capturePowersSnapshot(player, phase)
             for name, ap in pairs(phase3Ap) do
                 if takeoverPowers[name] then
                     results["TAKEOVER_POWERS"] = 1
-                    goto out
+                    break
                 else
                     for code, _ in pairs(ap.codes) do
                         if takeoverPowers[code] then
                             results["TAKEOVER_POWERS"] = 1
-                            goto out
+                            break
                         end
                     end
                 end
             end
         end
-
-        ::out::
 
         -- Place two triggered, skip the action card power and the last played card's powers
         if (placeTwoPhase or takeoverPhase) and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
@@ -1978,7 +1978,7 @@ function capturePowersSnapshot(player, phase)
         end
 
         -- Count base military for stat display purposes
-        if phase ~= "3" and info.passivePowers["3"] then               
+        if phase ~= "3" and info.passivePowers["3"] then            
             local mil = info.passivePowers["3"]["EXTRA_MILITARY"]
             if mil and next(mil.codes) == nil then
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
@@ -2255,7 +2255,7 @@ function updateTableauState(player)
                 local selectedCardPower = p.selectedCardPower
                 obj.highlightOn(goodsHighlightColor[parentData.goods])
 
-                if p.markedConsumedGoods[obj.getGUID()] then
+                if p.markedGoods[obj.getGUID()] then
                     displayXOn(obj, player)
                 else
                     if parentData.goods == "ANY" then
@@ -2646,6 +2646,7 @@ function markUsedMisc(player, card, power, n)
 
     data.selectedCard = p.selectedCard
     data.strength = data.strength + (n or 1)
+    data.triggerCard = card.getGUID()
 
     p.selectedGoods = {}
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, card.getGUID())
@@ -2767,7 +2768,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
     local takeoverName = isTakeoverPower(power)
     if useTakeovers and currentPhase == "3" then
-        refreshTakeoverMenu(player)
         if takeoverName ~= nil then
             p.takeoverSource = obj.getGUID()
             p.takeoverPower = power
@@ -2778,35 +2778,47 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
             p.powersSnapshot["BONUS_MILITARY"] = p.powersSnapshot["BONUS_MILITARY"] + power.strength
         end
+        refreshTakeoverMenu(player)
         --Wait.frames(function() refreshTakeoverMenu(player) end, 1)
     end
 
     queueUpdate(player, true)
 end
 
-function cancelMarkedCards(player, selectedCardGuid)
+function cancelAllMarkedCards(player, selectedCardGuid)
+    local p = playerData[player]
+    for guid, data in pairs(p.cardsAlreadyUsed) do
+        if data.selectedCard == selectedCardGuid then
+            cancelMarkedCards(player, guid)
+        end
+    end
+end
+
+function cancelMarkedCards(player, triggerCardGuid)
     local p = playerData[player]
     if not p then return end
 
-    for cardGuid, useData in pairs(p.cardsAlreadyUsed) do
-        for powerName, info in pairs(useData) do
-            if info.selectedCard == selectedCardGuid and canCancelAfter[powerName] then
-                for _, guid in pairs(info.markedDiscards) do
-                    local card = getObjectFromGUID(guid)
-                    card.setTags({})
-                    highlightOff(card)
-                    if card.is_face_down then
-                        card.flip()
-                    end
-
-                    if powerName == "MILITARY_HAND" then p.tempMilitary = p.tempMilitary - 1 end
+    local useData = p.cardsAlreadyUsed[triggerCardGuid]
+    for powerName, info in pairs(useData) do
+        if canCancelAfter[powerName] then
+            for _, guid in pairs(info.markedDiscards) do
+                local card = getObjectFromGUID(guid)
+                card.setTags({})
+                highlightOff(card)
+                displayXOff(card)
+                if card.is_face_down then
+                    card.flip()
                 end
 
-                for _, guid in pairs(info.markedGoods) do
-                end
-
-                p.cardsAlreadyUsed[cardGuid] = nil
+                if powerName == "MILITARY_HAND" then p.tempMilitary = p.tempMilitary - 1 end
             end
+
+            for guid, v in pairs(info.markedGoods) do
+                local card = getObjectFromGUID(guid)
+                displayXOff(card)
+                p.markedGoods[guid] = nil
+            end
+            p.cardsAlreadyUsed[triggerCardGuid] = nil
         end
     end
 end
@@ -2820,25 +2832,24 @@ function cancelPowerClick(obj, player, rightClick)
 
     if obj.hasTag("Slot") then obj = getCard(obj) end
     local p = playerData[player]
+    local currentPhase = getCurrentPhase()
+    local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
+
+    if node and currentPhase == 3 then
+        
+    end
 
     p.handCountSnapshot = countCardsInHand(player, true)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
-    if getCurrentPhase() == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
-        cancelMarkedCards(player, p.selectedCard)
-        -- for goodsGuid, data in pairs(p.markedConsumedGoods) do
-        --     if data.value == obj.getGUID() then
-        --         local good = getObjectFromGUID(goodsGuid)
-        --         p.markedConsumedGoods[goodsGuid] = nil
-        --         p.cardsAlreadyUsed[obj.getGUID()] = nil
-        --         if good then displayXOff(good) end
-        --     end
-        -- end
-    elseif getCurrentPhase() ~= 3 and getCurrentPhase() ~= 2 then
+    if currentPhase == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
+        cancelMarkedCards(player, obj.getGUID())
+        refreshTakeoverMenu(player)
+    elseif currentPhase ~= 3 and currentPhase ~= 2 then
         p.selectedCard = nil
         p.selectedCardPower = ""
         p.selectedGoods = {}
-    elseif useTakeovers and getCurrentPhase() == 3 then
+    elseif useTakeovers and currentPhase == 3 then
         if not p.miscSelectedCards.value then
             Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
             p.takeoverSource = nil
@@ -2971,12 +2982,13 @@ function goodSelectClick(slot, player, rightClick)
     end
 
     local parentCard = getCard(slot)
-
     local currentPhase = tostring(getCurrentPhase())
     local p = playerData[player]
     local guid = p.selectedCard
     local powerName = p.selectedCardPower
     local node = getLastNode(p.miscSelectedCards)
+
+    log(p.miscSelectedCards)
 
     if currentPhase == "3" then
         guid = node.value
@@ -2994,9 +3006,10 @@ function goodSelectClick(slot, player, rightClick)
         local good = getGoods(parentCard)
         if good == nil then broadcastToColor("Invalid goods selected.", player, color(1,0,0)) end
 
-        p.markedConsumedGoods[good.getGUID()] = node
+        p.markedGoods[good.getGUID()] = node
         displayXOn(good, player)
-        markUsedMisc(player, selectedCard, power, power.strength)
+        local data = markUsedMisc(player, selectedCard, power, power.strength)
+        data.markedGoods[good.getGUID()] = true
         queueUpdate(player, true)
         return
     elseif currentPhase == "4" then    -- consume the goods card
@@ -3094,7 +3107,7 @@ function cardCancelClick(object, player, rightClick)
 
     local p = playerData[player]
 
-    cancelMarkedCards(player, object.getGUID())
+    cancelAllMarkedCards(player)
 
     p.selectedCard = nil
     p.selectedCardPower = ""
@@ -3102,13 +3115,6 @@ function cardCancelClick(object, player, rightClick)
 
     object.removeTag("Selected")
     highlightOff(object)
-
-    -- for goodsGuid, data in pairs(p.markedConsumedGoods) do
-    --     local good = getObjectFromGUID(goodsGuid)
-    --     p.cardsAlreadyUsed[data.value] = nil
-    --     p.markedConsumedGoods[goodsGuid] = nil
-    --     if good then displayXOff(good) end
-    -- end
 
     for _, obj in pairs(Player[player].getHandObjects(1)) do
         if obj.is_face_down then
@@ -3220,35 +3226,37 @@ function updateHelpText(playerColor)
 
             while node and node.value do
                 local miscCard = getObjectFromGUID(node.value)
-                local miscPowers = card_db[miscCard.getName()].activePowers["3"]
-                if miscPowers then
-                    if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
-                        reduceZero = true
-                        reduceZeroName = miscCard.getName()
-                    elseif miscPowers["PAY_MILITARY"] then
-                        payMilitary = true
-                        payMilitaryStr = miscPowers["PAY_MILITARY"].strength
-                    elseif miscPowers["MILITARY_HAND"] then
-                        local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
-                        local usedAmount = 0
-                        if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name] then
-                            usedAmount = p.cardsAlreadyUsed[node.value][node.power.name].strength
-                        end
-                        if discarded + usedAmount < miscPowers["MILITARY_HAND"].strength then
-                            p.canFlip = true
-                        end
+                if miscCard then
+                    local miscPowers = card_db[miscCard.getName()].activePowers["3"]
+                    if miscPowers then
+                        if miscPowers["DISCARD"] and miscPowers["DISCARD"].codes["REDUCE_ZERO"] then
+                            reduceZero = true
+                            reduceZeroName = miscCard.getName()
+                        elseif miscPowers["PAY_MILITARY"] then
+                            payMilitary = true
+                            payMilitaryStr = miscPowers["PAY_MILITARY"].strength
+                        elseif miscPowers["MILITARY_HAND"] then
+                            local discardCount = p.handCountSnapshot - countCardsInHand(playerColor, false)
+                            local usedAmount = 0
+                            if p.cardsAlreadyUsed[node.value] and p.cardsAlreadyUsed[node.value][node.power.name] then
+                                usedAmount = p.cardsAlreadyUsed[node.value][node.power.name].strength
+                            end
+                            if discarded + usedAmount < miscPowers["MILITARY_HAND"].strength then
+                                p.canFlip = true
+                            end
 
-                        setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded + usedAmount .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
-                        return
-                    elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
-                        doMilitary = true
-                        militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
+                            setHelpText(playerColor, "▼ Settle: discard for bonus military. (" .. discarded + usedAmount .. "/" .. miscPowers["MILITARY_HAND"].strength .. ")")
+                            return
+                        elseif miscPowers["DISCARD_CONQUER_SETTLE"] then
+                            doMilitary = true
+                            militaryDiscount = miscPowers["DISCARD_CONQUER_SETTLE"].strength
+                        end
                     end
                 end
                 node = node.next
             end
 
-            for goodsGuid, usedPowers in pairs(p.markedConsumedGoods) do
+            for goodsGuid, usedPowers in pairs(p.markedGoods) do
                 if usedPowers.power.codes["REDUCE"] then
                     payDiscount = payDiscount + usedPowers.power.strength
                 end
