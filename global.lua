@@ -882,6 +882,10 @@ function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
                 --object.setRotation({rot[1], rot[2], 0})
                 return false
             end
+
+            if p.upgradeWorldNew == object.getGUID() and flip == 180 then
+                return false
+            end
         end
 
         if flip == 180 then
@@ -2158,8 +2162,11 @@ function updateHandState(playerColor)
 
     for _, obj in pairs(Player[playerColor].getHandObjects(1)) do
         local info = card_db[obj.getName()]
-
         obj.clearButtons()
+
+        if p.upgradeWorldNew == obj.getGUID() then
+            highlightOn(obj, "Purple", playerColor)
+        end
 
         if transitionNextPhase then
         else
@@ -2187,7 +2194,7 @@ function updateHandState(playerColor)
                 end
             elseif
                 (phase == 2 and info and info.type == 2 and not p.beforeDevelop) or    -- Make buttons on development or world cards if appropriate phase
-                (phase == 3 and info and info.type == 1 and not exploreAfterPhase) then
+                (phase == 3 and info and info.type == 1 and not exploreAfterPhase and p.upgradeWorldNew ~= obj.getGUID()) then
                 if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
                     goto skip
                 end
@@ -2517,6 +2524,10 @@ function updateTableauState(player)
                     end
                 end
 
+                if card.getGUID() == p.upgradeWorldOld then
+                    highlightOn(card, "Red", player)
+                end
+
                 -- Create buttons for active powers
                 if ap and (selectedCard or miscActiveNode or p.beingTargeted) then
                     for name, power in pairs(ap) do
@@ -2585,8 +2596,13 @@ function updateTableauState(player)
                     for name, power in pairs(ap) do
                         -- make buttons for takeover powers
                         if useTakeovers and isTakeoverPower(power) and not miscSelected or ap["UPGRADE_WORLD"] then
+                            local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
                             dontAutoPass = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                            if not used then
+                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
+                            elseif ap["UPGRADE_WORLD"] then
+                                createCancelButton(card)
+                            end
                         end
                     end
                 end
@@ -2976,8 +2992,13 @@ function cancelPowerClick(obj, player, rightClick)
     local p = playerData[player]
     local currentPhase = getCurrentPhase()
     local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
+    local info = card_db[obj.getName()]
 
-    if currentPhase == 3 and isUpgradingWorld(player) then
+    if currentPhase == 3 and (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
+        if p.upgradeWorldNew then
+            local card = getObjectFromGUID(p.upgradeWorldNew)
+            highlightOff(card)
+        end
         p.upgradeWorldOld = nil
         p.upgradeWorldNew = nil
     end
@@ -3087,6 +3108,13 @@ function confirmPowerClick(obj, player, rightClick)
             n = power.strength
             p.tempMilitary = p.tempMilitary + power.strength
             p.consumedPrestige = p.consumedPrestige + 1
+        elseif power.name == "UPGRADE_WORLD" then
+            if not p.upgradeWorldOld or not p.upgradeWorldNew then
+                broadcastToColor("Please select a world on your tableau and a new world to replace it.", player, "White")
+                return
+            else
+                n = power.strength
+            end
         end
 
         if n == 0 then return end
@@ -3262,12 +3290,21 @@ function cardSelectClick(object, player, rightClick)
         return
     end
 
-    p.selectedCard = object.getGUID()
-    p.handCountSnapshot = countCardsInHand(player, true)
-    p.selectedGoods = {}
-    object.addTag("Selected")
-    updateReadyButtons({player, false})
+    if isUpgradingWorld(player) then
+        if p.upgradeWorldOld then
+            -- local node = p.miscSelectedCards
+            -- markUsedMisc(player, getObjectFromGUID(node.value), node.power, 1)
+            -- p.miscSelectedCards = {}
+            p.upgradeWorldNew = object.getGUID()
+        end
+    else
+        p.selectedCard = object.getGUID()
+        p.handCountSnapshot = countCardsInHand(player, true)
+        p.selectedGoods = {}
+        object.addTag("Selected")
+    end
 
+    updateReadyButtons({player, false})
     queueUpdate(player, true)
 end
 
@@ -3308,6 +3345,7 @@ function worldSelectClick(object, player, rightClick)
 
     local p = playerData[player]
     p.upgradeWorldOld = object.getGUID()
+    p.updateWorldNew = nil
     queueUpdate(player, true)
 end
 
