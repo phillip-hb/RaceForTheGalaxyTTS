@@ -2415,32 +2415,39 @@ function updateTableauState(player)
                         end
 
                         if not used then
-                            if miscSelectedCount <= 0 then
-                                if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedInfo and selectedInfo.goods ~= "ALIEN" and not selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
-                                    powerName = name
-                                elseif name == "DISCARD_CONQUER_SETTLE" and selectedInfo and not selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif name == "PAY_MILITARY" and selectedInfo and selectedInfo.flags["MILITARY"] and
-                                        (not next(power.codes) and selectedInfo.goods ~= "ALIEN" or 
-                                        power.codes["ALIEN"] and selectedInfo.goods == "ALIEN" or 
-                                        power.codes["AGAINST_CHROMO"] and selectedInfo.flags["CHROMO"])  then
-                                    powerName = name
-                                elseif name == "MILITARY_HAND" and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
-                                    powerName = name
-                                elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] and p.prestigeCount > 0 then
-                                    powerName = name
-                                elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and selectedInfo and not selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedInfo and selectedInfo.flags["MILITARY"] then
-                                    powerName = name
-                                end
-                            elseif not miscSelectedCardsTable[card.getGUID()] and not takeoverPhase then
+                            local selectedMilitary = selectedInfo and selectedInfo.flags["MILITARY"]
+                            local selectedAlien = selectedInfo.goods == "ALIEN"
+
+                            if miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
+
+                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedMilitary and not selectedAlien then
+                                powerName = name
+                            elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
+                                powerName = name
+                            elseif name == "DISCARD_CONQUER_SETTLE" and selectedMilitary then
+                                powerName = name
+                            elseif name == "PAY_MILITARY" and selectedMilitary and
+                                    (not next(power.codes) and not selectedAlien or 
+                                    power.codes["ALIEN"] and selectedAlien or 
+                                    power.codes["AGAINST_CHROMO"] and selectedInfo.flags["CHROMO"])  then
+                                powerName = name
+                            elseif name == "MILITARY_HAND" and (takeoverPhase or selectedMilitary) then
+                                powerName = name
+                            elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and selectedMilitary and p.prestigeCount > 0 then
+                                powerName = name
+                            elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and not selectedMilitary then
+                                powerName = name
+                            elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedMilitary then
+                                powerName = name
+                            end
+                        
+                            if powerName ~= "" and miscSelectedCount > 0 and not miscSelectedCardsTable[card.getGUID()] and not takeoverPhase then
                                 -- check for compatible chains
                                 local key = concatPowerName(power)
                                 if compatible[miscActiveNodePowerKey] and compatible[miscActiveNodePowerKey][key] then
                                     powerName = power.name
+                                else
+                                    powerName = ""
                                 end
                             end
                         end
@@ -2987,8 +2994,6 @@ function goodSelectClick(slot, player, rightClick)
     local guid = p.selectedCard
     local powerName = p.selectedCardPower
     local node = getLastNode(p.miscSelectedCards)
-
-    log(p.miscSelectedCards)
 
     if currentPhase == "3" then
         guid = node.value
