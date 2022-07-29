@@ -1376,6 +1376,7 @@ function checkAllReadyCo()
     local placeTwo = {false,false,false,false}
     local placeTwoTriggered = false
     for _, player in pairs(players) do
+        local p = playerData[player]
         for _, obj in pairs(Player[player].getHandObjects(1)) do
             if obj.type == 'Card' and obj.hasTag("Selected") then
                 attemptPlayCard(obj, player)
@@ -1385,7 +1386,42 @@ function checkAllReadyCo()
             end
         end
 
-        local p = playerData[player]
+        -- Upgrade world
+        if p.upgradeWorldOld and p.upgradeWorldNew then
+            local old = getObjectFromGUID(p.upgradeWorldOld)
+            local new = getObjectFromGUID(p.upgradeWorldNew)
+            local newInfo = card_db[new.getName()]
+            local oldPos = old.getPosition()
+            local oldRot = old.getRotation()
+
+            highlightOff(old)
+            highlightOff(new)
+
+            local good = getGoods(old)
+            if good then discardCard(good) end
+            discardCard(old)
+
+            new.setPosition(oldPos)
+            new.setRotation(oldRot)
+            new.setLock(true)
+
+            p.ignoreCards[#p.ignoreCards + 1] = new
+
+            if newInfo.flags["WINDFALL"] then
+                wait(0.1)
+                placeGoodsAt(new.positionToWorld(goodsSnapPointOffset), oldRot[2], player)
+            end
+
+            if expansionLevel >= 3 then
+                local n = 1
+                if newInfo.flags["PRESTIGE"] then
+                    n = n + 1
+                end
+                getPrestigeChips(player, n)
+            end
+        end
+
+        -- Set flags for improved logistics
         if not placeTwoPhase and phase == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
             placeTwo[p.index] = true
             placeTwoPhase = true
