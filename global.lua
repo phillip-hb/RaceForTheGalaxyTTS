@@ -3241,10 +3241,17 @@ function updateHelpText(playerColor)
     -- develop
     elseif currentPhase == 2 then
         if p.beforeDevelop then
-            local discardTarget = p.powersSnapshot["MUST_DISCARD"]
-            if discarded < discardTarget then p.canFlip = true end
-            setHelpText(playerColor, "▼ Develop: discard from hand. (" .. discarded .. "/" .. discardTarget .. ")")
-        elseif p.selectedCard then
+            local discardTarget = p.powersSnapshot["MUST_DISCARD"] or 0
+            if discardTarget == 0 then
+                p.beforeDevelop = false
+            else
+                if discarded < discardTarget then p.canFlip = true end
+                setHelpText(playerColor, "▼ Develop: discard from hand. (" .. discarded .. "/" .. discardTarget .. ")")
+                return
+            end
+        end
+        
+        if p.selectedCard then
             local card = getObjectFromGUID(p.selectedCard)
             local info = card_db[card.getName()]
             local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
