@@ -2534,6 +2534,9 @@ function updateTableauState(player)
                             end
 
                             goodslimit = math.min(math.max(1, power.times * baseAmount[name]), goodslimit)
+                        elseif name == "CONSUME_PRESTIGE" then
+                            baseAmount[name] = 1
+                            goodslimit = p.prestigeCount
                         end
                     end
                 end
@@ -3024,7 +3027,8 @@ function confirmPowerClick(obj, player, rightClick)
             getPrestigeChips(player, times)
         end
     elseif p.selectedCardPower == "CONSUME_PRESTIGE" then
-        if power.codes["DRAW_3_CARDS"] then
+        p.consumedPrestige = p.consumedPrestige + 1
+        if power.codes["GET_3_CARD"] then
             dealTo(3, player)
         end
     end
