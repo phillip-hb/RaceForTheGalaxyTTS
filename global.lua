@@ -2923,6 +2923,7 @@ function confirmPowerClick(obj, player, rightClick)
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
     local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
+    local oldHandCount = p.handCountSnapshot
 
     p.handCountSnapshot = countCardsInHand(player)
 
@@ -2938,8 +2939,9 @@ function confirmPowerClick(obj, player, rightClick)
         return
     elseif currentPhase == "2" or currentPhase == "3" then
         if p.beforeDevelop then
-            local n = countDiscardInHand(player)
-            if n >= p.powersSnapshot["MUST_DISCARD"] then
+            local cardsInHand = countCardsInHand(player, false)
+            local discarded = oldHandCount - cardsInHand
+            if discarded >= p.powersSnapshot["MUST_DISCARD"] then
                 p.beforeDevelop = false
                 discardMarkedCards(player)
                 queueUpdate(player, true)
