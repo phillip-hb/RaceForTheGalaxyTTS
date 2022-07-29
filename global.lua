@@ -3302,7 +3302,7 @@ function updateHelpText(playerColor)
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
                     if payMilitary then
-                        payDiscount = payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
+                        payDiscount = payDiscount + payMilitaryStr + (p.powersSnapshot["PAY_DISCOUNT"] or 0)
                     end
                     local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0) - payDiscount)
                     if discarded >= discardTarget then p.canReady = true end
