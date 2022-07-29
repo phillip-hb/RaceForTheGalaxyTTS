@@ -12,6 +12,7 @@ takeoverPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
 searchPhase = false
+selectLastPhase = false
 expansionLevel = 0
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
@@ -177,6 +178,7 @@ function onSave()
     saved_data.enforceRules = enforceRules
     saved_data.expansionLevel = expansionLevel
     saved_data.searchPhase = searchPhase
+    saved_data.selectLastPhase = selectLastPhase
     return JSON.encode(saved_data)
 end
 
@@ -201,6 +203,7 @@ function onload(saved_data)
         enforceRules = data.enforceRules
         expansionLevel = data.expansionLevel
         searchPhase = data.searchPhase
+        selectLastPhase = data.selectLastPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -1125,6 +1128,9 @@ function playerReadyClicked(playerColor, forced, playSound)
     local p = playerData[playerColor]
     local count = getSelectedActionsCount(playerColor)
     local currentPhase = getCurrentPhase()
+    local maxCount = advanced2p and 2 or 1
+
+    if p.powersSnapshot["SELECT_LAST"] and not selectLastPhase then maxCount = maxCount - 1 end
 
     if transitionNextPhase then
         updateReadyButtons({playerColor, false})
@@ -1141,9 +1147,13 @@ function playerReadyClicked(playerColor, forced, playSound)
             updateReadyButtons({playerColor, false})
             return
         end
-    elseif currentPhaseIndex == 0 and (advanced2p and count < 2 or not advanced2p and count < 1) then
+    elseif currentPhaseIndex == 0 and (advanced2p and count < maxCount or not advanced2p and count < maxCount) then
         if advanced2p then
-            broadcastToColor("You must select 2 action cards!", playerColor, "White")
+            if p.powersSnapshot["SELECT_LAST"] then
+                broadcastToColor("You must select at least 1 action card!", playerColor, "White")
+            else
+                broadcastToColor("You must select 2 action cards!", playerColor, "White")
+            end
         else
             broadcastToColor("You must select an action card!", playerColor, "White")
         end
@@ -1245,10 +1255,16 @@ end
 function checkAllReadyCo()
     -- Check if all players are ready to move on to next step of game
     local players = getSeatedPlayersWithHands()
+    local triggerSelectLast = false
+    local selectLastPlayer = nil
 
     for _, player in pairs(players) do
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
         if readyToken and not readyToken.getVar("isReady") then return 1 end
+        if playerData[player].powersSnapshot["SELECT_LAST"] then
+            triggerSelectLast = true
+            selectLastPlayer = player
+        end
     end
 
     transitionNextPhase = true
@@ -1457,8 +1473,8 @@ function checkAllReadyCo()
             local selectedActions = {}
 
             for _, obj in pairs(zone.getObjects()) do
-                if obj.hasTag("Action Card") and obj.is_face_down then
-                    obj.flip()
+                if obj.hasTag("Action Card") then
+                    if obj.is_face_down then obj.flip() end
                     local name = split(getName(obj), " ")[1]
                     selectedActions[name] = true
                 end
@@ -1478,6 +1494,20 @@ function checkAllReadyCo()
             for name, value in pairs(selectedActions) do
                 if value then phases[name] = true end
             end
+        end
+
+        -- Check for select last
+        if triggerSelectLast and selectLastPlayer and not selectLastPhase then
+            wait(0.5)
+            transitionNextPhase = false
+            selectLastPhase = true
+            broadcastToAll((Player[selectLastPlayer].steam_name or selectLastPlayer) .. " gets to select an action card after all other players reveals theirs.", selectLastPlayer)
+            for _, player in pairs(players) do
+                if player ~= selectLastPlayer then
+                    updateReadyButtons({player, true})
+                end
+            end
+            return 1
         end
 
         for phase, _ in pairs(phases) do
@@ -1511,6 +1541,7 @@ function checkAllReadyCo()
 end
 
 function startNewRound()
+    selectLastPhase = false
     selectedPhases = {}
     resetPhaseTiles()
 
@@ -1916,6 +1947,7 @@ function capturePowersSnapshot(player, phase)
         if info.flags["GAME_END_14"] then results["GAME_END_14"] = 1 end
         if info.flags["IMPERIUM"] then results["IMPERIUM"] = 1 end
         if info.flags["TAKE_DISCARDS"] then results["TAKE_DISCARDS"] = 1 end
+        if info.flags["SELECT_LAST"] then results["SELECT_LAST"] = 1 end
 
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
