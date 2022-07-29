@@ -1707,7 +1707,8 @@ activePowers = {
      ["1"] = {
      },
      ["2"] = {
-          DISCARD_REDUCE = "Discard this card to reduce cost."
+          DISCARD_REDUCE = "Discard this card to reduce cost.",
+          CONSUME_RARE = "Consume Rare good."
      },
      ["3"] = {
           DISCARD = "Discard from tableau to ",

@@ -43,6 +43,7 @@ function player(i)
         canFlip = false,
         canConfirm = false,
         beforeExplore = false,
+        beforeDevelop = false,
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
@@ -621,7 +622,7 @@ function attemptPlayCard(card, player, fromTakeover)
             local isWindfall = info.flags["WINDFALL"]
 
             -- if windfall, place a goods on top
-            if isWindfall and not fromTakeover then
+            if (isWindfall or p.powersSnapshot["AUTO_PRODUCE"]) and not fromTakeover then
                 placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
             elseif isWindfall and fromTakeover and goods then
                 goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
@@ -1163,7 +1164,7 @@ function playerReadyClicked(playerColor, forced, playSound)
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = getLastNode(p.miscSelectedCards)
 
-        if node and node.power and requiresConfirm[concatPowerName(node.power)] then
+        if p.beforeDevelop or node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
@@ -1290,6 +1291,10 @@ function checkAllReadyCo()
             if good then
                 displayXOff(good)
                 discardCard(good)
+            end
+
+            if v.power.codes["EXTRA_MILITARY"] then
+                p.tempMilitary = p.tempMilitary + v.power.strength
             end
         end
 
@@ -1772,6 +1777,12 @@ function startDevelopPhase()
             dealTo(data.powersSnapshot["DRAW"], player)
         end
 
+        if data.powersSnapshot["EXPLORE"] then
+            data.handCountSnapshot = countCardsInHand(player) + data.powersSnapshot["EXPLORE"]
+            dealTo(data.powersSnapshot["EXPLORE"], player)
+            data.beforeDevelop = true
+        end
+
         updateHandState(player)
         updateHelpText(player)
     end
@@ -1871,8 +1882,8 @@ function capturePowersSnapshot(player, phase)
     local rebelMilitaryWorldCount = 0
     local militaryWorldCount = 0
     local tradeChromoBonus = false
-    local perMilitary = false
-    local perChromo = false
+    local perMilitary = 0
+    local perChromoWorld = 0
     local takeoverDefense = false
 
     for card in allCardsInTableau(player) do
@@ -1911,6 +1922,9 @@ function capturePowersSnapshot(player, phase)
             for name, power in pairs(powers) do
                 if not results[name] then
                     results[name] = 0
+                    if name == "EXPLORE" then
+                        results["MUST_DISCARD"] = 0
+                    end
                 end
 
                 -- count certain powers only in specific cases
@@ -1956,10 +1970,10 @@ function capturePowersSnapshot(player, phase)
 
                     if name == "EXTRA_MILITARY" and next(power.codes) ~= nil then
                         if power.codes["PER_MILITARY"] then
-                            perMilitary = true
+                            perMilitary = perMilitary + 1
                         end
                         if power.codes["PER_CHROMO"] then
-                            perChromo = true
+                            perChromoWorld = perChromoWorld + 1
                         end
                         goto skip
                     end
@@ -1967,6 +1981,9 @@ function capturePowersSnapshot(player, phase)
 
                 if name ~= "BONUS_MILITARY" then
                     results[name] = results[name] + power.strength
+                    if name == "EXPLORE" then
+                        results["MUST_DISCARD"] = results["MUST_DISCARD"] + 1
+                    end
                 end
 
                 if name == "TRADE_GENE" and power.codes["TRADE_BONUS_CHROMO"] then
@@ -1983,9 +2000,9 @@ function capturePowersSnapshot(player, phase)
             if mil and next(mil.codes) == nil then
                 results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + mil.strength
             elseif mil and mil.codes["PER_MILITARY"] then
-                perMilitary = true
+                perMilitary = perMilitary + 1
             elseif mil and mil.codes["PER_CHROMO"] then
-                perChromo = true
+                perChromoWorld = perChromoWorld + 1
             end
 
             mil = info.passivePowers["3"]["IMPERIUM_MILITARY"]
@@ -2020,12 +2037,12 @@ function capturePowersSnapshot(player, phase)
         results["TRADE_GENE"] = results["TRADE_GENE"] + chromoCount
     end
 
-    if perMilitary then
-        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + militaryWorldCount
+    if perMilitary > 0 then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + militaryWorldCount * perMilitary
     end
 
-    if perChromo then
-        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + chromoCount
+    if perChromoWorld > 0 then
+        results["EXTRA_MILITARY"] = results["EXTRA_MILITARY"] + results["CHROMO_WORLDS"] * perChromoWorld
     end
 
     if takeoverDefense then
@@ -2092,7 +2109,7 @@ function updateHandState(playerColor)
                         highlightOff(obj)
                     end
                 end
-            elseif (phase == 2 and info and info.type == 2) or    -- Make buttons on development or world cards if appropriate phase
+            elseif (phase == 2 and info and info.type == 2 and not p.beforeDevelop) or    -- Make buttons on development or world cards if appropriate phase
                 (phase == 3 and info and info.type == 1) then
                 if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
                     goto skip
@@ -2270,7 +2287,7 @@ function updateTableauState(player)
                     goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
 
                     -- change active selections based on the misc selected cards
-                    if currentPhase == "3" then
+                    if currentPhase == "2" or currentPhase == "3" then
                         activeCard = nil
                         activeInfo = nil
                         selectedCardPower = nil
@@ -2381,15 +2398,24 @@ function updateTableauState(player)
                     card.highlightOn("Yellow")
                     createConfirmButton(card)
                 end
-            elseif currentPhase == "2" and ap then
-                for name, power in pairs(ap) do
-                    if selectedCard then
-                        if miscSelectedCount <= 0 then
-                            dontAutoPass = true
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
-                        else
-                            dontAutoPass = true
-                            createCancelButton(card)
+            elseif currentPhase == "2" then
+                if p.beforeDevelop then
+                    local powers = info.passivePowers["2"]
+                    if powers and powers["EXPLORE"] then
+                        card.highlightOn("Yellow")
+                        createConfirmButton(card)
+                    end
+                elseif ap then
+                    for name, power in pairs(ap) do
+                        local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
+                        if selectedCard then
+                            if miscSelectedCount <= 0 and not used then
+                                dontAutoPass = true
+                                createUsePowerButton(card, power.index, info.activeCount[currentPhase], activePowers[currentPhase][name])
+                            elseif miscSelected or (used and canCancelAfter[name]) then
+                                dontAutoPass = true
+                                createCancelButton(card)
+                            end
                         end
                     end
                 end
@@ -2816,6 +2842,7 @@ function cancelMarkedCards(player, triggerCardGuid)
 end
 
 function cancelMarkedCard(player, powerName, useDataInfo)
+    local p = playerData[player]
     if canCancelAfter[powerName] then
         for _, guid in pairs(useDataInfo.markedDiscards) do
             local card = getObjectFromGUID(guid)
@@ -2832,7 +2859,7 @@ function cancelMarkedCard(player, powerName, useDataInfo)
         for guid, v in pairs(useDataInfo.markedGoods) do
             local card = getObjectFromGUID(guid)
             displayXOff(card)
-            playerData[player].markedGoods[guid] = nil
+            p.markedGoods[guid] = nil
         end
     end
 end
@@ -2856,7 +2883,7 @@ function cancelPowerClick(obj, player, rightClick)
     p.handCountSnapshot = countCardsInHand(player, true)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
-    if currentPhase == 3 and p.cardsAlreadyUsed[obj.getGUID()] then
+    if (currentPhase == 2 or currentPhase == 3) and p.cardsAlreadyUsed[obj.getGUID()] then
         cancelMarkedCards(player, obj.getGUID())
         refreshTakeoverMenu(player)
     elseif currentPhase ~= 3 and currentPhase ~= 2 then
@@ -2910,6 +2937,18 @@ function confirmPowerClick(obj, player, rightClick)
         end, 1)
         return
     elseif currentPhase == "2" or currentPhase == "3" then
+        if p.beforeDevelop then
+            local n = countDiscardInHand(player)
+            if n >= p.powersSnapshot["MUST_DISCARD"] then
+                p.beforeDevelop = false
+                discardMarkedCards(player)
+                queueUpdate(player, true)
+            else
+                broadcastToColor("Please discard the required number of cards.", player, "White")
+            end
+            return    
+        end
+
         local marked = {}
         local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
         local n = 0
@@ -2982,6 +3021,10 @@ function confirmPowerClick(obj, player, rightClick)
         if power.codes["GET_PRESTIGE"] then
             getPrestigeChips(player, times)
         end
+    elseif p.selectedCardPower == "CONSUME_PRESTIGE" then
+        if power.codes["DRAW_3_CARDS"] then
+            dealTo(3, player)
+        end
     end
 
     markUsed(player, obj, power)
@@ -3002,7 +3045,7 @@ function goodSelectClick(slot, player, rightClick)
     local powerName = p.selectedCardPower
     local node = getLastNode(p.miscSelectedCards)
 
-    if currentPhase == "3" then
+    if currentPhase == "2" or currentPhase == "3" then
         guid = node.value
         powerName = node.power.name
     end
@@ -3193,8 +3236,13 @@ function updateHelpText(playerColor)
             if discarded >= discardTarget then p.canReady = true end
             setHelpText(playerColor, "Explore: draw " .. powers["DRAW"] .. ", keep " .. powers["KEEP"] .. ". (discard " .. discarded .. "/" .. discardTarget .. ")")
         end
+    -- develop
     elseif currentPhase == 2 then
-        if p.selectedCard then
+        if p.beforeDevelop then
+            local discardTarget = p.powersSnapshot["MUST_DISCARD"]
+            if discarded < discardTarget then p.canFlip = true end
+            setHelpText(playerColor, "▼ Develop: discard from hand. (" .. discarded .. "/" .. discardTarget .. ")")
+        elseif p.selectedCard then
             local card = getObjectFromGUID(p.selectedCard)
             local info = card_db[card.getName()]
             local discardTarget = math.max(0, info.cost - (powers["REDUCE"] or 0))
@@ -3206,11 +3254,17 @@ function updateHelpText(playerColor)
 
                 if miscPowers then
                     if miscPowers["DISCARD_REDUCE"] then
-                        discardTarget = math.max(0, discardTarget - 3)
+                        discardTarget = math.max(0, discardTarget - miscPowers["DISCARD_REDUCE"].strength)
                     end
                 end
 
                 node = node.next
+            end
+
+            for goodsGuid, usedPowers in pairs(p.markedGoods) do
+                if usedPowers.power.name == "CONSUME_RARE" then
+                    discardTarget = math.max(0, discardTarget - usedPowers.power.strength)
+                end
             end
 
             if discarded >= discardTarget then p.canReady = true end
@@ -3219,6 +3273,7 @@ function updateHelpText(playerColor)
         else
             setHelpText(playerColor, "▼ Develop: may play a development.")
         end
+    -- settle
     elseif currentPhase == 3 then
         local planningTakeover = planningTakeover(playerColor)
 
@@ -3234,6 +3289,7 @@ function updateHelpText(playerColor)
             local payDiscount = 0
             local payMilitaryStr = 0
             local militaryDiscount = 0
+            local tempMilitary = p.tempMilitary
             local node = p.miscSelectedCards
 
             while node and node.value do
@@ -3271,11 +3327,13 @@ function updateHelpText(playerColor)
             for goodsGuid, usedPowers in pairs(p.markedGoods) do
                 if usedPowers.power.codes["REDUCE"] then
                     payDiscount = payDiscount + usedPowers.power.strength
+                elseif usedPowers.power.codes["EXTRA_MILITARY"] then
+                    tempMilitary = tempMilitary + usedPowers.power.strength
                 end
             end
 
             if planningTakeover then
-                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary .. ")")
+                setHelpText(playerColor, "Settle: takeover. (Military " .. p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + tempMilitary .. ")")
                 return
             end
 
@@ -3293,7 +3351,7 @@ function updateHelpText(playerColor)
                 elseif info.flags["REBEL"] and p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"] then
                     specialtyBonus = p.powersSnapshot["AGAINST_REBEL_BONUS_MILITARY"]
                 end
-                local totalMil = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary + specialtyBonus
+                local totalMil = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + tempMilitary + specialtyBonus
                 if totalMil >= def then p.canReady = true end
                 setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. totalMil .. "/" .. def .. ")")
             else
