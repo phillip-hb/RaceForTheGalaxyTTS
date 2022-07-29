@@ -13,6 +13,7 @@ useTakeovers = false
 queuePlaceTwoPhase = false
 searchPhase = false
 selectLastPhase = false
+exploreAfterPhase = false
 expansionLevel = 0
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
@@ -45,6 +46,7 @@ function player(i)
         canConfirm = false,
         beforeExplore = false,
         beforeDevelop = false,
+        afterSettle = false,
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
@@ -67,6 +69,7 @@ enforceRules = true
 delayNextPhase = false
 delayNextPhaseTime = 0
 transitionNextPhase = false
+triggerExploreAfterPhase = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -179,6 +182,7 @@ function onSave()
     saved_data.expansionLevel = expansionLevel
     saved_data.searchPhase = searchPhase
     saved_data.selectLastPhase = selectLastPhase
+    saved_data.exploreAfterPhase = exploreAfterPhase
     return JSON.encode(saved_data)
 end
 
@@ -204,6 +208,7 @@ function onload(saved_data)
         expansionLevel = data.expansionLevel
         searchPhase = data.searchPhase
         selectLastPhase = data.selectLastPhase
+        exploreAfterPhase = data.exploreAfterPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -599,10 +604,14 @@ function attemptPlayCard(card, player, fromTakeover)
         if hits[1].hit_object.hasTag("Slot") then
             -- trigger certain power bonuses based on phase
             if currentPhaseIndex > 0 and currentPhaseIndex <= #selectedPhases then
-                local phase = getCurrentPhase()
                 local powers = p.powersSnapshot
                 if powers["DRAW_AFTER"] then
                     dealTo(powers["DRAW_AFTER"], player)
+                end
+
+                if powers["EXPLORE_AFTER"] then
+                    triggerExploreAfterPhase = true
+                    dealTo(powers["EXPLORE_AFTER"], player)
                 end
             end
 
@@ -815,16 +824,16 @@ function allCardsInTableau(player)
     local i = 0
 
     return function()
+        i = i + 1
+
+        while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
             i = i + 1
-
-            while i <= n and objs[i] and (objs[i].type ~= 'Card' or objs[i].is_face_down) do
-                i = i + 1
-            end
-
-            if i <= n then
-                return objs[i]
-            end
         end
+
+        if i <= n then
+            return objs[i]
+        end
+    end
 end
 
 -- ======================
@@ -1174,7 +1183,7 @@ function playerReadyClicked(playerColor, forced, playSound)
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = getLastNode(p.miscSelectedCards)
 
-        if p.beforeDevelop or node and node.power and requiresConfirm[concatPowerName(node.power)] then
+        if p.beforeDevelop or p.afterSettle or node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
@@ -1257,6 +1266,8 @@ function checkAllReadyCo()
     local players = getSeatedPlayersWithHands()
     local triggerSelectLast = false
     local selectLastPlayer = nil
+
+    triggerExploreAfterPhase = false
 
     for _, player in pairs(players) do
         local readyToken = getObjectFromGUID(readyTokens_GUID[playerData[player].index])
@@ -1394,6 +1405,24 @@ function checkAllReadyCo()
         playerData[player].beingTargeted = nil
     end
 
+    if triggerExploreAfterPhase and not exploreAfterPhase then
+        exploreAfterPhase = true
+        for _, player in pairs(players) do
+            local p = playerData[player]
+            if p.powersSnapshot["EXPLORE_AFTER"] then
+                broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. " to resolve \"Imperium Fuel Depot.\"", player)
+                p.afterSettle = true
+                p.handCountSnapshot = countCardsInHand(player, false) + p.powersSnapshot["EXPLORE_AFTER"] + p.powersSnapshot["DRAW_AFTER"]
+                updateReadyButtons({player, false})
+            else
+                updateReadyButtons({player, true})
+            end
+        end
+        transitionNextPhase = false
+        return 1
+    end
+    exploreAfterPhase = false
+
     -- Trigger takeovers
     if useTakeovers and not takeoverPhase then
         local targetedPlayers = {}
@@ -1436,7 +1465,7 @@ function checkAllReadyCo()
     for _, player in pairs(players) do
         if placeTwoTriggered then
             if placeTwo[playerData[player].index] then
-                broadcastToAll("Waiting for " .. Player[player].steam_name .. "'s use of Improved Logistics.", player)
+                broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. "'s to resolve Improved Logistics.", player)
             else
                 updateReadyButtons({player, true})
             end
@@ -2142,7 +2171,7 @@ function updateHandState(playerColor)
                     end
                 end
             elseif (phase == 2 and info and info.type == 2 and not p.beforeDevelop) or    -- Make buttons on development or world cards if appropriate phase
-                (phase == 3 and info and info.type == 1) then
+                (phase == 3 and info and info.type == 1 and not exploreAfterPhase) then
                 if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
                     goto skip
                 end
@@ -2450,6 +2479,11 @@ function updateTableauState(player)
                             end
                         end
                     end
+                end
+            elseif currentPhase == "3" and exploreAfterPhase then
+                if exploreAfterPhase and info.passivePowers[currentPhase] and info.passivePowers[currentPhase]["EXPLORE_AFTER"] and p.afterSettle then
+                    card.highlightOn("Yellow")
+                    createConfirmButton(card)
                 end
             elseif currentPhase == "3" then
                 if takeoverPhase then
@@ -2973,17 +3007,26 @@ function confirmPowerClick(obj, player, rightClick)
         end, 1)
         return
     elseif currentPhase == "2" or currentPhase == "3" then
-        if p.beforeDevelop then
+        if p.beforeDevelop or p.afterSettle then
             local cardsInHand = countCardsInHand(player, false)
             local discarded = oldHandCount - cardsInHand
-            if discarded >= p.powersSnapshot["MUST_DISCARD"] then
+            local discardTarget = 1
+            if currentPhase == "2" then
+                discardTarget = p.powersSnapshot["MUST_DISCARD"]
+            end
+            if discarded >= discardTarget then
                 p.beforeDevelop = false
+                p.afterSettle = false
                 discardMarkedCards(player)
                 queueUpdate(player, true)
+                if currentPhase == "3" then
+                    sound.AssetBundle.playTriggerEffect(3)
+                    updateReadyButtons({player, true}, true)
+                end
             else
                 broadcastToColor("Please discard the required number of cards.", player, "White")
             end
-            return    
+            return
         end
 
         local marked = {}
@@ -3319,6 +3362,17 @@ function updateHelpText(playerColor)
             setHelpText(playerColor, "▼ Develop: may play a development.")
         end
     -- settle
+    elseif currentPhase == 3 and exploreAfterPhase then
+        local discardTarget = 1
+        if p.afterSettle then
+            if discarded < discardTarget then
+                p.canFlip = true
+                p.canConfirm = false
+            end
+            setHelpText(playerColor, "▼ Settle: discard from hand. (" .. discarded .. "/" .. discardTarget .. ")")
+        else
+            setHelpText(playerColor, "Settle: waiting for other players.")
+        end
     elseif currentPhase == 3 then
         local planningTakeover = planningTakeover(playerColor)
 
