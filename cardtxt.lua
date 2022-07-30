@@ -1743,6 +1743,7 @@ activePowers = {
           TAKEOVER_REBEL = "Takeover REBEL military world.",
           CONSUME_PRESTIGE = "Discard prestige to ",
           TAKEOVER_PRESTIGE = "Spend prestige to takeover military world.",
+          TAKEOVER_MILITARY = "Takeover military world from tableau with at least 1 Military.",
           CONSUME_RARE = "Consume Rare good.",
           CONSUME_GENE = "Consume Genes good.",
           UPGRADE_WORLD = "Replace a world on tableau."

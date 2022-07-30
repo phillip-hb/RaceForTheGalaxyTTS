@@ -101,6 +101,7 @@ compatible = {
     ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_PRESTIGE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
+    ["TAKEOVER_MILITARY"]= {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1,["CONSUME_GENE"]=1},
 }
 
@@ -801,6 +802,11 @@ function drawCard()
 end
 
 function discardCard(card)
+    local good = nil
+    if card.getDescription() == '' then
+        good = getGoods(card)
+    end
+
     card.memo = ''
     card.setDescription('')
     card.setTags({})
@@ -815,12 +821,17 @@ function discardCard(card)
     if discardPile then
         card.setPosition(add(card.getPosition(), {0, discardZone.getPosition()[2], 0}))
         discardPile = discardPile.putObject(card)
+        if good then
+            discardCard(good)
+        end
         return
     end
 
     discardPile = card
     card.setPosition(discardZone.getPosition())
     card.setRotation({0, 0, 180})
+
+    if good then discardCard(good) end
 end
 
 function discardPrestige(player, n)
@@ -1495,8 +1506,6 @@ function checkAllReadyCo()
             highlightOff(old)
             highlightOff(new)
 
-            local good = getGoods(old)
-            if good then discardCard(good) end
             discardCard(old)
 
             new.setPosition(oldPos)
@@ -3695,21 +3704,28 @@ function resolveTakeovers()
 
             -- Takeover successfull
             if not taken[targetCard.getGUID()] and sourceStr >= targetStr then
-                broadcastToAll((Player[player].steam_name or player) .. "'s takeover of \"" .. targetCard.getName() ..'" was successful!', player)
+                local destroy = false
                 taken[targetCard.getGUID()] = true
-
-                -- Take control of the target card
-                attemptPlayCard(targetCard, player, true)
-                takeoverSuccess = true
 
                 -- Process rewards
                 local node = p.prevMiscSelectedCards
                 while node and node.value do
-                    if node.power.name == "TAKEOVER_PRESTIGE" then
+                    if node.power.name == "TAKEOVER_PRESTIGE" or node.power.codes["DESTROY"] then
                         getPrestigeChips(player, node.power.strength)
+                        if node.power.codes["DESTROY"] then destroy = true end
                     end
                     node = node.next
                 end
+
+                -- Take control of the target card
+                if destroy then
+                    discardCard(targetCard)
+                    broadcastToAll((Player[player].steam_name or player) .. ' successfully destroyed "' .. targetCard.getName() ..'."', player)
+                else
+                    attemptPlayCard(targetCard, player, true)
+                    broadcastToAll((Player[player].steam_name or player) .. '\'s takeover of "' .. targetCard.getName() ..'" was successful!', player)
+                end
+                takeoverSuccess = true
             else
                 broadcastToAll((Player[player].steam_name or player) .. " failed to takeover \"" .. targetCard.getName() .. '."', player)
             end
