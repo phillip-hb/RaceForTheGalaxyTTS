@@ -817,6 +817,36 @@ function discardCard(card)
     card.setRotation({0, 0, 180})
 end
 
+function discardPrestige(player, n)
+    local p = playerData[player]
+    local prestigeBag = getObjectFromGUID(prestigeBag_GUID)
+
+    if n > 0 then
+        for k, v in pairs(p.prestigeChips) do
+            local chips = getObjectFromGUID(k)
+            if chips.getQuantity() < 0 then
+                prestigeBag.putObject(chips)
+                n = n - 1
+            else
+                -- stack of chips
+                for i=1, chips.getQuantity() do
+                    prestigeBag.putObject(chips.takeObject())
+                    n = n - 1
+
+                    if n <= 0 then break end
+                end
+            end
+
+            if n <= 0 then break end
+        end
+    end
+
+    if n > 0 then
+        broadcastToAll("Error: " .. (Player[player].steam_name or player) .. " spent non-existing Prestige.", color(1,0,0))
+        n = 0
+    end
+end
+
 function dealTo(n, player)
     for i=1, n do
         local card = drawCard()
@@ -1381,7 +1411,6 @@ function checkAllReadyCo()
 
     Global.setVectorLines(getDefaultVectorLines())
 
-    local prestigeBag = getObjectFromGUID(prestigeBag_GUID)
     local discardHappened = false
     local takeDiscard = nil
     local phase = getCurrentPhase()
@@ -1424,30 +1453,7 @@ function checkAllReadyCo()
         end
 
         -- remove used prestige
-        if p.consumedPrestige > 0 then
-            for k, v in pairs(p.prestigeChips) do
-                local chips = getObjectFromGUID(k)
-                if chips.getQuantity() < 0 then
-                    prestigeBag.putObject(chips)
-                    p.consumedPrestige = p.consumedPrestige - 1
-                else
-                    -- stack of chips
-                    for i=1, chips.getQuantity() do
-                        prestigeBag.putObject(chips.takeObject())
-                        p.consumedPrestige = p.consumedPrestige - 1
-
-                        if p.consumedPrestige <= 0 then break end
-                    end
-                end
-
-                if p.consumedPrestige <= 0 then break end
-            end
-        end
-
-        if p.consumedPrestige > 0 then
-            broadcastToAll("Error: " .. (Player[player].steam_name or player) .. " spent non-existing Prestige.", color(1,0,0))
-            p.consumedPrestige = 0
-        end
+        discardPrestige(player, p.consumedPrestige)
     end
 
     if discardHappened then wait(0.1) end
@@ -2318,7 +2324,8 @@ function updateHandState(playerColor)
             elseif
                 (phase == 2 and info and info.type == 2 and not p.beforeDevelop) or    -- Make buttons on development or world cards if appropriate phase
                 (phase == 3 and info and info.type == 1 and not exploreAfterPhase and p.upgradeWorldNew ~= obj.getGUID()) then
-                if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase or (enforceRules and p.recordedCards[obj.getName()]) then
+
+                if phase == 3 and placeTwoPhase and not p.powersSnapshot["PLACE_TWO"] or planningTakeover(playerColor) or takeoverPhase then
                     goto skip
                 end
 
@@ -3232,6 +3239,8 @@ function confirmPowerClick(obj, player, rightClick)
     local info = card_db[obj.getName()]
     local power = info.activePowers[currentPhase] and info.activePowers[currentPhase][p.selectedCardPower] or nil
     local oldHandCount = p.handCountSnapshot
+    local paidCost = false
+    local times = 1
 
     p.handCountSnapshot = countCardsInHand(player)
 
@@ -3296,13 +3305,13 @@ function confirmPowerClick(obj, player, rightClick)
             n = #marked
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength - usedAmount)
             refreshTakeoverMenu(player)
-        elseif power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+        elseif power.name == "DISCARD" then
             n = 1
-            p.tempMilitary = p.tempMilitary + power.strength
+            paidCost = true
             discardCard(obj)
-        elseif power.name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] then
+        elseif power.name == "CONSUME_PRESTIGE" then
             n = power.strength
-            p.tempMilitary = p.tempMilitary + power.strength
+            paidCost = true
             p.consumedPrestige = p.consumedPrestige + 1
         elseif power.name == "UPGRADE_WORLD" then
             if not p.upgradeWorldOld or not p.upgradeWorldNew then
@@ -3321,6 +3330,20 @@ function confirmPowerClick(obj, player, rightClick)
         end
         queueUpdate(player, true)
         return
+    elseif currentPhase == "4" then
+        if p.selectedCardPower == "CONSUME_PRESTIGE" then
+            discardPrestige(player, power.times)
+            paidCost = true
+        elseif p.selectedCardPower == "DISCARD_HAND" then
+            if enforceRules and not p.canConfirm then
+                broadcastToColor("Please discard the required number of cards.", player, "White")
+                return
+            end
+    
+            times = math.min(power.times, #discardMarkedCards(player))
+            if times == 0 then return end
+            paidCost = true
+        end
     elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
             local n = #discardMarkedCards(player)
@@ -3346,26 +3369,26 @@ function confirmPowerClick(obj, player, rightClick)
                 tryProduceAt(player, obj)
             end
         end
-    elseif p.selectedCardPower == "DISCARD_HAND" then
-        if enforceRules and not p.canConfirm then
-            broadcastToColor("Please discard the required number of cards.", player, "White")
-            return
-        end
-        local times = math.min(power.times, #discardMarkedCards(player))
-        if times == 0 then return end
+    end
+
+    if paidCost and power then
+        local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
+
         if power.codes["GET_VP"] then
-            getVpChips(player, times)
+            getVpChips(player, power.strength * vpMultiplier)
+        end
+        if power.codes["GET_3_CARD"] then
+            dealTo(3, player)
         end
         if power.codes["GET_CARD"] then
             dealTo(power.strength, player)
         end
         if power.codes["GET_PRESTIGE"] then
-            getPrestigeChips(player, times)
+            getPrestigeChips(player, power.strength)
         end
-    elseif p.selectedCardPower == "CONSUME_PRESTIGE" then
-        p.consumedPrestige = p.consumedPrestige + 1
-        if power.codes["GET_3_CARD"] then
-            dealTo(3, player)
+
+        if power.codes["EXTRA_MILITARY"] then
+            p.tempMilitary = p.tempMilitary + power.strength
         end
     end
 
