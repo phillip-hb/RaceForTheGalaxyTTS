@@ -61,6 +61,12 @@ function add(v1, v2)
     return {v1[1] + v2[1], v1[2] + v2[2], v1[3] + v2[3]}
 end
 
+-- checks if value1 is close to value2, in degrees. Theta is the offset
+function nearAngle(value1, value2, theta)
+    local diff = (value1 - value2 + 180 + 360) % 360 - 180
+    return math.abs(diff) <= theta
+end
+
 function getCardSlot(card)
     local hits = Physics.cast({
          origin = add(card.getPosition(), {0,1,0}),

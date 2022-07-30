@@ -1754,7 +1754,8 @@ activePowers = {
           DRAW_DIFFERENT = "Draw 1 card for each kind of good you produced.",
           DISCARD_HAND = "Discard from hand to use.",
           DRAW_CHROMO = "Draw 2 cards for each Gene world w/ Chromosome in tableau.",
-          DRAW_REBEL = "Draw 1 card for each Rebel world in tableau."
+          DRAW_REBEL = "Draw 1 card for each Rebel world in tableau.",
+          TAKE_SAVED = "Draw all cards under this world."
      }
 }
 

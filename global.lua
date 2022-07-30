@@ -15,6 +15,7 @@ queuePlaceTwoPhase = false
 searchPhase = false
 selectLastPhase = false
 exploreAfterPhase = false
+firstRound = true
 expansionLevel = 0
 selectedPhases = {}
 -- nil if no choice was made, otherwise GUID of selected object
@@ -75,7 +76,6 @@ delayNextPhase = false
 delayNextPhaseTime = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
-firstRound = true
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -216,7 +216,11 @@ function onload(saved_data)
         searchPhase = data.searchPhase
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
-        firstRound = saved_data.firstRound or true
+        if data.firstRound == nil or data.firstRound then
+            firstRound = true
+        else
+            firstRound = false
+        end
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -685,6 +689,28 @@ function attemptPlayCard(card, player, fromTakeover)
                 getPrestigeChips(player, 1)
             end
 
+            -- save card
+            if p.powersSnapshot["SAVE_COST"] and (not info.flags["MILITARY"] or usedPayMilitary) then
+                local discards = getDiscardInHand(player, false)
+                if #discards > 0 then
+                    local placeUnderTarget = getObjectFromGUID(p.powersSnapshot["START_SAVE"])
+                    local savedCard = discards[1]
+                    local possibleSaves = {}
+
+                    for _, discard in pairs(discards) do
+                        if nearAngle(discard.getRotation().y, Player[player].getHandTransform(1).rotation.y, 100) then
+                            possibleSaves[#possibleSaves + 1] = discard
+                        end
+                    end
+
+                    if #possibleSaves > 0 then
+                        savedCard = possibleSaves[math.random(#possibleSaves)]
+                    else
+                        savedCard = discards[math.random(#discards)]
+                    end
+                    storeCard(placeUnderTarget, savedCard)
+                end
+            end
             return
         end
     end
@@ -838,6 +864,10 @@ function storeCard(targetCard, card)
         direction = {0, -1, 0}
     })
 
+    card.setTags({})
+    card.highlightOff()
+    highlightOff(card)
+
     for _, hit in pairs(hits) do
         local other = hit.hit_object
         if other.type == 'Deck' or other.type == 'Card' and other.getDescription() == "" and other.is_face_down then
@@ -846,7 +876,7 @@ function storeCard(targetCard, card)
 
             other.setLock(false)
             other = other.putObject(card)
-            pos.y = pos.y + bounds.size.y / 2 + yoff + yoff * 2
+            pos.y = pos.y + bounds.size.y/2 + yoff
             targetCard.setPosition(pos)
 
             if good then
@@ -2082,7 +2112,7 @@ function capturePowersSnapshot(player, phase)
         if info.flags["IMPERIUM"] then results["IMPERIUM"] = 1 end
         if info.flags["TAKE_DISCARDS"] then results["TAKE_DISCARDS"] = 1 end
         if info.flags["SELECT_LAST"] then results["SELECT_LAST"] = 1 end
-        if info.flags["START_SAVE"] and firstRound then results["START_SAVE"] = 1 end
+        if info.flags["START_SAVE"] then results["START_SAVE"] = card.getGUID() end
 
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
@@ -3013,6 +3043,29 @@ function usePowerClick(obj, player, rightClick, powerIndex)
             local n = countTrait(player, "flags", "REBEL", 1)
             dealTo(n * power.strength, player)
             usedPower = true
+        elseif power.name == "TAKE_SAVED" then
+            local hits = Physics.cast({
+                origin = obj.getPosition(),
+                direction = {0, -1, 0},
+                max_distance = 0.5
+            })
+
+            if #hits > 0 then
+                local item = hits[1].hit_object
+                if item.type == 'Card' and item.getDescription() == "" or item.type == 'Deck' then
+                    item.deal(math.max(item.getQuantity(), 1), player)
+                end
+
+                for _, hit in pairs(hits) do
+                    if hit.hit_object.hasTag("Slot") then
+                        local tb = hit.hit_object
+                        local pos = obj.getPosition()
+                        obj.setPosition({pos.x, tb.getPosition().y + 0.02, pos.z})
+                        break
+                    end
+                end
+            end
+            usedPower = true
         end
 
         if usedPower then
@@ -3194,6 +3247,7 @@ function confirmPowerClick(obj, player, rightClick)
         data.selectedCard = p.selectedCard
         p.cardsAlreadyUsed[p.selectedCard] = data
         p.selectedCard = nil
+        p.selectedCardPower = nil
         storeCard(obj, discard[1])
         return
     elseif currentPhase == "1" and p.beforeExplore then
