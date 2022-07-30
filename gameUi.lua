@@ -59,7 +59,6 @@ end
 
 function createConfirmButton(card)
     local slot = getCardSlot(card)
-
     if not slot then return end
 
     slot.createButton({
@@ -116,8 +115,11 @@ function createCancelButton(card)
 end
 
 function createGoodsButton(card, label, color)
-    local offset = {0.28, 6, 0.13}
+    local goodsSnapPointOffset = {0.6, 0.3, 0.4}
     local slot = getCardSlot(card)
+
+    local pos = card.positionToWorld(goodsSnapPointOffset)
+
     slot.createButton({
         click_function = "goodSelectClick",
         function_owner = Global,
@@ -126,8 +128,8 @@ function createGoodsButton(card, label, color)
         color = color or "White",
         width = 500,
         height = 750,
-        position = offset,
-        scale = {0.5, 2, 0.35}
+        position = slot.positionToLocal(pos),
+        scale = {0.5, 1, 0.35}
     })
 end
 
