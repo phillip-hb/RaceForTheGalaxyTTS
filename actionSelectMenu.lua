@@ -219,8 +219,9 @@ function prestigeSearchClick()
 end
 
 function selectPhaseCo()
+     local playerData = Global.getVar("playerData")
      if Global.getVar("gameStarted") == false or Global.getVar("currentPhaseIndex") ~= 0 or Global.getVar("transitionNextPhase") or 
-          (Global.getVar("selectLastPhase") and not Global.getVar("playerData")[player].powersSnapshot["SELECT_LAST"]) then
+          (Global.getVar("selectLastPhase") and not playerData[player].powersSnapshot["SELECT_LAST"]) or playerData[player].selectedCardPower == "START_SAVE" then
           broadcastToColor("You cannot select an action card at this time.", player, "White")
           return 1
      end

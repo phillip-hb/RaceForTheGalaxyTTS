@@ -41,7 +41,16 @@ function updateHelpText(playerColor)
         p.canFlip = true
     -- start of round
     elseif currentPhaseIndex == 0 then
-        setHelpText(playerColor, "▲ Select an action.")
+        if powers["START_SAVE"] and p.selectedCard then
+            discarded = countDiscardInHand(playerColor, false)
+            if discarded < 1 then
+                p.canFlip = true
+                p.canConfirm = false
+            end
+            setHelpText(playerColor, "▼ Select card to save. (" .. discarded .. "/1)")
+        else
+            setHelpText(playerColor, "▲ Select an action.")
+        end
     -- explore
     elseif currentPhase == 1 then
         if p.beforeExplore then

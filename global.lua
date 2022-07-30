@@ -50,6 +50,7 @@ function player(i)
         afterSettle = false,
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
+        startSavePhase = nil,
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
@@ -74,6 +75,7 @@ delayNextPhase = false
 delayNextPhaseTime = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
+firstRound = true
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
@@ -187,6 +189,7 @@ function onSave()
     saved_data.searchPhase = searchPhase
     saved_data.selectLastPhase = selectLastPhase
     saved_data.exploreAfterPhase = exploreAfterPhase
+    saved_data.firstRound = firstRound
     return JSON.encode(saved_data)
 end
 
@@ -213,6 +216,7 @@ function onload(saved_data)
         searchPhase = data.searchPhase
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
+        firstRound = saved_data.firstRound or true
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -517,17 +521,26 @@ end
 
 function countDiscardInHand(playerColor, countMarked)
     countMarked = countMarked == nil and false or countMarked
-
     local objs = Player[playerColor].getHandObjects(1)
-
     local n = 0
     for _, obj in pairs(objs) do
         if obj.hasTag("Discard") and not obj.hasTag("Marked") or countMarked then
             n = n + 1
         end
     end
-
     return n
+end
+
+function getDiscardInHand(playerColor, countMarked)
+    countMarked = countMarked == nil and false or countMarked
+    local objs = Player[playerColor].getHandObjects(1)
+    local results = {}
+    for _, obj in pairs(objs) do
+        if obj.hasTag("Discard") and not obj.hasTag("Marked") or countMarked then
+            results[#results + 1] = obj
+        end
+    end
+    return results
 end
 
 -- returns number of selected actions. 0 = no actions selected.
@@ -694,7 +707,7 @@ function placeGoodsAt(position, yRotation, player)
      local card = drawCard()
 
      if card then
-          card.setPositionSmooth(add(position, {0, 0.2, 0}))
+          card.setPositionSmooth(add(position, {0, 1, 0}), false, true)
           card.setRotation({0, yRotation, 180})
           playerData[player].incomingGood = true
           delayNextPhase = true
@@ -817,6 +830,54 @@ function planningTakeover(player)
     end
 end
 
+function storeCard(targetCard, card)
+    local yoff = targetCard.getBounds().size.y / 2
+    local good = getGoods(targetCard)
+    local hits = Physics.cast({
+        origin = targetCard.getPosition(),
+        direction = {0, -1, 0}
+    })
+
+    for _, hit in pairs(hits) do
+        local other = hit.hit_object
+        if other.type == 'Deck' or other.type == 'Card' and other.getDescription() == "" and other.is_face_down then
+            local bounds = other.getBounds()
+            local pos = other.getPosition()
+
+            other.setLock(false)
+            other = other.putObject(card)
+            pos.y = pos.y + bounds.size.y / 2 + yoff + yoff * 2
+            targetCard.setPosition(pos)
+
+            if good then
+                local p = good.getPosition()
+                p.y = pos.y + 0.03
+                good.setPosition(p)
+            end
+
+            Wait.frames(function()
+                other.setLock(true)
+            end, 5)
+            return     
+        end
+    end
+
+    card.setPosition(targetCard.getPosition())
+    card.setRotation({targetCard.getRotation().x, targetCard.getRotation().y, 180})
+    card.setLock(true)
+    local bounds = card.getBounds()
+    local pos = targetCard.getPosition()
+    pos.y = pos.y + bounds.size.y/2 + yoff
+
+    if good then
+        local p = good.getPosition()
+        p.y = pos.y + 0.03
+        good.setPosition(p)
+    end
+
+    targetCard.setPosition(pos)
+end
+
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
 function allCardsInTableau(player)
     local pi = playerData[player].index
@@ -862,24 +923,18 @@ function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
 
     -- check to see if the object is in the player's hand zone to prevent mark for deletion
     if (object.hasTag("Selected") or 
-            object.hasTag("Explore Highlight") and currentPhaseIndex == -1 or 
-            not object.hasTag("Explore Highlight") and getCurrentPhase() == 1 and not playerData[player_color].beforeExplore) and
-            inHandZone and flip == 180 then
-        local rot = object.getRotation()
-        --object.setRotation({rot[1], rot[2], 0})
+        object.hasTag("Explore Highlight") and currentPhaseIndex == -1 or 
+        not object.hasTag("Explore Highlight") and getCurrentPhase() == 1 and not playerData[player_color].beforeExplore) and
+        inHandZone and flip == 180 then
         return false
     elseif object.hasTag("Marked") and inHandZone and flip == 0 then
-        local rot = object.getRotation()
-        --object.setRotation({rot[1], rot[2], 180})
         return false
     end
 
-    if inHandZone and (flip == 180 or flip == 0) and not object.hasTag("Selected") then
+    if inHandZone and flip ~= old_flip and not object.hasTag("Selected") then
         if player_color then
             local p = playerData[player_color]
             if enforceRules and (not p.canFlip or p.canReady) and flip == 180 then
-                local rot = object.getRotation()
-                --object.setRotation({rot[1], rot[2], 0})
                 return false
             end
 
@@ -1544,6 +1599,7 @@ function checkAllReadyCo()
 
     if currentPhaseIndex == 0 then  -- All players have selected an action
         local phases = {}
+        firstRound = false
 
         -- flip over all selected phase cards and phase tiles
         for _, guid in pairs(selectedActionZone_GUID) do
@@ -2026,6 +2082,7 @@ function capturePowersSnapshot(player, phase)
         if info.flags["IMPERIUM"] then results["IMPERIUM"] = 1 end
         if info.flags["TAKE_DISCARDS"] then results["TAKE_DISCARDS"] = 1 end
         if info.flags["SELECT_LAST"] then results["SELECT_LAST"] = 1 end
+        if info.flags["START_SAVE"] and firstRound then results["START_SAVE"] = 1 end
 
         if info.passivePowers[phase] then
             local powers = info.passivePowers[phase]
@@ -2501,6 +2558,33 @@ function updateTableauState(player)
             end
         end
 
+        if info.flags["START_SAVE"] then
+            local hits = Physics.cast({
+                origin = card.getPosition(),
+                direction = {0, -1, 0},
+                max_distance = 0.5
+            })
+
+            if #hits > 0 then
+                local n = 0
+                if hits[1].hit_object.type == 'Card' and hits[1].hit_object.getDescription() == "" then
+                    n = 1
+                elseif hits[1].hit_object.type == 'Deck' then
+                    n = hits[1].hit_object.getQuantity()
+                end
+                card.createButton({
+                    click_function = "none",
+                    function_owner = Global,
+                    label = "Saved: " .. n,
+                    font_color = "White",
+                    width = 0,
+                    height = 0,
+                    font_size = 100,
+                    position = {0, 1, -0.72}
+                })
+            end
+        end
+
         if not card.hasTag("Action Card") then
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
@@ -2512,13 +2596,20 @@ function updateTableauState(player)
                 card.highlightOn("Yellow")
             end
 
-            if currentPhase == "1" and p.beforeExplore then
+            if currentPhaseIndex == 0 and info.flags["START_SAVE"] and firstRound then  -- Galactic scavengers
+                local used = p.cardsAlreadyUsed[card.getGUID()]
+                if not used then
+                    p.selectedCard = card.getGUID()
+                    p.selectedCardPower = "START_SAVE"
+                    createConfirmButton(card)
+                end
+            elseif currentPhase == "1" and p.beforeExplore then
                 local powers = info.passivePowers["1"]
                 if powers and powers["DISCARD_PRESTIGE"] then
                     card.highlightOn("Yellow")
                     createConfirmButton(card)
                 end
-            elseif currentPhase == "2" then
+            elseif currentPhase == "2" then -- develop phase
                 if p.beforeDevelop then
                     local powers = info.passivePowers["2"]
                     if powers and powers["EXPLORE"] then
@@ -2539,12 +2630,12 @@ function updateTableauState(player)
                         end
                     end
                 end
-            elseif currentPhase == "3" and exploreAfterPhase then
+            elseif currentPhase == "3" and exploreAfterPhase then   -- end of settle phase
                 if exploreAfterPhase and info.passivePowers[currentPhase] and info.passivePowers[currentPhase]["EXPLORE_AFTER"] and p.afterSettle then
                     card.highlightOn("Yellow")
                     createConfirmButton(card)
                 end
-            elseif currentPhase == "3" then
+            elseif currentPhase == "3" then -- settle phase
                 local isUpgradingWorld = isUpgradingWorld(player)
                 if takeoverPhase then
                     if p.beingTargeted and p.beingTargeted[card.getGUID()] then
@@ -2642,7 +2733,7 @@ function updateTableauState(player)
                         end
                     end
                 end
-            elseif currentPhase == "4" then
+            elseif currentPhase == "4" then -- consume phase
                 local baseAmount = {}
                 local goodslimit = 1
                 local enoughGoods = false
@@ -3085,12 +3176,27 @@ function confirmPowerClick(obj, player, rightClick)
 
     local p = playerData[player]
     local currentPhase = tostring(getCurrentPhase())
-    local power = card_db[obj.getName()].activePowers[currentPhase][p.selectedCardPower]
+    local info = card_db[obj.getName()]
+    local power = info.activePowers[currentPhase] and info.activePowers[currentPhase][p.selectedCardPower] or nil
     local oldHandCount = p.handCountSnapshot
 
     p.handCountSnapshot = countCardsInHand(player)
 
-    if currentPhase == "1" and p.beforeExplore then
+    if currentPhaseIndex == 0 and firstRound and p.selectedCardPower == "START_SAVE" then
+        local discard = getDiscardInHand(player, false)
+
+        if #discard < 1 then
+            broadcastToColor("Please flip a card facedown in your hand before clicking confirm.", player, "White")
+            return
+        end
+
+        local data = cardAlreadyUsedInit()
+        data.selectedCard = p.selectedCard
+        p.cardsAlreadyUsed[p.selectedCard] = data
+        p.selectedCard = nil
+        storeCard(obj, discard[1])
+        return
+    elseif currentPhase == "1" and p.beforeExplore then
         -- Discarding cards for prestige from hand before explore
         local marked = #discardMarkedCards(player)
         getPrestigeChips(player, marked)
