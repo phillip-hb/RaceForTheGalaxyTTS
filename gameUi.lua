@@ -115,7 +115,7 @@ function createCancelButton(card)
 end
 
 function createGoodsButton(card, label, color)
-    local goodsSnapPointOffset = {0.6, 0.3, 0.4}
+    local goodsSnapPointOffset = {0.6, 1, 0.4}
     local slot = getCardSlot(card)
 
     local pos = card.positionToWorld(goodsSnapPointOffset)

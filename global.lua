@@ -2703,9 +2703,9 @@ function updateTableauState(player)
 
                             if miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
 
-                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and selectedMilitary and not selectedAlien then
+                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien then
                                 powerName = name
-                            elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedInfo.flags["MILITARY"]) then
+                            elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedMilitary) then
                                 powerName = name
                             elseif name == "DISCARD_CONQUER_SETTLE" and selectedMilitary then
                                 powerName = name
@@ -2723,7 +2723,7 @@ function updateTableauState(player)
                             elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedMilitary then
                                 powerName = name
                             end
-                        
+
                             if powerName ~= "" and miscSelectedCount > 0 and not miscSelectedCardsTable[card.getGUID()] and not takeoverPhase then
                                 -- check for compatible chains
                                 local key = concatPowerName(power)
