@@ -2707,7 +2707,7 @@ function updateTableauState(player)
                                 powerName = name
                             elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedMilitary) then
                                 powerName = name
-                            elseif name == "DISCARD_CONQUER_SETTLE" and selectedMilitary then
+                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedMilitary then
                                 powerName = name
                             elseif name == "PAY_MILITARY" and selectedMilitary and
                                     (not next(power.codes) and not selectedAlien or 
