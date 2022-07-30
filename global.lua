@@ -98,6 +98,7 @@ compatible = {
     ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
+    ["TAKEOVER_PRESTIGE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1,["CONSUME_GENE"]=1},
 }
 
@@ -291,10 +292,15 @@ function getName(obj)
 end
 
 function isTakeoverPower(power)
-    if power.name == "TAKEOVER_IMPERIUM" or power.name == "TAKEOVER_REBEL" then
+    local takeoverPowers = {["TAKEOVER_IMPERIUM"]=1,["TAKEOVER_REBEL"]=1,["TAKEOVER_PRESTIGE"]=1,["TAKEOVER_MILITARY"]=1}
+    if takeoverPowers[power.name] then
         return power.name
-    elseif power.codes["TAKEOVER_MILITARY"] then
-        return "TAKEOVER_MILITARY"
+    else
+        for name, _ in pairs(takeoverPowers) do
+            if power.codes[name] then
+                return name
+            end
+        end
     end
 
     return nil
@@ -2708,7 +2714,8 @@ function updateTableauState(player)
                             local selectedMilitary = selectedInfo and selectedInfo.flags["MILITARY"]
                             local selectedAlien = selectedInfo and selectedInfo.goods == "ALIEN"
 
-                            if miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
+                            if selectedMilitary and miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
+                            if not selectedMilitary and planningTakeover(player) then selectedMilitary = true end
 
                             if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien then
                                 powerName = name
