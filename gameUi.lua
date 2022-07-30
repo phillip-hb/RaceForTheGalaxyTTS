@@ -343,12 +343,13 @@ function calcStrength(player, card, addDefense, activePlayer)
 end
 
 function menuValueChanged(player, value, id)
+    local p = playerData[player.color]
     if value == "True" then
         Global.UI.setAttribute(id, "color", "rgb(0.4,0.8,1)")
-        playerData[player.color].takeoverTarget = split(id, "_")[2]
+        p.takeoverTarget = split(id, "_")[2]
     else
         Global.UI.setAttribute(id, "color", "White")
-        playerData[player.color].takeoverTarget = nil
+        p.takeoverTarget = nil
     end
 end
 

@@ -1702,6 +1702,30 @@ F:PRESTIGE | DISCARD_TO_12
 P:5:DRAW:3:0
 ]]
 
+startWorlds = {
+     ["Gateway Station"] = -6,
+     ["Abandoned Mine Squatters"] = -5,
+     ["Transforming Colonists"] = -4,
+     ["Galactic Trade Emissaries"] = -3,
+     ["Industrial Robots"] = -2,
+     ["Star Nomad Raiders"] = -1,
+     ["Old Earth"] = 0,
+     ["Epsilon Eridani"] = 1,
+     ["Alpha Centauri"] = 2,
+     ["New Sparta"] = 3,
+     ["Earth's Lost Colony"] = 4,
+     ["Separatist Colony"] = 5,
+     ["Ancient Race"] = 6,
+     ["Damaged Alien Factory"] = 7,
+     ["Doomed World"] = 8,
+     ["Rebel Cantina"] = 9,
+     ["Galactic Developers"] = 10,
+     ["Imperium Warlord"] = 11,
+     ["Galactic Scavengers"] = 12,
+     ["Uplift Mercenary Force"] = 13,
+     ["Alien Research Team"] = 14,
+ }
+
 -- key: name, value: tooltip
 activePowers = {
      ["1"] = {

@@ -15,9 +15,10 @@ queuePlaceTwoPhase = false
 searchPhase = false
 selectLastPhase = false
 exploreAfterPhase = false
-firstRound = true
 expansionLevel = 0
 selectedPhases = {}
+firstPlayer = "Yellow"
+firstRound = false
 -- nil if no choice was made, otherwise GUID of selected object
 
 function player(i)
@@ -30,6 +31,7 @@ function player(i)
         selectedCardPower = "",
         cardsAlreadyUsed = {},
         miscSelectedCards = {},
+        prevMiscSelectedCards = {},
         mustConsumeCount = 0,
         produceCount = {},
         paidCost = {},
@@ -190,6 +192,7 @@ function onSave()
     saved_data.searchPhase = searchPhase
     saved_data.selectLastPhase = selectLastPhase
     saved_data.exploreAfterPhase = exploreAfterPhase
+    saved_data.firstPlayer = firstPlayer
     saved_data.firstRound = firstRound
     return JSON.encode(saved_data)
 end
@@ -217,11 +220,8 @@ function onload(saved_data)
         searchPhase = data.searchPhase
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
-        if data.firstRound == nil or data.firstRound then
-            firstRound = true
-        else
-            firstRound = false
-        end
+        firstPlayer = data.firstPlayer or "Yellow"
+        firstRound = data.firstRound
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -1208,6 +1208,7 @@ end
 function gameStart(params)
     playerData = {Yellow=player(1),Red=player(2),Blue=player(3),Green=player(4)}
 
+    firstRound = true
     gameStarted = true
     currentPhaseIndex = -1
     advanced2p = params.advanced2p
@@ -1544,7 +1545,23 @@ function checkAllReadyCo()
 
     wait(0.1)
 
+    -- figure out who the first player is going to be
+    if firstRound then
+        local lowest = 100
+        local index = 0
+
+        for i, player in pairs(players) do
+            local n = getStartWorldNumber(player)
+            if n < lowest then
+                lowest = n
+                firstPlayer = player
+                index = i
+            end
+        end
+    end
+
     for _, player in pairs(players) do
+        playerData[player].prevMiscSelectedCards = playerData[player].miscSelectedCards
         playerData[player].miscSelectedCards = {}
         updateReadyButtons({player, false})
         queueUpdate(player, true)
@@ -1580,6 +1597,12 @@ function checkAllReadyCo()
                 broadcastToAll((Player[player].steam_name or player) .. " is attempting a takeover!", player)
                 takeoverTriggered = true
                 intendTakeover[p.index] = true
+
+                -- Check if spending prestige
+                local node = p.prevMiscSelectedCards
+                if node.power and node.power.name == "TAKEOVER_PRESTIGE" then
+                    discardPrestige(player, 1)
+                end
 
                 local card = getObjectFromGUID(p.takeoverTarget)
                 local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
@@ -2765,6 +2788,10 @@ function updateTableauState(player)
                     end
                 elseif ap and not takeoverPhase then
                     for name, power in pairs(ap) do
+                        -- check if can pay cost
+                        if name == "TAKEOVER_PRESTIGE" and p.prestigeCount <= 0 then
+                            goto skip
+                        end
                         -- make buttons for takeover powers
                         if useTakeovers and isTakeoverPower(power) and not miscSelected or ap["UPGRADE_WORLD"] then
                             local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
@@ -2775,6 +2802,8 @@ function updateTableauState(player)
                                 createCancelButton(card)
                             end
                         end
+
+                        ::skip::
                     end
                 end
             elseif currentPhase == "4" then -- consume phase
@@ -3617,27 +3646,6 @@ function moveGoalToPlayer(params)
 end
 
 function getStartWorldNumber(player)
-    local startWorlds = {
-        ["Gateway Station"] = -6,
-        ["Abandoned Mine Squatters"] = -5,
-        ["Transforming Colonists"] = -4,
-        ["Galactic Trade Emissaries"] = -3,
-        ["Industrial Robots"] = -2,
-        ["Star Nomad Raiders"] = -1,
-        ["Old Earth"] = 0,
-        ["Epsilon Eridani"] = 1,
-        ["Alpha Centauri"] = 2,
-        ["New Sparta"] = 3,
-        ["Earth's Lost Colony"] = 4,
-        ["Separatist Colony"] = 5,
-        ["Ancient Race"] = 6,
-        ["Damaged Alien Factory"] = 7,
-        ["Doomed World"] = 8,
-        ["Rebel Cantina"] = 9,
-        ["Galactic Developers"] = 10,
-        ["Imperium Warlord"] = 11,
-
-    }
     local p = playerData[player]
     local tableau = getObjectFromGUID(tableau_GUID[p.index])
     local sp = tableau.getSnapPoints()[1]
@@ -3651,35 +3659,18 @@ function getStartWorldNumber(player)
         local obj = hit.hit_object
         if obj.type == 'Card' and not obj.is_face_down and not obj.hasTag("Ignore Tableau") and startWorlds[obj.getName()] then
             return startWorlds[obj.getName()]
+        else
+            broadcastToAll("Error: No start world detected for " .. (Player[player].steam_name or player), color(1, 0, 0))
         end
     end
 
     return 1000
 end
 
--- Find player with lowest start world
-function getFirstPlayer()
-    local players = getSeatedPlayersWithHands()
-    local lowest = 100
-    local target = nil
-    local index = 0
-
-    for i, player in pairs(players) do
-        local n = getStartWorldNumber(player)
-        if n < lowest then
-            lowest = n
-            target = player
-            index = i
-        end
-    end
-
-    return target, index
-end
-
 function resolveTakeovers()
     local takeoverSuccess = false
     local players = getSeatedPlayersWithHands()
-    local firstPlayer, firstIndex = getFirstPlayer()
+    local firstIndex = playerData[firstPlayer].index
     local taken = {}
 
     local i = firstIndex
@@ -3706,9 +3697,19 @@ function resolveTakeovers()
             if not taken[targetCard.getGUID()] and sourceStr >= targetStr then
                 broadcastToAll((Player[player].steam_name or player) .. "'s takeover of \"" .. targetCard.getName() ..'" was successful!', player)
                 taken[targetCard.getGUID()] = true
+
                 -- Take control of the target card
                 attemptPlayCard(targetCard, player, true)
                 takeoverSuccess = true
+
+                -- Process rewards
+                local node = p.prevMiscSelectedCards
+                while node and node.value do
+                    if node.power.name == "TAKEOVER_PRESTIGE" then
+                        getPrestigeChips(player, node.power.strength)
+                    end
+                    node = node.next
+                end
             else
                 broadcastToAll((Player[player].steam_name or player) .. " failed to takeover \"" .. targetCard.getName() .. '."', player)
             end
