@@ -1434,7 +1434,7 @@ E@3:2
 F:IMPERIUM | PRESTIGE
 P:3:EXTRA_MILITARY:3:0
 P:3:BONUS_MILITARY | AGAINST_REBEL:1:0
-P:3:DISCARD | CONQUER_SETTLE | PRESTIGE:0:0
+P:3:DISCARD_CONQUER_SETTLE | PRESTIGE:0:0
 
 N:Uplift Gene Breeders
 T:1:3:0
@@ -1743,7 +1743,7 @@ activePowers = {
           TAKEOVER_REBEL = "Takeover REBEL military world.",
           CONSUME_PRESTIGE = "Discard prestige to ",
           TAKEOVER_PRESTIGE = "Spend prestige to takeover military world.",
-          TAKEOVER_MILITARY = "Takeover military world from tableau with at least 1 Military.",
+          TAKEOVER_MILITARY = "Takeover military world.",
           CONSUME_RARE = "Consume Rare good.",
           CONSUME_GENE = "Consume Genes good.",
           UPGRADE_WORLD = "Replace a world on tableau."
@@ -1787,7 +1787,7 @@ activePowers = {
 subtooltip = {
      REDUCE_ZERO = "settle normal world (non-Alien) for free.",
      EXTRA_MILITARY = "gain extra military.",
-     TAKEOVER_MILITARY = "perform takeover."
+     TAKEOVER_MILITARY = "takeover military world."
 }
 
 takeoverPowers = {

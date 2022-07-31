@@ -237,6 +237,17 @@ function refreshTakeoverMenu(owner)
     local mainPanelBody = xml[indexValues[owner].main]
     local groupBody = mainPanelBody.children[1].children[3].children[1].children[1].children
     local largestCount = 0
+    local node = playerData[owner].miscSelectedCards
+    local conquerSettle = false
+    local reselected = false
+
+    while node and node.value do
+        if node.power.name == "DISCARD_CONQUER_SETTLE" then
+            conquerSettle = true
+            break
+        end
+        node = node.next
+    end
 
     for _, player in pairs(players) do
         if player ~= owner then
@@ -261,7 +272,7 @@ function refreshTakeoverMenu(owner)
                     goto skip_card
                 end
 
-                if info.type == 1 and info.flags["MILITARY"] then
+                if info.type == 1 and (not conquerSettle and info.flags["MILITARY"] or conquerSettle and not info.flags["MILITARY"]) then
                     local yourStrength = calcStrength(owner, card, false, owner)
                     local theirDefense = calcStrength(player, card, true, owner)
                     local canTake = yourStrength >= theirDefense
@@ -271,6 +282,8 @@ function refreshTakeoverMenu(owner)
                     -- Disable previously selected target if can no longer take it
                     if not canTake and op.takeoverTarget == card.getGUID() then
                         op.takeoverTarget = nil
+                    elseif canTake and op.takeoverTarget == card.getGUID() then
+                        reselected = true
                     end
 
                     local btn = {
@@ -298,6 +311,10 @@ function refreshTakeoverMenu(owner)
             groupBody[indexValues[owner][player]].children = column
             if btnCount > largestCount then largestCount = btnCount end
         end
+    end
+
+    if not reselected then
+        op.takeoverTarget = nil
     end
 
     -- need to readjust height of the toggle group to fit all the buttons

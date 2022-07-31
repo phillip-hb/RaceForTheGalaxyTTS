@@ -60,6 +60,7 @@ function player(i)
         consumedPrestige = 0,
         markedGoods = {},
         ignoreCards = {},
+        discardLaterFromTableau = {}
     }
 end
 
@@ -97,11 +98,11 @@ optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1,["CONSUME_PRESTIGE"]=1}
 compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,["CONSUME_PRESTIGE"]=1},
     ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["TAKEOVER_PRESTIGE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
-    ["TAKEOVER_MILITARY"]= {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
+    ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
+    ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
+    ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
+    ["TAKEOVER_PRESTIGE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
+    ["TAKEOVER_MILITARY"]= {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1,["CONSUME_GENE"]=1},
 }
 
@@ -1440,6 +1441,7 @@ function checkAllReadyCo()
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
         if p.powersSnapshot["TAKE_DISCARDS"] and phase == 100 then takeDiscard = player end
 
+        -- TODO: Only remove certain cards at appropriate times to not mess with mlitary values
         -- remove misc selected cards if they have discard power
         while node and node.value do
             local card = getObjectFromGUID(node.value)
@@ -1447,10 +1449,19 @@ function checkAllReadyCo()
                 local info = card_db[card.getName()]
                 local power = node.power
                 if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
-                    discardCard(card)
-                    discardHappened = true
-                    if power.name == 'DISCARD' and power.codes["EXTRA_MILITARY"] then
-                        p.tempMilitary = p.tempMilitary + power.strength
+                    if power.name == "DISCARD_CONQUER_SETTLE" and info.passivePowers["3"] and (info.passivePowers["3"]["EXTRA_MILITARY"] or info.passivePowers["3"]["BONUS_MILITARY"]) then
+                        p.discardLaterFromTableau[card.getGUID()] = true
+                        local data = cardAlreadyUsedInit()
+                        data.triggerCard = node.value
+                        data.selectedCard = node.value
+                        if not p.cardsAlreadyUsed[node.value] then p.cardsAlreadyUsed[node.value] = {} end
+                        p.cardsAlreadyUsed[node.value][power.name] = data
+                    else
+                        discardCard(card)
+                        discardHappened = true
+                        if power.name == 'DISCARD' and power.codes["EXTRA_MILITARY"] then
+                            p.tempMilitary = p.tempMilitary + power.strength
+                        end
                     end
                 end
             end
@@ -1578,6 +1589,7 @@ function checkAllReadyCo()
     end
 
     if triggerExploreAfterPhase and not exploreAfterPhase then
+        transitionNextPhase = false
         exploreAfterPhase = true
         for _, player in pairs(players) do
             local p = playerData[player]
@@ -1590,7 +1602,6 @@ function checkAllReadyCo()
                 updateReadyButtons({player, true})
             end
         end
-        transitionNextPhase = false
         return 1
     end
     exploreAfterPhase = false
@@ -1642,6 +1653,7 @@ function checkAllReadyCo()
     -- Trigger Improved Logistics
     for _, player in pairs(players) do
         if placeTwoTriggered then
+            transitionNextPhase = false
             if placeTwo[playerData[player].index] then
                 broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. "'s to resolve Improved Logistics.", player)
             else
@@ -1656,6 +1668,17 @@ function checkAllReadyCo()
         sound.AssetBundle.playTriggerEffect(1)
         transitionNextPhase = false
         return 1
+    end
+
+    -- delete marked cards
+    for _, player in pairs(players) do
+        local p = playerData[player]
+        for guid, _ in pairs(p.discardLaterFromTableau) do
+            local card = getObjectFromGUID(guid)
+            if card then discardCard(card) end
+        end
+
+        p.discardLaterFromTableau = {}
     end
 
     if gameStarted and currentPhaseIndex == -1 then
@@ -2022,8 +2045,7 @@ function startDevelopPhase()
             data.beforeDevelop = true
         end
 
-        updateHandState(player)
-        updateHelpText(player)
+        queueUpdate(player, true)
     end
 end
 
@@ -2032,9 +2054,7 @@ function startSettlePhase()
         data.cardsAlreadyUsed = {}
         data.miscSelectedCards = {}
 
-        capturePowersSnapshot(player, "3")
-        updateHandState(player)
-        updateHelpText(player)
+        queueUpdate(player, true)
     end
 end
 
@@ -2712,6 +2732,7 @@ function updateTableauState(player)
                 end
             elseif currentPhase == "3" then -- settle phase
                 local isUpgradingWorld = isUpgradingWorld(player)
+                local planningTakeover = planningTakeover(player)
                 if takeoverPhase then
                     if p.beingTargeted and p.beingTargeted[card.getGUID()] then
                         createStrengthLabel(player, card, true)
@@ -2747,13 +2768,13 @@ function updateTableauState(player)
                             local selectedAlien = selectedInfo and selectedInfo.goods == "ALIEN"
 
                             if selectedMilitary and miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
-                            if not selectedMilitary and planningTakeover(player) then selectedMilitary = true end
+                            if not selectedMilitary and planningTakeover then selectedMilitary = true end
 
                             if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien then
                                 powerName = name
                             elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedMilitary) then
                                 powerName = name
-                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedMilitary then
+                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedMilitary or (planningTakeover and not power.codes["NO_TAKEOVER"]) then
                                 powerName = name
                             elseif name == "PAY_MILITARY" and selectedMilitary and
                                     (not next(power.codes) and not selectedAlien or 
@@ -3713,6 +3734,8 @@ function resolveTakeovers()
                     if node.power.name == "TAKEOVER_PRESTIGE" or node.power.codes["DESTROY"] then
                         getPrestigeChips(player, node.power.strength)
                         if node.power.codes["DESTROY"] then destroy = true end
+                    elseif node.power.codes["PRESTIGE"] then
+                        getPrestigeChips(player, 2)
                     end
                     node = node.next
                 end
