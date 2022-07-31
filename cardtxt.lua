@@ -1583,7 +1583,7 @@ E@3:2
 #E:0:0:0:2:0
 F:REBEL
 P:1:DISCARD_ANY:0:0
-P:3:DISCARD | PLACE_MILITARY:0:0
+P:3:DISCARD_PLACE_MILITARY:0:0
 P:3:DISCARD | TAKEOVER_IMPERIUM:2:0
 
 N:Pan-Galactic Hologrid
@@ -1787,7 +1787,8 @@ activePowers = {
 subtooltip = {
      REDUCE_ZERO = "settle normal world (non-Alien) for free.",
      EXTRA_MILITARY = "gain extra military.",
-     TAKEOVER_MILITARY = "takeover military world."
+     TAKEOVER_MILITARY = "takeover military world.",
+     TAKEOVER_IMPERIUM = "takeover military world from IMPERIUM tableau."
 }
 
 takeoverPowers = {

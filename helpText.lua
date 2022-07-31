@@ -220,7 +220,9 @@ function updateHelpText(playerColor)
                 end
             end
         else
-            if placeTwoPhase then
+            if rebelSneakAttackPhase and p.rebelSneakAttack then
+                setHelpText(playerColor, 'Settle: resolve "Rebel Sneak Attack."')
+            elseif placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Settle: waiting for other players.")
                 else

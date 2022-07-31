@@ -15,6 +15,9 @@ queuePlaceTwoPhase = false
 searchPhase = false
 selectLastPhase = false
 exploreAfterPhase = false
+rebelSneakAttackPhase = false
+queueRebelSneakAttackPhase = false
+denyTakeoverPhase = false
 expansionLevel = 0
 selectedPhases = {}
 firstPlayer = "Yellow"
@@ -50,6 +53,9 @@ function player(i)
         canConfirm = false,
         beforeExplore = false,
         beforeDevelop = false,
+        improvedLogistics = false,
+        rebelSneakAttack = false,
+        denyTakeover = false,
         afterSettle = false,
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
@@ -97,7 +103,8 @@ optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1,["CONSUME_PRESTIGE"]=1}
 -- Key = card's power, Value = what the key can be chained with
 compatible = {
     ["DISCARD|EXTRA_MILITARY"] = {["MILITARY_HAND"]=1,["CONSUME_PRESTIGE"]=1},
-    ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1},
+    ["DISCARD_PLACE_MILITARY"] = {["DISCARD_CONQUER_SETTLE"]=1,["DISCARD|EXTRA_MILITARY"]=1,["MILITARY_HAND"]=1},
+    ["DISCARD_CONQUER_SETTLE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_PLACE_MILITARY"]=1},
     ["DISCARD|TAKEOVER_MILITARY"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
     ["TAKEOVER_REBEL"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
     ["TAKEOVER_IMPERIUM"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
@@ -196,6 +203,9 @@ function onSave()
     saved_data.exploreAfterPhase = exploreAfterPhase
     saved_data.firstPlayer = firstPlayer
     saved_data.firstRound = firstRound
+    saved_data.rebelSneakAttackPhase = rebelSneakAttackPhase
+    saved_data.queueRebelSneakAttackPhase = queueRebelSneakAttackPhase
+    saved_data.denyTakeoverPhase = denyTakeoverPhase
     return JSON.encode(saved_data)
 end
 
@@ -224,6 +234,9 @@ function onload(saved_data)
         exploreAfterPhase = data.exploreAfterPhase
         firstPlayer = data.firstPlayer or "Yellow"
         firstRound = data.firstRound
+        denyTakeoverPhase = data.denyTakeoverPhase
+        rebelSneakAttackPhase = data.rebelSneakAttackPhase
+        queueRebelSneakAttackPhase = data.queueRebelSneakAttackPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -1330,7 +1343,7 @@ function playerReadyClicked(playerColor, forced, playSound)
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = getLastNode(p.miscSelectedCards)
 
-        if p.beforeDevelop or p.afterSettle or node and node.power and requiresConfirm[concatPowerName(node.power)] then
+        if p.beforeDevelop or p.afterSettle or (rebelSneakAttackPhase and p.rebelSneakAttack) or node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
@@ -1441,7 +1454,6 @@ function checkAllReadyCo()
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
         if p.powersSnapshot["TAKE_DISCARDS"] and phase == 100 then takeDiscard = player end
 
-        -- TODO: Only remove certain cards at appropriate times to not mess with mlitary values
         -- remove misc selected cards if they have discard power
         while node and node.value do
             local card = getObjectFromGUID(node.value)
@@ -1495,6 +1507,7 @@ function checkAllReadyCo()
     -- play selected cards in hand
     local placeTwo = {false,false,false,false}
     local placeTwoTriggered = false
+    local rebelSneakAttack = {false,false,false,false}
     for _, player in pairs(players) do
         local p = playerData[player]
         for _, obj in pairs(Player[player].getHandObjects(1)) do
@@ -1539,9 +1552,16 @@ function checkAllReadyCo()
             end
         end
 
+        -- Set flags for rebel sneak attack
+        if not rebelSneakAttackPhase and phase == 3 and p.powersSnapshot["DISCARD_PLACE_MILITARY"] and p.lastPlayedCard then
+            p.rebelSneakAttack = true
+            queueRebelSneakAttackPhase = true
+        end
+        
         -- Set flags for improved logistics
         if not placeTwoPhase and phase == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
             placeTwo[p.index] = true
+            p.improvedLogistics = true
             placeTwoPhase = true
             placeTwoTriggered = true
         end
@@ -1588,6 +1608,7 @@ function checkAllReadyCo()
         playerData[player].beingTargeted = nil
     end
 
+    -- Trigger Imperium Fuel Depot
     if triggerExploreAfterPhase and not exploreAfterPhase then
         transitionNextPhase = false
         exploreAfterPhase = true
@@ -1605,6 +1626,29 @@ function checkAllReadyCo()
         return 1
     end
     exploreAfterPhase = false
+
+    -- Trigger Rebel Sneak Attack
+    if queueRebelSneakAttackPhase and not rebelSneakAttackPhase then
+        queueRebelSneakAttackPhase = false
+        rebelSneakAttackPhase = true
+        transitionNextPhase = false
+        for _, player in pairs(players) do
+            local p = playerData[player]
+            if p.rebelSneakAttack then
+                broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. " to resolve \"Rebel Sneak Attack.\"", player)
+            end
+            updateReadyButtons({player, not p.rebelSneakAttack})
+            queueUpdate(player)
+        end
+        sound.AssetBundle.playTriggerEffect(1)
+        return 1
+    else
+        for _, player in pairs(players) do
+            local p = playerData[player]
+            p.rebelSneakAttack = false
+        end
+        rebelSneakAttackPhase = false
+    end
 
     -- Trigger takeovers
     if useTakeovers and not takeoverPhase then
@@ -1819,8 +1863,10 @@ function beginNextPhase()
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
     queuePlaceTwoPhase = false
+    queueRebelSneakAttackPhase = false
     placeTwoPhase = false
     takeoverPhase = false
+    rebelSneakAttackPhase = false
 
     -- Apply end of phase powers here
     if phase == 5 then
@@ -2683,12 +2729,15 @@ function updateTableauState(player)
         if not card.hasTag("Action Card") then
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
+            local passives = info.passivePowers[currentPhase]
+            local isRebelSneakAttackCard = passives and passives["DISCARD_PLACE_MILITARY"]
 
             if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
-            elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] or
-                    takeoverPhase and p.takeoverSource == card.getGUID() then
-                card.highlightOn("Yellow")
+            -- TODO: Highlight for Improved Logistics
+            -- elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] or
+            --         takeoverPhase and p.takeoverSource == card.getGUID() then
+            --     card.highlightOn("Yellow")
             end
 
             if currentPhaseIndex == 0 and info.flags["START_SAVE"] and firstRound then  -- Galactic scavengers
@@ -2731,8 +2780,10 @@ function updateTableauState(player)
                     createConfirmButton(card)
                 end
             elseif currentPhase == "3" then -- settle phase
+                local rebelSneakAttack = p.rebelSneakAttack
                 local isUpgradingWorld = isUpgradingWorld(player)
                 local planningTakeover = planningTakeover(player)
+
                 if takeoverPhase then
                     if p.beingTargeted and p.beingTargeted[card.getGUID()] then
                         createStrengthLabel(player, card, true)
@@ -2752,7 +2803,12 @@ function updateTableauState(player)
                 end
 
                 -- Create buttons for active powers
-                if ap and (selectedCard or miscActiveNode or p.beingTargeted) then
+                if rebelSneakAttackPhase and isRebelSneakAttackCard then
+                    card.highlightOn("Yellow")
+                    dontAutoPass = true
+                    createCancelButton(card)
+                    createConfirmButton(card)
+                elseif ap and (selectedCard or miscActiveNode or p.beingTargeted) then
                     for name, power in pairs(ap) do
                         local powerName = ""
                         local fullName = miscActiveNode and concatPowerName(miscActiveNode.power) or ""
@@ -2768,7 +2824,7 @@ function updateTableauState(player)
                             local selectedAlien = selectedInfo and selectedInfo.goods == "ALIEN"
 
                             if selectedMilitary and miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
-                            if not selectedMilitary and planningTakeover then selectedMilitary = true end
+                            if not selectedMilitary and (planningTakeover or miscPowerSnapshot["DISCARD_CONQUER_SETTLE"]) then selectedMilitary = true end
 
                             if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien then
                                 powerName = name
@@ -2788,6 +2844,8 @@ function updateTableauState(player)
                             elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and not selectedMilitary then
                                 powerName = name
                             elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedMilitary then
+                                powerName = name
+                            elseif name == "DISCARD_PLACE_MILITARY" then
                                 powerName = name
                             end
 
@@ -3148,12 +3206,10 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         end
     end
 
+    local power = getActivePower(obj.getName(), currentPhase, powerIndex)
     local node = getLastNode(p.miscSelectedCards)
 
     if not p.miscSelectedCards then p.miscSelectedCards = {} end
-
-    local power = getActivePower(obj.getName(), currentPhase, powerIndex)
-
     if not p.miscSelectedCards.value then
          p.miscSelectedCards = {value = obj.getGUID(), power=power, next = nil}
     else
@@ -3247,13 +3303,23 @@ function cancelPowerClick(obj, player, rightClick)
     local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
     local info = card_db[obj.getName()]
 
-    if currentPhase == 3 and (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
-        if p.upgradeWorldNew then
-            local card = getObjectFromGUID(p.upgradeWorldNew)
-            highlightOff(card)
+    if currentPhase == 3 then
+        if rebelSneakAttackPhase and p.rebelSneakAttack then
+            -- Cancelling rebel sneak attack, must cancel and undo all used cards for this step of phase
+            if p.selectedCard then
+            else
+                p.rebelSneakAttack = false
+                updateReadyButtons({player, true})
+                return
+            end
+        elseif (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
+            if p.upgradeWorldNew then
+                local card = getObjectFromGUID(p.upgradeWorldNew)
+                highlightOff(card)
+            end
+            p.upgradeWorldOld = nil
+            p.upgradeWorldNew = nil
         end
-        p.upgradeWorldOld = nil
-        p.upgradeWorldNew = nil
     end
 
     if node and node.value == p.miscSelectedCards.value and currentPhase == 3 then
@@ -3355,6 +3421,8 @@ function confirmPowerClick(obj, player, rightClick)
             else
                 broadcastToColor("Please discard the required number of cards.", player, "White")
             end
+            return
+        elseif rebelSneakAttackPhase and p.rebelSneakAttack then
             return
         end
 
