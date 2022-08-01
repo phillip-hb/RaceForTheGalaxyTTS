@@ -43,20 +43,6 @@ function createSelectWorldButton(card)
     })
 end
 
-function createCardBottomButton(card, text, func)
-    local slot = getCardSlot(card)
-    slot.createButton({
-        click_function = func,
-        function_owner = Global,
-        label = text,
-        font_size = 150,
-        width = 900,
-        height = 220,
-        position = {0, 0, .63},
-        scale = {0.5, 1, 0.4}
-    })
-end
-
 function createConfirmButton(card)
     local slot = getCardSlot(card)
     if not slot then return end
@@ -309,7 +295,7 @@ function refreshTakeoverMenu(owner)
             ::skip_player::
 
             groupBody[indexValues[owner][player]].children = column
-            if btnCount > largestCount then largestCount = btnCount end
+            -- if btnCount > largestCount then largestCount = btnCount end
         end
     end
 
@@ -391,6 +377,7 @@ function drawTakeoverLines()
     Global.setVectorLines(lines)
 end
 
+-- The default vector lines are the colored square around each player action selection box
 function getDefaultVectorLines()
     return {{
         points={{-2.79, 1.49, -8.34},{2.77, 1.49, -8.34},{2.77, 1.49, -11.66},{-2.79, 1.49, -11.66}},
@@ -408,4 +395,12 @@ function getDefaultVectorLines()
         points={{-8.31, 1.49, 2.78},{-8.31, 1.49, -2.78},{-11.67, 1.49, -2.78},{-11.67, 1.49, 2.78}},
         color="Red", thickness=0.1, loop=true
     }}
+end
+
+function updateHandCount(playerColor)
+    local i = playerData[playerColor].index
+    local statTracker = getObjectFromGUID(statTracker_GUID[i])
+    if statTracker then
+        statTracker.call("updateLabel", {"hand", #Player[playerColor].getHandObjects()})
+    end
 end

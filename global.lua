@@ -87,8 +87,7 @@ transitionNextPhase = false
 triggerExploreAfterPhase = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1}
-requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,
-    ["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
+requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1,["UPGRADE_WORLD"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
@@ -174,15 +173,11 @@ phaseText = {"Phase I: Explore", "Phase II: Develop", "Phase III: Settle", "Phas
 phaseTextAdv2p = {"Phase I: Explore", "Phase II: Develop 1", "Phase II: Develop 2", "Phase III: Settle 1", "Phase III: Settle 2", "Phase IV: Consume", "Phase V: Produce"}
 phaseCardNames = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Settle", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
 phaseCardNamesAdv2p = {"Explore (+5)", "Explore (+1,+1)", "Develop", "DevelopAdv2p", "Settle", "SettleAdv2p", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
-twoPlayerAdvancedMode = false
 
 goodsSnapPointOffset = {-0.6, 0.1, 0.4}
 drawDeck_GUID = ""
 discardPile = nil
 vpBag = nil
-
--- GUIDS of cards that may have possible actions to perform
-possibleTableauActions = {["Yellow"] = {}, ["Red"] = {}, ["Blue"] = {}, ["Green"] = {}}
 
 function onSave()
     local saved_data = {}
@@ -353,20 +348,12 @@ function getCurrentPhase()
 end
 
 function trySetAdvanced2pMode()
-     if advanced2p then
-          phaseTilePlacement = phaseTilePlacementAdv2p
-          phaseIndex = phaseIndexAdv2p
-          phaseCardNames = phaseCardNamesAdv2p
-          phaseText = phaseTextAdv2p
-     end
-end
-
-function updateHandCount(playerColor)
-     local i = playerData[playerColor].index
-     local statTracker = getObjectFromGUID(statTracker_GUID[i])
-     if statTracker then
-          statTracker.call("updateLabel", {"hand", #Player[playerColor].getHandObjects()})
-     end
+    if advanced2p then
+        phaseTilePlacement = phaseTilePlacementAdv2p
+        phaseIndex = phaseIndexAdv2p
+        phaseCardNames = phaseCardNamesAdv2p
+        phaseText = phaseTextAdv2p
+    end
 end
 
 function countTrait(player, trait, name, cardType)
@@ -391,23 +378,24 @@ function countTrait(player, trait, name, cardType)
     return count
 end
 
+-- Retrieves the good that is sitting on the card (if one exists)
 function getGoods(card)
-     local goods = nil
-     local pos = card.positionToWorld(goodsSnapPointOffset)
-     local hits = Physics.cast({
-          origin = {pos[1], pos[2] + 2, pos[3]},
-          direction = {0, -1, 0},
-          max_distance = 4
-     })
+    local goods = nil
+    local pos = card.positionToWorld(goodsSnapPointOffset)
+    local hits = Physics.cast({
+        origin = {pos[1], pos[2] + 2, pos[3]},
+        direction = {0, -1, 0},
+        max_distance = 4
+    })
 
-     for _, hit in pairs(hits) do
-          if hit.hit_object.type == 'Card' and hit.hit_object.getDescription() == card.getGUID() then
-               goods = hit.hit_object
-               break
-          end
-     end
+    for _, hit in pairs(hits) do
+        if hit.hit_object.type == 'Card' and hit.hit_object.getDescription() == card.getGUID() then
+            goods = hit.hit_object
+            break
+        end
+    end
 
-     return goods
+    return goods
 end
 
 function tryProduceAt(player, card)
@@ -491,26 +479,6 @@ function replaceVpBag()
     componentsBag.putObject(oldBag)
 end
 
-function getCardActions(phase, card)
-    local data = cardData[card.getName()]
-
-    if not data.powers[phase] then
-        return nil
-    end
-
-    local results = {}
-
-    for i, data in pairs(data.powers[phase]) do
-        if phase == "3" and settleActions[data.name] or
-            phase == "4" and consumeActions[data.name] or
-            phase == "5" and produceActions[data.name] then
-            results[i] = {name = data.name, data = data}
-        end
-    end
-
-    return results
-end
-
 function checkIfSelectedAction(player, actionName)
     local zone = getObjectFromGUID(selectedActionZone_GUID[playerData[player].index])
 
@@ -542,18 +510,6 @@ function countCardsInHand(playerColor, countMarked)
 
         return n
     end
-end
-
-function countDiscardInHand(playerColor, countMarked)
-    countMarked = countMarked == nil and false or countMarked
-    local objs = Player[playerColor].getHandObjects(1)
-    local n = 0
-    for _, obj in pairs(objs) do
-        if obj.hasTag("Discard") and not obj.hasTag("Marked") or countMarked then
-            n = n + 1
-        end
-    end
-    return n
 end
 
 function getDiscardInHand(playerColor, countMarked)
@@ -598,7 +554,7 @@ function toggleEnforceRulesClick(obj, player)
     broadcastToAll("Enforce rules has been turned " .. (enforceRules and "ON." or "OFF."), "Purple")
 end
 
--- returns guid of cards discarded as list
+-- Discards all cards that are face down in hand. Returns guid of cards discarded as list
 function discardMarkedCards(player, markForDiscard)
     if markForDiscard == nil then markForDiscard = false end
 
@@ -617,7 +573,7 @@ function discardMarkedCards(player, markForDiscard)
     return cards
 end
 
-function giveMarkedCards(player, target)
+function getMarkedCards(player, target)
     local cards = {}
     for _, obj in pairs(Player[player].getHandObjects(1)) do
         if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
@@ -628,7 +584,7 @@ function giveMarkedCards(player, target)
     return cards
 end
 
--- check zone for any 'Selected' cards and attempt to play them
+-- Check hand zone for any 'Selected' cards and attempt to play them
 function attemptPlayCard(card, player, fromTakeover)
     if type(card) == "table" then
         player = card[2]
@@ -1343,16 +1299,32 @@ function playerReadyClicked(playerColor, forced, playSound)
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = getLastNode(p.miscSelectedCards)
 
-        if p.beforeDevelop or p.afterSettle or (rebelSneakAttackPhase and p.rebelSneakAttack) or node and node.power and requiresConfirm[concatPowerName(node.power)] then
+        if p.beforeDevelop or p.afterSettle or node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
         end
-
         if currentPhase == 3 and planningTakeover(playerColor) and not p.takeoverTarget then
             broadcastToColor("You must have a valid takeover target.", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
+        end
+        if rebelSneakAttackPhase and p.rebelSneakAttack and p.selectedCard then
+            local info = card_db[getObjectFromGUID(p.selectedCard).getName()]
+            local conquerSettle = false
+            local node = p.miscSelectedCards
+            while node and node.value do
+                if node.power.name == "DISCARD_CONQUER_SETTLE" then
+                    conquerSettle = true
+                    break
+                end
+                node = node.next
+            end
+            if not info.flags["MILITARY"] and not conquerSettle then
+                broadcastToColor("You can only play Military worlds or use 'conquer non-military world' power.", playerColor, "White")
+                updateReadyButtons({playerColor, false})
+                return
+            end
         end
 
         if enforceRules and p.selectedCard and not p.canReady then
@@ -1571,7 +1543,7 @@ function checkAllReadyCo()
             local n = 0
 
             if takeDiscard then
-                n = giveMarkedCards(player, takeDiscard)
+                n = getMarkedCards(player, takeDiscard)
             else
                 n = #discardMarkedCards(player)
             end
@@ -2699,6 +2671,10 @@ function updateTableauState(player)
             end
         end
 
+        if rebelSneakAttackPhase and not p.rebelSneakAttack then
+            goto continue
+        end
+
         if info.flags["START_SAVE"] then
             local hits = Physics.cast({
                 origin = card.getPosition(),
@@ -2803,11 +2779,8 @@ function updateTableauState(player)
                 end
 
                 -- Create buttons for active powers
-                if rebelSneakAttackPhase and isRebelSneakAttackCard then
+                if rebelSneakAttackPhase and isRebelSneakAttackCard and p.rebelSneakAttack then
                     card.highlightOn("Yellow")
-                    dontAutoPass = true
-                    createCancelButton(card)
-                    createConfirmButton(card)
                 elseif ap and (selectedCard or miscActiveNode or p.beingTargeted) then
                     for name, power in pairs(ap) do
                         local powerName = ""
@@ -2815,7 +2788,8 @@ function updateTableauState(player)
                         local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
 
                         if power.codes["AGAINST_REBEL"] and selectedInfo and not selectedInfo.flags["REBEL"] or 
-                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] then
+                            miscActiveNode and miscActiveNode.value ~= card.getGUID() and requiresConfirm[fullName] or
+                            rebelSneakAttackPhase and (name == "PAY_MILITARY" or power.codes["PAY_MILITARY"]) then
                             goto skip_power
                         end
 
@@ -2876,12 +2850,15 @@ function updateTableauState(player)
                     end
                 elseif ap and not takeoverPhase then
                     for name, power in pairs(ap) do
+                        local isTakeoverPower = isTakeoverPower(power)
+
                         -- check if can pay cost
-                        if name == "TAKEOVER_PRESTIGE" and p.prestigeCount <= 0 then
+                        if name == "TAKEOVER_PRESTIGE" and p.prestigeCount <= 0 or (rebelSneakAttackPhase and isTakeoverPower) then
                             goto skip
                         end
+
                         -- make buttons for takeover powers
-                        if useTakeovers and isTakeoverPower(power) and not miscSelected or ap["UPGRADE_WORLD"] then
+                        if useTakeovers and isTakeoverPower and not miscSelected or ap["UPGRADE_WORLD"] then
                             local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
                             dontAutoPass = true
                             if not used then
@@ -3031,6 +3008,7 @@ function updateTableauState(player)
                 end
             end
         end
+        ::continue::
     end
 
     -- Force the player ready when they have nothing left to do
@@ -3303,23 +3281,13 @@ function cancelPowerClick(obj, player, rightClick)
     local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
     local info = card_db[obj.getName()]
 
-    if currentPhase == 3 then
-        if rebelSneakAttackPhase and p.rebelSneakAttack then
-            -- Cancelling rebel sneak attack, must cancel and undo all used cards for this step of phase
-            if p.selectedCard then
-            else
-                p.rebelSneakAttack = false
-                updateReadyButtons({player, true})
-                return
-            end
-        elseif (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
-            if p.upgradeWorldNew then
-                local card = getObjectFromGUID(p.upgradeWorldNew)
-                highlightOff(card)
-            end
-            p.upgradeWorldOld = nil
-            p.upgradeWorldNew = nil
+    if currentPhase == 3 and (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
+        if p.upgradeWorldNew then
+            local card = getObjectFromGUID(p.upgradeWorldNew)
+            highlightOff(card)
         end
+        p.upgradeWorldOld = nil
+        p.upgradeWorldNew = nil
     end
 
     if node and node.value == p.miscSelectedCards.value and currentPhase == 3 then
@@ -3334,7 +3302,7 @@ function cancelPowerClick(obj, player, rightClick)
         refreshTakeoverMenu(player)
     elseif currentPhase ~= 3 and currentPhase ~= 2 then
         p.selectedCard = nil
-        p.selectedCardPower = ""
+        p.selectedCardPower = nil
         p.selectedGoods = {}
     elseif useTakeovers and currentPhase == 3 then
         if not p.miscSelectedCards.value then
@@ -3351,6 +3319,7 @@ function cancelPowerClick(obj, player, rightClick)
     for _, obj in pairs(Player[player].getHandObjects(1)) do
         if obj.is_face_down then
             obj.flip()
+            obj.removeTag("Discard")
         end
     end
 
@@ -3421,8 +3390,6 @@ function confirmPowerClick(obj, player, rightClick)
             else
                 broadcastToColor("Please discard the required number of cards.", player, "White")
             end
-            return
-        elseif rebelSneakAttackPhase and p.rebelSneakAttack then
             return
         end
 

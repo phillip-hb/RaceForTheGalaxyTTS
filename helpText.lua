@@ -205,9 +205,11 @@ function updateHelpText(playerColor)
                 local totalMil = p.powersSnapshot["EXTRA_MILITARY"] + p.powersSnapshot["BONUS_MILITARY"] + tempMilitary + specialtyBonus
                 if totalMil >= def then p.canReady = true end
                 setHelpText(playerColor, "Settle: " .. def .. " defense. (Military " .. totalMil .. "/" .. def .. ")")
+            elseif rebelSneakAttackPhase and p.selectedCard then
+                setHelpText(playerColor, "Settle: can only play Military worlds.")
             else
                 if reduceZero then
-                    p.canReady = true
+                    p.canReady = truefff
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
                     if payMilitary then
