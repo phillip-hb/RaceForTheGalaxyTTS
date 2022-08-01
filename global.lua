@@ -11,6 +11,8 @@ advanced2p = false
 placeTwoPhase = false
 takeoverPhase = false
 queueTakeoverPhase = false
+securityCouncilPhase = false
+queueSecurityCouncilPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
 searchPhase = false
@@ -88,7 +90,7 @@ delayNextPhaseTime = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
 
-requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1,["UPGRADE_WORLD"]=1}
 goodsHighlightColor = {
@@ -200,10 +202,11 @@ function onSave()
     saved_data.selectLastPhase = selectLastPhase
     saved_data.exploreAfterPhase = exploreAfterPhase
     saved_data.firstPlayer = firstPlayer
-    saved_data.firstRound = firstRound
     saved_data.rebelSneakAttackPhase = rebelSneakAttackPhase
     saved_data.queueRebelSneakAttackPhase = queueRebelSneakAttackPhase
     saved_data.denyTakeoverPhase = denyTakeoverPhase
+    saved_data.securityCouncilPhase = securityCouncilPhase
+    saved_data.queueSecurityCouncilPhase = queueSecurityCouncilPhase
     return JSON.encode(saved_data)
 end
 
@@ -232,10 +235,11 @@ function onload(saved_data)
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
         firstPlayer = data.firstPlayer or "Yellow"
-        firstRound = data.firstRound
         denyTakeoverPhase = data.denyTakeoverPhase
         rebelSneakAttackPhase = data.rebelSneakAttackPhase
         queueRebelSneakAttackPhase = data.queueRebelSneakAttackPhase
+        securityCouncilPhase = data.securityCouncilPhase
+        queueSecurityCouncilPhase = data.queueSecurityCouncilPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -1611,6 +1615,7 @@ function checkAllReadyCo()
     -- Trigger takeovers
     if useTakeovers and not takeoverPhase then
         local takeoverTriggered = false
+        local canPreventTakeover = nil
         for _, player in pairs(players) do
             local p = playerData[player]
             if p.takeoverTarget then
@@ -1634,6 +1639,10 @@ function checkAllReadyCo()
                 if Player[targetPlayer].seated then
                     broadcastToColor("You are being targeted for a takeover by " .. (Player[player].steam_name or player) .. "!", targetPlayer, "Purple")
                 end
+            end
+
+            if p.powersSnapshot["PREVENT_TAKEOVER"] then
+                canPreventTakeover = player
             end
         end
 
@@ -2870,7 +2879,7 @@ function updateTableauState(player)
                 end
             elseif currentPhase == "4" then -- consume phase
                 local baseAmount = {}
-                local goodslimit = 1
+                local goodslimit = {}
                 local enoughGoods = false
 
                 if info.activePowers[currentPhase] then
@@ -2881,11 +2890,13 @@ function updateTableauState(player)
 
                 if next(baseAmount) then
                     for name, power in pairs(info.activePowers[currentPhase]) do
+                        if not goodslimit[name] then goodslimit[name] = 1 end
+
                         if requiresGoods[name] then
                             if name == "CONSUME_ANY" or name == "CONSUME_ALL" or name == "CONSUME_3_DIFF" or name == "CONSUME_N_DIFF" or name == "TRADE_ACTION" then
-                                goodslimit = goodsCount["TOTAL"]
+                                goodslimit[name] = goodsCount["TOTAL"]
                             elseif name:sub(1,7) == "CONSUME" then
-                                goodslimit = goodsCount[name:sub(9, name:len())]
+                                goodslimit[name] = goodsCount[name:sub(9, name:len())]
                             end
 
                             if power.name ~= "DISCARD_HAND" and power.codes["CONSUME_TWO"] then
@@ -2900,10 +2911,10 @@ function updateTableauState(player)
                                 baseAmount[name] = 0
                             end
 
-                            goodslimit = math.min(math.max(1, power.times * baseAmount[name]), goodslimit)
+                            goodslimit[name] = math.min(math.max(1, power.times * baseAmount[name]), goodslimit[name])
                         elseif name == "CONSUME_PRESTIGE" then
                             baseAmount[name] = 1
-                            goodslimit = p.prestigeCount
+                            goodslimit[name] = p.prestigeCount
                         end
                     end
                 end
@@ -2911,7 +2922,7 @@ function updateTableauState(player)
                 if not selectedCard and ap then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
-                        if (not used or not used[name]) and baseAmount[name] <= goodslimit then
+                        if (not used or not used[name]) and baseAmount[name] <= goodslimit[name] then
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
                             local prefix = (currentPhase == "4" and optionalPowers[name]) and "(Optional) " or ""
@@ -2927,7 +2938,11 @@ function updateTableauState(player)
                         createConfirmButton(selectedCard)
                     end
 
-                    p.mustConsumeCount = math.max(baseAmount[p.selectedCardPower], goodslimit)
+                    p.mustConsumeCount = math.max(baseAmount[p.selectedCardPower], goodslimit[p.selectedCardPower])
+
+                    if p.selectedCardPower == "DRAW_LUCKY" then
+                        createGamblingWorldUi(card)
+                    end
                 end
             elseif currentPhase == "5" then
                 if not selectedCard and ap then
@@ -3083,6 +3098,7 @@ function usePowerClick(obj, player, rightClick, powerIndex)
         return
     end
 
+    local slot = obj
     if obj.hasTag("Slot") then obj = getCard(obj) end
 
     local p = playerData[player]
@@ -3432,6 +3448,16 @@ function confirmPowerClick(obj, player, rightClick)
         if p.selectedCardPower == "CONSUME_PRESTIGE" then
             discardPrestige(player, power.times)
             paidCost = true
+        elseif p.selectedCardPower == "DRAW_LUCKY" then
+            local newCard = drawCard()
+            local newCardInfo = card_db[newCard.getName()]
+            local n = obj.getVar("number") or 1
+            broadcastToAll((Player[player].steam_name or player) .. " guessed " .. n .. " and drew \"" .. newCard.getName() .. "\" (cost: " .. newCardInfo.cost .. ").", player)
+            if n == newCardInfo.cost then
+                newCard.deal(1, player)
+            else
+                discardCard(newCard)
+            end
         elseif p.selectedCardPower == "DISCARD_HAND" then
             if enforceRules and not p.canConfirm then
                 broadcastToColor("Please discard the required number of cards.", player, "White")
@@ -3796,4 +3822,25 @@ function resolveTakeovers()
     end
 
     return takeoverSuccess
+end
+
+function gamblingWorldChangeValue(obj, player, rightClick)
+    local n = obj.getVar("number")
+    if not n then
+        n = 1
+    end
+
+    if rightClick then
+        if n > 1 then
+            n = n - 1
+        end
+    elseif n < 7 then
+        n = n + 1
+    end
+
+    obj.editButton({
+        index = 0,
+        label = n
+    })
+    obj.setVar("number", n)
 end

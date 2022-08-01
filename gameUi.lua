@@ -377,6 +377,19 @@ function drawTakeoverLines()
     Global.setVectorLines(lines)
 end
 
+function createGamblingWorldUi(card)
+    local n = card.getVar("number") or 1
+    card.createButton({
+        click_function = "gamblingWorldChangeValue",
+        function_owner = Global,
+        width = 400,
+        height = 400,
+        label = n,
+        font_size = 300,
+        position = {0, 1, -0.3},
+    })
+end
+
 -- The default vector lines are the colored square around each player action selection box
 function getDefaultVectorLines()
     return {{

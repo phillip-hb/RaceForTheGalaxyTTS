@@ -268,6 +268,8 @@ function updateHelpText(playerColor)
                 setHelpText(playerColor, "▼ Consume: discard to " .. reward .. appendStr)
             elseif p.selectedCardPower == "CONSUME_PRESTIGE" then
                 setHelpText(playerColor, "▲ Consume: use prestige?")
+            elseif p.selectedCardPower == "DRAW_LUCKY" then
+                setHelpText(playerColor, "▲ Consume: guess number from 1-7.")
             else
                 setHelpText(playerColor, "▲ Consume: select goods to consume.")
             end

@@ -1264,7 +1264,7 @@ E@2:1
 P:1:DISCARD_ANY:0:0
 P:4:TRADE_ANY:2:0
 
-N:Gambling World
+N:Gambling World+
 T:1:1:1
 E@2:1
 #E:0:0:1:1:0
@@ -1762,7 +1762,7 @@ activePowers = {
           DISCARD_HAND = "Discard from hand.",
           DRAW = "Draw card(s).",
           ANTE_CARD = "Gamble draw.",
-          DRAW_LUCKY = "Gamble draw.",
+          DRAW_LUCKY = "Draw if lucky.",
           VP = "Gain VP."
      },
      ["5"] = {
