@@ -56,7 +56,7 @@ function player(i)
         improvedLogistics = false,
         rebelSneakAttack = false,
         denyTakeover = false,
-        afterSettle = false,
+        exploreAfterPower = false,
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
         startSavePhase = nil,
@@ -585,7 +585,7 @@ function getMarkedCards(player, target)
 end
 
 -- Check hand zone for any 'Selected' cards and attempt to play them
-function attemptPlayCard(card, player, fromTakeover)
+function attemptPlayCard(card, player)
     if type(card) == "table" then
         player = card[2]
         card = card[1]
@@ -622,7 +622,7 @@ function attemptPlayCard(card, player, fromTakeover)
 
             local pos = tableau.positionToWorld(sp[i].position)
             local rot = tableau.getRotation()
-            if not fromTakeover then
+            if not takeoverPhase then
                 card.setPosition(add(pos, {0, 0.04, 0}))
             else
                 card.setPositionSmooth(add(pos, {0, 0.04, 0}))
@@ -632,14 +632,15 @@ function attemptPlayCard(card, player, fromTakeover)
             card.setLock(true)
             highlightOff(card)
             p.lastPlayedCard = card.getGUID()
+            p.ignoreCards[card.getGUID()] = true
 
             local info = card_db[card.getName()]
             local isWindfall = info.flags["WINDFALL"]
 
             -- if windfall, place a goods on top
-            if (isWindfall or p.powersSnapshot["AUTO_PRODUCE"]) and not fromTakeover then
+            if (isWindfall or p.powersSnapshot["AUTO_PRODUCE"]) and not takeoverPhase then
                 placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
-            elseif isWindfall and fromTakeover and goods then
+            elseif isWindfall and takeoverPhase and goods then
                 goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
                 goods.setRotationSmooth({rot[1], rot[2], 180})
                 p.incomingGood = true
@@ -1299,7 +1300,7 @@ function playerReadyClicked(playerColor, forced, playSound)
     elseif currentPhase == 2 or currentPhase == 3 then
         local node = getLastNode(p.miscSelectedCards)
 
-        if p.beforeDevelop or p.afterSettle or node and node.power and requiresConfirm[concatPowerName(node.power)] then
+        if p.beforeDevelop or p.exploreAfterPower or node and node.power and requiresConfirm[concatPowerName(node.power)] then
             broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
@@ -1588,7 +1589,7 @@ function checkAllReadyCo()
             local p = playerData[player]
             if p.powersSnapshot["EXPLORE_AFTER"] then
                 broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. " to resolve \"Imperium Fuel Depot.\"", player)
-                p.afterSettle = true
+                p.exploreAfterPower = true
                 p.handCountSnapshot = countCardsInHand(player, false) + p.powersSnapshot["EXPLORE_AFTER"] + p.powersSnapshot["DRAW_AFTER"]
                 updateReadyButtons({player, false})
             else
@@ -1596,8 +1597,9 @@ function checkAllReadyCo()
             end
         end
         return 1
+    else
+        exploreAfterPhase = false
     end
-    exploreAfterPhase = false
 
     -- Trigger Rebel Sneak Attack
     if queueRebelSneakAttackPhase and not rebelSneakAttackPhase then
@@ -2170,22 +2172,15 @@ function capturePowersSnapshot(player, phase)
         -- Check if have takeover powers
         if not results["TAKEOVER_POWERS"] and phase3Ap then
             for name, ap in pairs(phase3Ap) do
-                if takeoverPowers[name] then
+                if isTakeoverPower(ap) then
                     results["TAKEOVER_POWERS"] = 1
                     break
-                else
-                    for code, _ in pairs(ap.codes) do
-                        if takeoverPowers[code] then
-                            results["TAKEOVER_POWERS"] = 1
-                            break
-                        end
-                    end
                 end
             end
         end
 
-        -- Place two triggered, skip the action card power and the last played card's powers
-        if (placeTwoPhase or takeoverPhase) and (card.hasTag("Action Card") or card.getGUID() == p.lastPlayedCard) or card.hasTag("Ignore Tableau") then
+        -- Skip the action card power or cards played this phase
+        if (placeTwoPhase or takeoverPhase or rebelSneakAttackPhase) and card.hasTag("Action Card") or card.hasTag("Ignore Tableau") or p.ignoreCards[card.getGUID()] then
             goto next_card
         end
 
@@ -2751,7 +2746,7 @@ function updateTableauState(player)
                     end
                 end
             elseif currentPhase == "3" and exploreAfterPhase then   -- end of settle phase
-                if exploreAfterPhase and info.passivePowers[currentPhase] and info.passivePowers[currentPhase]["EXPLORE_AFTER"] and p.afterSettle then
+                if exploreAfterPhase and info.passivePowers[currentPhase] and info.passivePowers[currentPhase]["EXPLORE_AFTER"] and p.exploreAfterPower then
                     card.highlightOn("Yellow")
                     createConfirmButton(card)
                 end
@@ -3371,7 +3366,7 @@ function confirmPowerClick(obj, player, rightClick)
         end, 1)
         return
     elseif currentPhase == "2" or currentPhase == "3" then
-        if p.beforeDevelop or p.afterSettle then
+        if p.beforeDevelop or p.exploreAfterPower then
             local cardsInHand = countCardsInHand(player, false)
             local discarded = oldHandCount - cardsInHand
             local discardTarget = 1
@@ -3380,7 +3375,7 @@ function confirmPowerClick(obj, player, rightClick)
             end
             if discarded >= discardTarget then
                 p.beforeDevelop = false
-                p.afterSettle = false
+                p.exploreAfterPower = false
                 discardMarkedCards(player)
                 queueUpdate(player, true)
                 if currentPhase == "3" then

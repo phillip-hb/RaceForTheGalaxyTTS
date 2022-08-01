@@ -110,7 +110,7 @@ function updateHelpText(playerColor)
     -- settle
     elseif currentPhase == 3 and exploreAfterPhase then
         local discardTarget = 1
-        if p.afterSettle then
+        if p.exploreAfterPower then
             if discarded < discardTarget then
                 p.canFlip = true
                 p.canConfirm = false
@@ -223,7 +223,7 @@ function updateHelpText(playerColor)
             end
         else
             if rebelSneakAttackPhase and p.rebelSneakAttack then
-                setHelpText(playerColor, 'Settle: resolve "Rebel Sneak Attack."')
+                setHelpText(playerColor, 'Settle: may play a military world.')
             elseif placeTwoPhase then
                 if not p.powersSnapshot["PLACE_TWO"] then
                     setHelpText(playerColor, "Settle: waiting for other players.")
