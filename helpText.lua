@@ -208,8 +208,10 @@ function updateHelpText(playerColor)
             elseif rebelSneakAttackPhase and p.selectedCard then
                 setHelpText(playerColor, "Settle: can only play Military worlds.")
             else
-                if reduceZero then
-                    p.canReady = truefff
+                if placeTwoPhase and not p.improvedLogistics then
+                    setHelpText(playerColor, "Settle: waiting for other players.")
+                elseif reduceZero then
+                    p.canReady = true
                     setHelpText(playerColor, "Settle: paid w/ " .. reduceZeroName .. ".")
                 else
                     if payMilitary then

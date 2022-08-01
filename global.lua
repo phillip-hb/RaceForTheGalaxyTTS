@@ -10,6 +10,7 @@ gameStarted = false
 advanced2p = false
 placeTwoPhase = false
 takeoverPhase = false
+queueTakeoverPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
 searchPhase = false
@@ -55,6 +56,7 @@ function player(i)
         beforeDevelop = false,
         improvedLogistics = false,
         rebelSneakAttack = false,
+        doTakeover = false,
         denyTakeover = false,
         exploreAfterPower = false,
         upgradeWorldOld = nil,
@@ -189,6 +191,7 @@ function onSave()
     saved_data.playerData = playerData
     saved_data.placeTwoPhase = placeTwoPhase
     saved_data.takeoverPhase = takeoverPhase
+    saved_data.queueTakeoverPhase = queueTakeoverPhase
     saved_data.useTakeovers = useTakeovers
     saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
     saved_data.enforceRules = enforceRules
@@ -220,6 +223,7 @@ function onload(saved_data)
         playerData = data.playerData
         placeTwoPhase = data.placeTwoPhase or false
         takeoverPhase = data.takeoverPhase or false
+        queueTakeoverPhase = data.queueTakeoverPhase or false
         useTakeovers = data.useTakeovers or false
         queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
         enforceRules = data.enforceRules
@@ -1424,6 +1428,8 @@ function checkAllReadyCo()
         local p = playerData[player]
         local node = p.miscSelectedCards
 
+        p.lastPlayedCard = nil
+
         Global.UI.setAttribute("takeoverMenu_" .. player, "active", false)
         if p.powersSnapshot["TAKE_DISCARDS"] and phase == 100 then takeDiscard = player end
 
@@ -1434,11 +1440,15 @@ function checkAllReadyCo()
                 local info = card_db[card.getName()]
                 local power = node.power
                 if power and (power.name == 'DISCARD' and not power.codes["TAKEOVER_MILITARY"] or power.name == "DISCARD_REDUCE" or power.name == "DISCARD_CONQUER_SETTLE") then
-                    if power.name == "DISCARD_CONQUER_SETTLE" and info.passivePowers["3"] and (info.passivePowers["3"]["EXTRA_MILITARY"] or info.passivePowers["3"]["BONUS_MILITARY"]) then
-                        p.discardLaterFromTableau[card.getGUID()] = true
+                    if power.name == "DISCARD_CONQUER_SETTLE" or info.passivePowers["3"] and (info.passivePowers["3"]["EXTRA_MILITARY"] or info.passivePowers["3"]["BONUS_MILITARY"])
+                        or power.name == "DISCARD" and isTakeoverPower(power) then
                         local data = cardAlreadyUsedInit()
+                        
                         data.triggerCard = node.value
                         data.selectedCard = node.value
+
+                        p.discardLaterFromTableau[card.getGUID()] = true
+
                         if not p.cardsAlreadyUsed[node.value] then p.cardsAlreadyUsed[node.value] = {} end
                         p.cardsAlreadyUsed[node.value][power.name] = data
                     else
@@ -1478,9 +1488,6 @@ function checkAllReadyCo()
     end
 
     -- play selected cards in hand
-    local placeTwo = {false,false,false,false}
-    local placeTwoTriggered = false
-    local rebelSneakAttack = {false,false,false,false}
     for _, player in pairs(players) do
         local p = playerData[player]
         for _, obj in pairs(Player[player].getHandObjects(1)) do
@@ -1526,17 +1533,15 @@ function checkAllReadyCo()
         end
 
         -- Set flags for rebel sneak attack
-        if not rebelSneakAttackPhase and phase == 3 and p.powersSnapshot["DISCARD_PLACE_MILITARY"] and p.lastPlayedCard then
+        if not takeoverPhase and not rebelSneakAttackPhase and phase == 3 and p.powersSnapshot["DISCARD_PLACE_MILITARY"] and p.lastPlayedCard then
             p.rebelSneakAttack = true
             queueRebelSneakAttackPhase = true
         end
         
         -- Set flags for improved logistics
-        if not placeTwoPhase and phase == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard then
-            placeTwo[p.index] = true
+        if not placeTwoPhase and phase == 3 and p.powersSnapshot["PLACE_TWO"] and p.lastPlayedCard and not rebelSneakAttackPhase then
             p.improvedLogistics = true
-            placeTwoPhase = true
-            placeTwoTriggered = true
+            queuePlaceTwoPhase = true
         end
 
         -- discard all face down cards in hand
@@ -1558,7 +1563,7 @@ function checkAllReadyCo()
 
     wait(0.1)
 
-    -- figure out who the first player is going to be
+    -- figure out who the 'first' player is going to be
     if firstRound then
         local lowest = 100
         local index = 0
@@ -1583,28 +1588,77 @@ function checkAllReadyCo()
 
     -- Trigger Imperium Fuel Depot
     if triggerExploreAfterPhase and not exploreAfterPhase then
-        transitionNextPhase = false
         exploreAfterPhase = true
+        wait(1)
+        transitionNextPhase = false
         for _, player in pairs(players) do
             local p = playerData[player]
             if p.powersSnapshot["EXPLORE_AFTER"] then
                 broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. " to resolve \"Imperium Fuel Depot.\"", player)
                 p.exploreAfterPower = true
-                p.handCountSnapshot = countCardsInHand(player, false) + p.powersSnapshot["EXPLORE_AFTER"] + p.powersSnapshot["DRAW_AFTER"]
-                updateReadyButtons({player, false})
+                p.handCountSnapshot = countCardsInHand(player)
             else
                 updateReadyButtons({player, true})
             end
+            queueUpdate(player)
         end
+        sound.AssetBundle.playTriggerEffect(1)
         return 1
     else
         exploreAfterPhase = false
+    end
+
+    -- Trigger takeovers
+    if useTakeovers and not takeoverPhase then
+        local takeoverTriggered = false
+        for _, player in pairs(players) do
+            local p = playerData[player]
+            if p.takeoverTarget then
+                broadcastToAll((Player[player].steam_name or player) .. " is attempting a takeover!", player)
+                takeoverTriggered = true
+                p.doTakeover = true
+
+                -- Check if spending prestige
+                local node = p.prevMiscSelectedCards
+                if node.power and node.power.name == "TAKEOVER_PRESTIGE" then
+                    discardPrestige(player, 1)
+                end
+
+                local card = getObjectFromGUID(p.takeoverTarget)
+                local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
+                local otherp = playerData[targetPlayer]
+
+                if not otherp.beingTargeted then otherp.beingTargeted = {} end
+
+                otherp.beingTargeted[p.takeoverTarget] = true
+                if Player[targetPlayer].seated then
+                    broadcastToColor("You are being targeted for a takeover by " .. (Player[player].steam_name or player) .. "!", targetPlayer, "Purple")
+                end
+            end
+        end
+
+        if takeoverTriggered then
+            takeoverPhase = true
+            drawTakeoverLines()
+            sound.AssetBundle.playTriggerEffect(1)
+            wait(0.5)
+            transitionNextPhase = false
+            for _, player in pairs(players) do
+                if not playerData[player].beingTargeted then
+                    updateReadyButtons({player, true})
+                end
+            end
+            return 1
+        end
+    else
+        takeoverPhase = false
     end
 
     -- Trigger Rebel Sneak Attack
     if queueRebelSneakAttackPhase and not rebelSneakAttackPhase then
         queueRebelSneakAttackPhase = false
         rebelSneakAttackPhase = true
+        wait(0.1)
         transitionNextPhase = false
         for _, player in pairs(players) do
             local p = playerData[player]
@@ -1624,71 +1678,24 @@ function checkAllReadyCo()
         rebelSneakAttackPhase = false
     end
 
-    -- Trigger takeovers
-    if useTakeovers and not takeoverPhase then
-        local targetedPlayers = {}
-        local intendTakeover = {false, false, false, false}
-        local takeoverTriggered = false
-        for _, player in pairs(players) do
-            local p = playerData[player]
-            if p.takeoverTarget then
-                broadcastToAll((Player[player].steam_name or player) .. " is attempting a takeover!", player)
-                takeoverTriggered = true
-                intendTakeover[p.index] = true
-
-                -- Check if spending prestige
-                local node = p.prevMiscSelectedCards
-                if node.power and node.power.name == "TAKEOVER_PRESTIGE" then
-                    discardPrestige(player, 1)
-                end
-
-                local card = getObjectFromGUID(p.takeoverTarget)
-                local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
-                local otherp = playerData[targetPlayer]
-
-                if not otherp.beingTargeted then otherp.beingTargeted = {} end
-
-                otherp.beingTargeted[p.takeoverTarget] = true
-                if Player[targetPlayer].seated then
-                    broadcastToColor("You are being targeted for a takeover by " .. (Player[player].steam_name or player) .. "!", targetPlayer, "Purple")
-                end
-            end
-
-            queueUpdate(player)
-        end
-
-        if takeoverTriggered then
-            transitionNextPhase = false
-            sound.AssetBundle.playTriggerEffect(1)
-            takeoverPhase = true
-            drawTakeoverLines()
-            return 1
-        end
-    else
-        takeoverPhase = false
-    end
-
     -- Trigger Improved Logistics
-    for _, player in pairs(players) do
-        if placeTwoTriggered then
-            transitionNextPhase = false
-            if placeTwo[playerData[player].index] then
+    if queuePlaceTwoPhase and not placeTwoPhase then
+        placeTwoPhase = true
+        sound.AssetBundle.playTriggerEffect(1)
+        wait(0.1)
+        transitionNextPhase = false
+        for _, player in pairs(players) do
+            if playerData[player].improvedLogistics then
                 broadcastToAll("Waiting for " .. (Player[player].steam_name or player) .. "'s to resolve Improved Logistics.", player)
             else
                 updateReadyButtons({player, true})
             end
+            queueUpdate(player)
         end
-
-        queueUpdate(player)
-    end
-
-    if placeTwoTriggered then
-        sound.AssetBundle.playTriggerEffect(1)
-        transitionNextPhase = false
         return 1
     end
 
-    -- delete marked cards
+    -- Delete marked cards
     for _, player in pairs(players) do
         local p = playerData[player]
         for guid, _ in pairs(p.discardLaterFromTableau) do
@@ -1837,10 +1844,10 @@ function beginNextPhase()
     if currentPhaseIndex <= 0 then currentPhaseIndex = 0 end
 
     queuePlaceTwoPhase = false
-    queueRebelSneakAttackPhase = false
     placeTwoPhase = false
-    takeoverPhase = false
+    queueRebelSneakAttackPhase = false
     rebelSneakAttackPhase = false
+    takeoverPhase = false
 
     -- Apply end of phase powers here
     if phase == 5 then
@@ -2180,7 +2187,7 @@ function capturePowersSnapshot(player, phase)
         end
 
         -- Skip the action card power or cards played this phase
-        if (placeTwoPhase or takeoverPhase or rebelSneakAttackPhase) and card.hasTag("Action Card") or card.hasTag("Ignore Tableau") or p.ignoreCards[card.getGUID()] then
+        if (placeTwoPhase or rebelSneakAttackPhase) and card.hasTag("Action Card") or card.hasTag("Ignore Tableau") or p.ignoreCards[card.getGUID()] then
             goto next_card
         end
 
@@ -2705,10 +2712,6 @@ function updateTableauState(player)
 
             if miscSelected then
                 highlightOn(card, "rgb(0,1,0)", player)
-            -- TODO: Highlight for Improved Logistics
-            -- elseif placeTwoPhase and info.passivePowers["3"] and info.passivePowers["3"]["PLACE_TWO"] or
-            --         takeoverPhase and p.takeoverSource == card.getGUID() then
-            --     card.highlightOn("Yellow")
             end
 
             if currentPhaseIndex == 0 and info.flags["START_SAVE"] and firstRound then  -- Galactic scavengers
@@ -2761,9 +2764,7 @@ function updateTableauState(player)
                     elseif p.takeoverSource == card.getGUID() then
                         createStrengthLabel(player, card, false)
                     end
-                end
-
-                if isUpgradingWorld then
+                elseif isUpgradingWorld then
                     if info.type == 1 and not info.flags["MILITARY"] then
                         createSelectWorldButton(card)
                     end
@@ -2774,7 +2775,8 @@ function updateTableauState(player)
                 end
 
                 -- Create buttons for active powers
-                if rebelSneakAttackPhase and isRebelSneakAttackCard and p.rebelSneakAttack then
+                if rebelSneakAttackPhase and isRebelSneakAttackCard and p.rebelSneakAttack or
+                    placeTwoPhase and passives and passives["PLACE_TWO"] then
                     card.highlightOn("Yellow")
                 elseif ap and (selectedCard or miscActiveNode or p.beingTargeted) then
                     for name, power in pairs(ap) do
@@ -3729,7 +3731,7 @@ end
 
 function resolveTakeovers()
     local takeoverSuccess = false
-    local players = getSeatedPlayersWithHands()
+    local players = playerOrder
     local firstIndex = playerData[firstPlayer].index
     local taken = {}
 
@@ -3775,7 +3777,7 @@ function resolveTakeovers()
                     discardCard(targetCard)
                     broadcastToAll((Player[player].steam_name or player) .. ' successfully destroyed "' .. targetCard.getName() ..'."', player)
                 else
-                    attemptPlayCard(targetCard, player, true)
+                    attemptPlayCard(targetCard, player)
                     broadcastToAll((Player[player].steam_name or player) .. '\'s takeover of "' .. targetCard.getName() ..'" was successful!', player)
                 end
                 takeoverSuccess = true
