@@ -64,6 +64,9 @@ function player(i)
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
         startSavePhase = nil,
+        selectedAnte = nil,
+        anteSucceed = false,
+        selectedReward = nil,
         recordedCards = {},
         prestigeChips = {},
         prestigeCount = 0,
@@ -100,7 +103,7 @@ goodsHighlightColor = {
      ["ALIEN"] = color(0.933, 0.909, 0.105),
      ["ANY"] = "White"
 }
-optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1,["CONSUME_PRESTIGE"]=1}
+optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1,["CONSUME_PRESTIGE"]=1,["ANTE_CARD"]=1}
 
 -- Determines which settle powers can chain with other settle powers. If separated with '|', the first word is the key, the rest are matching codes.
 -- Key = card's power, Value = what the key can be chained with
@@ -2423,6 +2426,18 @@ function updateHandState(playerColor)
                 end
 
                 ::skip::
+            elseif phase == 4 and p.selectedCardPower == "ANTE_CARD" and info.cost >= 1 and info.cost <= 6 and not p.anteSucceed then
+                if not p.selectedAnte then
+                    createSelectButtonOnCard(obj)
+                elseif p.selectedAnte == obj.getGUID() then
+                    createCancelButtonOnCard(obj)
+                end
+            elseif phase == 4 and p.anteSucceed and obj.hasTag("Gamble Reward") then
+                if not p.selectedReward then
+                    createSelectButtonOnCard(obj)
+                elseif p.selectedReward == obj.getGUID() then
+                    createCancelButtonOnCard(obj)
+                end
             end
 
             if phase == 1 and p.powersSnapshot["DISCARD_ANY"] ~= nil and not obj.hasTag("Explore Highlight") then
@@ -2430,14 +2445,16 @@ function updateHandState(playerColor)
             end
 
             -- Explore orange highlight
-            if phase == 1 and obj.hasTag("Explore Highlight") then
+            if phase == 1 and obj.hasTag("Explore Highlight") or obj.hasTag("Gamble Reward") then
                 obj.highlightOn("Orange")
-            elseif currentPhaseIndex == 0 or phase and phase ~= 1 and obj.hasTag("Explore Highlight") then
+            elseif currentPhaseIndex == 0 or phase and (phase ~= 1) and obj.hasTag("Explore Highlight") then
                 obj.highlightOff()
                 obj.removeTag("Explore Highlight")
             end
 
-            if obj.hasTag("Selected") then
+            if obj.hasTag("Selected") and obj.hasTag("Gamble Reward") then
+                obj.highlightOn(color(0, 1, 0))
+            elseif obj.hasTag("Selected") and not p.anteSucceed then
                 highlightOn(obj, "rgb(0,1,0,1)", playerColor)
             elseif obj.hasTag("Marked") then
                 highlightOn(obj, "Red", playerColor)
@@ -2932,7 +2949,11 @@ function updateTableauState(player)
                 elseif selectedCard == card then
                     p.canReady = false
                     dontAutoPass = true
-                    createCancelButton(card)
+                    if p.selectedCardPower == "ANTE_CARD" and p.anteSucceed then
+                       -- Do something for when ante is successful 
+                    else
+                        createCancelButton(card)
+                    end
 
                     if requiresConfirm[p.selectedCardPower] then
                         createConfirmButton(selectedCard)
@@ -3314,6 +3335,7 @@ function cancelPowerClick(obj, player, rightClick)
         cancelMarkedCards(player, obj.getGUID())
         refreshTakeoverMenu(player)
     elseif currentPhase ~= 3 and currentPhase ~= 2 then
+        p.selectedAnte = nil
         p.selectedCard = nil
         p.selectedCardPower = nil
         p.selectedGoods = {}
@@ -3452,7 +3474,7 @@ function confirmPowerClick(obj, player, rightClick)
             local newCard = drawCard()
             local newCardInfo = card_db[newCard.getName()]
             local n = obj.getVar("number") or 1
-            broadcastToAll((Player[player].steam_name or player) .. " guessed " .. n .. " and drew \"" .. newCard.getName() .. "\" (cost: " .. newCardInfo.cost .. ").", player)
+            broadcastToAll("Gambling World: " .. (Player[player].steam_name or player) .. " guessed " .. n .. " and drew \"" .. newCard.getName() .. "\" (cost: " .. newCardInfo.cost .. ").", player)
             if n == newCardInfo.cost then
                 newCard.deal(1, player)
             else
@@ -3467,6 +3489,65 @@ function confirmPowerClick(obj, player, rightClick)
             times = math.min(power.times, #discardMarkedCards(player))
             if times == 0 then return end
             paidCost = true
+        elseif p.selectedCardPower == "ANTE_CARD" then
+            local prefix =  "Gambling World: " .. (Player[player].steam_name or player)
+            if p.anteSucceed then
+                if p.selectedReward then
+                    local card = getObjectFromGUID(p.selectedReward)
+                    broadcastToAll(prefix .. " kept \"" .. card.getName() .. ".\"", player)
+
+                    for _, obj in pairs(Player[player].getHandObjects(1)) do
+                        obj.highlightOff()
+                        if obj.getGUID() ~= p.selectedReward and obj.hasTag("Gamble Reward") then
+                            obj.setTags({})
+                            discardCard(obj)
+                        else
+                            obj.setTags({})
+                        end
+                    end
+                    p.selectedReward = nil
+                elseif enforceRules then
+                    broadcastToColor("Please select a reward to keep.", player, "White")
+                    return
+                end
+            elseif p.selectedAnte then
+                local drawnCards = {}
+                local anteCard = getObjectFromGUID(p.selectedAnte)
+                local anteInfo = card_db[anteCard.getName()]
+
+                broadcastToAll(prefix .. " anted \"" .. anteCard.getName() .. "\" (cost:" .. anteInfo.cost .. ").", player)
+
+                for i=1, anteInfo.cost do
+                    local newCard = drawCard()
+                    local newInfo = card_db[newCard.getName()]
+                    drawnCards[#drawnCards+1] = newCard
+
+                    printToAll(prefix .. ' drew "' .. newCard.getName() .. '" (cost: ' .. newInfo.cost .. ').', "Grey")
+
+                    if newInfo.cost > anteInfo.cost then
+                        p.anteSucceed = true
+                    end
+                end
+
+                p.selectedAnte = nil
+                highlightOff(anteCard)
+
+                if p.anteSucceed then
+                    for _, card in pairs(drawnCards) do
+                        card.deal(1, player)
+                        card.addTag("Gamble Reward")
+                    end
+
+                    queueUpdate(player, true)
+                    return
+                else
+                    discardCard(anteCard)
+                    broadcastToAll(prefix .. " was unlucky and lost the ante.", player)
+                end
+            else
+                broadcastToColor("Please select a card to ante.", player, "White")
+                return
+            end
         end
     elseif currentPhase == "5" then
         if p.selectedCardPower == "DISCARD_HAND" then
@@ -3640,6 +3721,13 @@ function cardSelectClick(object, player, rightClick)
             -- p.miscSelectedCards = {}
             p.upgradeWorldNew = object.getGUID()
         end
+    elseif p.selectedCardPower == "ANTE_CARD" then
+        if p.anteSucceed then
+            p.selectedReward = object.getGUID()
+        else
+            p.selectedAnte = object.getGUID()
+        end
+        object.addTag("Selected")
     else
         p.selectedCard = object.getGUID()
         p.handCountSnapshot = countCardsInHand(player, true)
@@ -3660,11 +3748,16 @@ function cardCancelClick(object, player, rightClick)
 
     local p = playerData[player]
 
-    cancelAllMarkedCards(player, p.selectedCard)
+    if p.selectedCardPower == "ANTE_CARD" then
+        p.selectedAnte = nil
+        p.selectedReward = nil
+    else
+        cancelAllMarkedCards(player, p.selectedCard)
 
-    p.selectedCard = nil
-    p.selectedCardPower = ""
-    p.miscSelectedCards = {}
+        p.selectedCard = nil
+        p.selectedCardPower = ""
+        p.miscSelectedCards = {}
+    end
 
     object.removeTag("Selected")
     highlightOff(object)

@@ -1761,7 +1761,7 @@ activePowers = {
           CONSUME_PRESTIGE = "Consume prestige.",
           DISCARD_HAND = "Discard from hand.",
           DRAW = "Draw card(s).",
-          ANTE_CARD = "Gamble draw.",
+          ANTE_CARD = "Ante card and draw if lucky.",
           DRAW_LUCKY = "Draw if lucky.",
           VP = "Gain VP."
      },

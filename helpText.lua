@@ -270,6 +270,12 @@ function updateHelpText(playerColor)
                 setHelpText(playerColor, "▲ Consume: use prestige?")
             elseif p.selectedCardPower == "DRAW_LUCKY" then
                 setHelpText(playerColor, "▲ Consume: guess number from 1-7.")
+            elseif p.selectedCardPower == "ANTE_CARD" then
+                if p.anteSucceed then
+                    setHelpText(playerColor, "▼ Consume: select card to keep.")
+                else
+                    setHelpText(playerColor, "▼ Consume: select card to ante.")
+                end
             else
                 setHelpText(playerColor, "▲ Consume: select goods to consume.")
             end
