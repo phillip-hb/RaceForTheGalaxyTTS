@@ -232,6 +232,8 @@ function updateHelpText(playerColor)
                 else
                     setHelpText(playerColor, "▼ Settle: may play a 2nd world.")
                 end
+            elseif securityCouncilPhase then
+                setHelpText(playerColor, "Settle: prevent takeover?")
             else
                 setHelpText(playerColor, "▼ Settle: may play a world.")
             end

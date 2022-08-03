@@ -12,7 +12,6 @@ placeTwoPhase = false
 takeoverPhase = false
 queueTakeoverPhase = false
 securityCouncilPhase = false
-queueSecurityCouncilPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
 searchPhase = false
@@ -20,7 +19,6 @@ selectLastPhase = false
 exploreAfterPhase = false
 rebelSneakAttackPhase = false
 queueRebelSneakAttackPhase = false
-denyTakeoverPhase = false
 expansionLevel = 0
 selectedPhases = {}
 firstPlayer = "Yellow"
@@ -59,7 +57,7 @@ function player(i)
         improvedLogistics = false,
         rebelSneakAttack = false,
         doTakeover = false,
-        denyTakeover = false,
+        securityCouncil = false,
         exploreAfterPower = false,
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
@@ -93,7 +91,7 @@ delayNextPhaseTime = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
 
-requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1}
+requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1,["PREVENT_TAKEOVER"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
 canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1,["UPGRADE_WORLD"]=1}
 goodsHighlightColor = {
@@ -207,9 +205,7 @@ function onSave()
     saved_data.firstPlayer = firstPlayer
     saved_data.rebelSneakAttackPhase = rebelSneakAttackPhase
     saved_data.queueRebelSneakAttackPhase = queueRebelSneakAttackPhase
-    saved_data.denyTakeoverPhase = denyTakeoverPhase
     saved_data.securityCouncilPhase = securityCouncilPhase
-    saved_data.queueSecurityCouncilPhase = queueSecurityCouncilPhase
     return JSON.encode(saved_data)
 end
 
@@ -238,11 +234,9 @@ function onload(saved_data)
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
         firstPlayer = data.firstPlayer or "Yellow"
-        denyTakeoverPhase = data.denyTakeoverPhase
         rebelSneakAttackPhase = data.rebelSneakAttackPhase
         queueRebelSneakAttackPhase = data.queueRebelSneakAttackPhase
         securityCouncilPhase = data.securityCouncilPhase
-        queueSecurityCouncilPhase = data.queueSecurityCouncilPhase
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -1644,7 +1638,7 @@ function checkAllReadyCo()
                 end
             end
 
-            if p.powersSnapshot["PREVENT_TAKEOVER"] then
+            if p.powersSnapshot["PREVENT_TAKEOVER"] and p.prestigeCount > 0 then
                 canPreventTakeover = player
             end
         end
@@ -1652,7 +1646,24 @@ function checkAllReadyCo()
         if takeoverTriggered then
             takeoverPhase = true
             drawTakeoverLines()
-            sound.AssetBundle.playTriggerEffect(1)
+            if canPreventTakeover then
+                wait(1)
+                securityCouncilPhase = true
+                sound.AssetBundle.playTriggerEffect(1)
+                local activePlayer = canPreventTakeover
+                broadcastToAll("Waiting for " .. (Player[activePlayer].steam_name or activePlayer) .. " to resolve \"Pan-Galactic Security Council.\"", activePlayer)
+                wait(0.5)
+                transitionNextPhase = false
+                for _, player in pairs(players) do
+                    if player ~= activePlayer then
+                        updateReadyButtons({player, true})
+                    else
+                        playerData[player].securityCouncil = true
+                    end
+                    queueUpdate(player, true)
+                end
+                return 1
+            end
             wait(0.5)
             transitionNextPhase = false
             for _, player in pairs(players) do
@@ -2800,8 +2811,12 @@ function updateTableauState(player)
                     highlightOn(card, "Red", player)
                 end
 
-                -- Create buttons for active powers
-                if rebelSneakAttackPhase and isRebelSneakAttackCard and p.rebelSneakAttack or
+                -- Create buttons or highlights for active powers
+                if securityCouncilPhase and passives and passives["PREVENT_TAKEOVER"] then
+                    card.highlightOn(color(0,1,0))
+                    createConfirmButton(card)
+                    createCancelButton(card)
+                elseif rebelSneakAttackPhase and isRebelSneakAttackCard and p.rebelSneakAttack or
                     placeTwoPhase and passives and passives["PLACE_TWO"] then
                     card.highlightOn("Yellow")
                 elseif ap and (selectedCard or miscActiveNode or p.beingTargeted) then
