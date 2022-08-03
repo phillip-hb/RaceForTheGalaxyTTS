@@ -58,6 +58,7 @@ function player(i)
         rebelSneakAttack = false,
         doTakeover = false,
         securityCouncil = false,
+        securityCouncilTarget = nil,
         exploreAfterPower = false,
         upgradeWorldOld = nil,
         upgradeWorldNew = nil,
@@ -297,11 +298,23 @@ function onload(saved_data)
     else
         Global.setVectorLines(getDefaultVectorLines())
     end
+
+    redisplayXmlUi()
 end
 
 -- ======================
 -- Game specific helper functions
 -- ======================
+function redisplayXmlUi()
+    local players = getSeatedPlayersWithHands()
+    for _, player in pairs(players) do
+        local p = playerData[player]
+        if p.securityCouncil then
+            showSecurityCouncilMenu(player)
+        end
+    end
+end
+
 function getName(obj)
      return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
 end
@@ -1331,6 +1344,9 @@ function playerReadyClicked(playerColor, forced, playSound)
                 updateReadyButtons({playerColor, false})
                 return
             end
+        elseif securityCouncilPhase and p.securityCouncil then
+            broadcastToColor("You must confirm or cancel the card's power before clicking ready!", playerColor, "White")
+            return
         end
 
         if enforceRules and p.selectedCard and not p.canReady then
@@ -1652,6 +1668,8 @@ function checkAllReadyCo()
                 sound.AssetBundle.playTriggerEffect(1)
                 local activePlayer = canPreventTakeover
                 broadcastToAll("Waiting for " .. (Player[activePlayer].steam_name or activePlayer) .. " to resolve \"Pan-Galactic Security Council.\"", activePlayer)
+                playerData[activePlayer].securityCouncilTarget = nil
+                showSecurityCouncilMenu(activePlayer)
                 wait(0.5)
                 transitionNextPhase = false
                 for _, player in pairs(players) do
@@ -2812,7 +2830,7 @@ function updateTableauState(player)
                 end
 
                 -- Create buttons or highlights for active powers
-                if securityCouncilPhase and passives and passives["PREVENT_TAKEOVER"] then
+                if securityCouncilPhase and passives and passives["PREVENT_TAKEOVER"] and p.securityCouncil then
                     card.highlightOn(color(0,1,0))
                     createConfirmButton(card)
                     createCancelButton(card)
@@ -3337,6 +3355,12 @@ function cancelPowerClick(obj, player, rightClick)
         end
         p.upgradeWorldOld = nil
         p.upgradeWorldNew = nil
+    elseif currentPhase == 3 and securityCouncilPhase and info.passivePowers["3"] and info.passivePowers["3"]["PREVENT_TAKEOVER"] then
+        p.securityCouncil = false
+        Global.UI.setAttribute("securityCouncilMenu", "active", false)
+        queueUpdate(player, true)
+        updateReadyButtons({player, true})
+        return
     end
 
     if node and node.value == p.miscSelectedCards.value and currentPhase == 3 then

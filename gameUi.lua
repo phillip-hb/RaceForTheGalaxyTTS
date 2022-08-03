@@ -417,3 +417,30 @@ function updateHandCount(playerColor)
         statTracker.call("updateLabel", {"hand", #Player[playerColor].getHandObjects()})
     end
 end
+
+function showSecurityCouncilMenu(targetPlayer)
+    local p = playerData[targetPlayer]
+    local targetText = "Target: "
+    if p.securityCouncilTarget then 
+        targetText = targetText .. Player[p.securityCouncilTarget].steam_name or p.securityCouncilTarget
+    else
+        targetText = targetText .. "None"
+    end
+    Global.UI.setValue("securityTarget", targetText)
+    for player, data in pairs(playerData) do
+        local id = "security" .. player
+        Global.UI.setAttribute(id, "text", Player[player].steam_name or player)
+        if data.takeoverTarget then
+            Global.UI.setAttribute(id, "interactable", true)
+        else
+            Global.UI.setAttribute(id, "interactable", false)
+        end
+    end
+    Global.UI.setAttributes("securityCouncilMenu", {active=true, visibility=targetPlayer})
+end
+
+function securitySelectTarget(player, button, id)
+    local p = playerData[player.color]
+    p.securityCouncilTarget = id:sub(9, id:len())
+    Global.UI.setValue("securityTarget", "Target: " .. (player.steam_name or player.color))
+end
