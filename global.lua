@@ -10,7 +10,6 @@ gameStarted = false
 advanced2p = false
 placeTwoPhase = false
 takeoverPhase = false
-queueTakeoverPhase = false
 securityCouncilPhase = false
 useTakeovers = false
 queuePlaceTwoPhase = false
@@ -72,7 +71,8 @@ function player(i)
         consumedPrestige = 0,
         markedGoods = {},
         ignoreCards = {},
-        discardLaterFromTableau = {}
+        discardLaterFromTableau = {},
+        takeoverMenuMap = {},
     }
 end
 
@@ -94,7 +94,7 @@ triggerExploreAfterPhase = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1,["PREVENT_TAKEOVER"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
-canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1,["UPGRADE_WORLD"]=1}
+canCancelAfter = {["MILITARY_HAND"]=1,["CONSUME_GENE"]=1,["CONSUME_RARE"]=1,["UPGRADE_WORLD"]=1,["CONSUME_PRESTIGE"]=1}
 goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
      ["RARE"] = color(0.709, 0.407, 0.129),
@@ -195,7 +195,6 @@ function onSave()
     saved_data.playerData = playerData
     saved_data.placeTwoPhase = placeTwoPhase
     saved_data.takeoverPhase = takeoverPhase
-    saved_data.queueTakeoverPhase = queueTakeoverPhase
     saved_data.useTakeovers = useTakeovers
     saved_data.queuePlaceTwoPhase = queuePlaceTwoPhase
     saved_data.enforceRules = enforceRules
@@ -226,7 +225,6 @@ function onload(saved_data)
         playerData = data.playerData
         placeTwoPhase = data.placeTwoPhase or false
         takeoverPhase = data.takeoverPhase or false
-        queueTakeoverPhase = data.queueTakeoverPhase or false
         useTakeovers = data.useTakeovers or false
         queuePlaceTwoPhase = data.queuePlaceTwoPhase or false
         enforceRules = data.enforceRules
@@ -343,6 +341,7 @@ function cardAlreadyUsedInit()
     return {
         selectedCard = nil,
         triggerCard = nil,
+        power = nil,
         strength = 0,
         markedDiscards = {},
         markedGoods = {}
@@ -830,10 +829,10 @@ function discardPrestige(player, n)
     if n > 0 then
         for k, v in pairs(p.prestigeChips) do
             local chips = getObjectFromGUID(k)
-            if chips.getQuantity() < 0 then
+            if chips and chips.getQuantity() < 0 then
                 prestigeBag.putObject(chips)
                 n = n - 1
-            else
+            elseif chips then
                 -- stack of chips
                 for i=1, chips.getQuantity() do
                     prestigeBag.putObject(chips.takeObject())
@@ -1395,6 +1394,27 @@ function playerReadyClicked(playerColor, forced, playSound)
     startLuaCoroutine(Global, "checkAllReadyCo")
 end
 
+function finalizeUsedResources(player)
+    local p = playerData[player]
+    for guid, v in pairs(p.markedGoods) do
+        local good = getObjectFromGUID(guid)
+        if good then
+            displayXOff(good)
+            discardCard(good)
+        end
+
+        if v.power.codes["EXTRA_MILITARY"] then
+            p.tempMilitary = p.tempMilitary + v.power.strength
+        end
+    end
+
+    -- remove used prestige
+    discardPrestige(player, p.consumedPrestige)
+
+    p.markedGoods = nil
+    p.consumedPrestige = 0
+end
+
 -- Makes all the ready buttons belonging to player the same toggle state
 -- [1] = owner, [2] = state
 function updateReadyButtons(params)
@@ -1481,20 +1501,9 @@ function checkAllReadyCo()
         end
 
         -- remove marked goods
-        for guid, v in pairs(p.markedGoods) do
-            local good = getObjectFromGUID(guid)
-            if good then
-                displayXOff(good)
-                discardCard(good)
-            end
-
-            if v.power.codes["EXTRA_MILITARY"] then
-                p.tempMilitary = p.tempMilitary + v.power.strength
-            end
+        if not p.takeoverTarget then
+            finalizeUsedResources(player)
         end
-
-        -- remove used prestige
-        discardPrestige(player, p.consumedPrestige)
     end
 
     if discardHappened then wait(0.1) end
@@ -1889,6 +1898,7 @@ function beginNextPhase()
     queueRebelSneakAttackPhase = false
     rebelSneakAttackPhase = false
     takeoverPhase = false
+    securityCouncilPhase = false
 
     -- Apply end of phase powers here
     if phase == 5 then
@@ -3118,6 +3128,7 @@ function markUsedMisc(player, card, power, n)
     local data = p.cardsAlreadyUsed[card.getGUID()][power.name] or cardAlreadyUsedInit()
 
     data.selectedCard = p.selectedCard
+    data.power = power
     data.strength = data.strength + (n or 1)
     data.triggerCard = card.getGUID()
 
@@ -3268,7 +3279,8 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                 p.takeoverSource = obj.getGUID()
                 p.takeoverPower = power
                 p.takeoverTarget = nil
-                Wait.frames(function() Global.UI.setAttribute("takeoverMenu_" .. player, "active", true) end, 1)
+                Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+                --Wait.frames(function() Global.UI.setAttribute("takeoverMenu_" .. player, "active", true) end, 1)
             end
 
             if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
@@ -3293,29 +3305,29 @@ function cancelAllMarkedCards(player, selectedCardGuid)
     for guid, useData in pairs(p.cardsAlreadyUsed) do
         for power, data in pairs(useData) do
             if data.selectedCard == selectedCardGuid then
-                cancelMarkedCard(player, power, data)
+                cancelUsedCard(player, data)
                 p.cardsAlreadyUsed[data.triggerCard] = nil
             end
         end
     end
 end
 
-function cancelMarkedCards(player, triggerCardGuid)
+function cancelUsedCards(player, triggerCardGuid)
     local p = playerData[player]
     if not p then return end
 
-    for powerName, info in pairs(p.cardsAlreadyUsed[triggerCardGuid]) do
-        if canCancelAfter[powerName] then
-            cancelMarkedCard(player, powerName, info)
+    for name, info in pairs(p.cardsAlreadyUsed[triggerCardGuid]) do
+        if canCancelAfter[name] then
+            cancelUsedCard(player, info)
             p.cardsAlreadyUsed[triggerCardGuid] = nil
         end
     end
 end
 
-function cancelMarkedCard(player, powerName, useDataInfo)
+function cancelUsedCard(player, info)
     local p = playerData[player]
-    if canCancelAfter[powerName] then
-        for _, guid in pairs(useDataInfo.markedDiscards) do
+    if canCancelAfter[info.power.name] then
+        for _, guid in pairs(info.markedDiscards) do
             local card = getObjectFromGUID(guid)
             card.setTags({})
             highlightOff(card)
@@ -3323,14 +3335,20 @@ function cancelMarkedCard(player, powerName, useDataInfo)
             if card.is_face_down then
                 card.flip()
             end
-
-            if powerName == "MILITARY_HAND" then p.tempMilitary = p.tempMilitary - 1 end
         end
 
-        for guid, v in pairs(useDataInfo.markedGoods) do
+        for guid, v in pairs(info.markedGoods) do
             local card = getObjectFromGUID(guid)
             displayXOff(card)
             p.markedGoods[guid] = nil
+        end
+
+        if info.power.name == "MILITARY_HAND" or info.power.codes["EXTRA_MILITARY"] then
+            p.tempMilitary = p.tempMilitary - info.strength
+        end
+
+        if info.power.name == "CONSUME_PRESTIGE" then
+            p.consumedPrestige = p.consumedPrestige - 1
         end
     end
 end
@@ -3359,7 +3377,7 @@ function cancelPowerClick(obj, player, rightClick)
         p.securityCouncil = false
         Global.UI.setAttribute("securityCouncilMenu", "active", false)
         queueUpdate(player, true)
-        updateReadyButtons({player, true})
+        updateReadyButtons({player, true}, true)
         return
     end
 
@@ -3371,7 +3389,7 @@ function cancelPowerClick(obj, player, rightClick)
     p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, obj.getGUID())
 
     if (currentPhase == 2 or currentPhase == 3) and p.cardsAlreadyUsed[obj.getGUID()] then
-        cancelMarkedCards(player, obj.getGUID())
+        cancelUsedCards(player, obj.getGUID())
         refreshTakeoverMenu(player)
     elseif currentPhase ~= 3 and currentPhase ~= 2 then
         p.selectedAnte = nil
@@ -3465,6 +3483,24 @@ function confirmPowerClick(obj, player, rightClick)
                 broadcastToColor("Please discard the required number of cards.", player, "White")
             end
             return
+        elseif p.securityCouncil and info.passivePowers["3"] and info.passivePowers["3"]["PREVENT_TAKEOVER"] then
+            if p.securityCouncilTarget and p.prestigeCount > 0 then
+                discardPrestige(player, 1)
+                p.securityCouncil = false
+
+                preventTakeoverAttempt(p.securityCouncilTarget)
+                drawTakeoverLines()
+
+                p.securityCouncilTarget = nil
+                Global.UI.setAttribute("securityCouncilMenu", "active", false)
+                updateReadyButtons({player, true}, true)
+                queueUpdate(player, true)
+            elseif p.securityCouncilTarget and p.prestigeCount <= 0 then
+                broadcastToColor("Prestige required to prevent takeover attempt.", player, "White")
+            else
+                broadcastToColor("Please select a player to stop their takeover attempt.", player, "White")
+            end
+            return
         end
 
         local marked = {}
@@ -3503,6 +3539,11 @@ function confirmPowerClick(obj, player, rightClick)
         if #marked > 0 then
             data.markedDiscards = appendList(data.markedDiscards, marked)
         end
+
+        if paidCost and power.codes["EXTRA_MILITARY"] then
+            p.tempMilitary = p.tempMilitary + power.strength
+        end
+
         queueUpdate(player, true)
         return
     elseif currentPhase == "4" then
@@ -3629,10 +3670,6 @@ function confirmPowerClick(obj, player, rightClick)
         end
         if power.codes["GET_PRESTIGE"] then
             getPrestigeChips(player, power.strength)
-        end
-
-        if power.codes["EXTRA_MILITARY"] then
-            p.tempMilitary = p.tempMilitary + power.strength
         end
     end
 
@@ -3943,6 +3980,8 @@ function resolveTakeovers()
                 broadcastToAll((Player[player].steam_name or player) .. " failed to takeover \"" .. targetCard.getName() .. '."', player)
             end
 
+            finalizeUsedResources(player)
+
             p.takeoverSource = nil
             p.takeoverPower = nil
             p.takeoverTarget  = nil
@@ -3975,4 +4014,27 @@ function gamblingWorldChangeValue(obj, player, rightClick)
         label = n
     })
     obj.setVar("number", n)
+end
+
+function preventTakeoverAttempt(player)
+    local p = playerData[player]
+    local card = getObjectFromGUID(p.takeoverSource)
+    local info = card_db[card.getName()]
+    local powers = info.activePowers["3"]
+
+    broacastToAll((Player[player].steam_name or player) .. "'s takeover attempt has been defeated by \"Pan-Galactic Security Council.\"", "Purple")
+
+    -- Remove takeover cards if using them requires discard
+    if powers["DISCARD"] then
+        discardCard(card)
+    elseif powers["TAKEOVER_PRESTIGE"] then
+        discardPrestige(player, 1)
+    end
+
+    -- Refund spent cards for extra military because takeover attempt pointless
+    for guid, data in pairs(p.alreadyUsedCards) do
+    end
+    --cancelAllMarkedCards(player)
+
+    p.takeoverTarget = nil
 end

@@ -219,13 +219,14 @@ function refreshTakeoverMenu(owner)
         Green = {main=6,Yellow=1,Red=2,Blue=3}
     }
 
-    local xml = Global.UI.getXmlTable()
-    local mainPanelBody = xml[indexValues[owner].main]
-    local groupBody = mainPanelBody.children[1].children[3].children[1].children[1].children
     local largestCount = 0
-    local node = playerData[owner].miscSelectedCards
+    local op = playerData[owner]
+    local node = op.miscSelectedCards
+    local takeoverPower = isTakeoverPower(op.takeoverPower)
     local conquerSettle = false
     local reselected = false
+
+    op.takeoverMenuMap = {}
 
     while node and node.value do
         if node.power.name == "DISCARD_CONQUER_SETTLE" then
@@ -236,15 +237,12 @@ function refreshTakeoverMenu(owner)
     end
 
     for _, player in pairs(players) do
+        local btnCount = 0
         if player ~= owner then
-            local btnCount = 0
-            local textElement = mainPanelBody.children[1].children[2].children[1].children[indexValues[owner][player]].children[1]
-            textElement.value = Player[player].steam_name or player
-            textElement.attributes.color = player
-            
-            local column = {}
+            local nameId = "name" .. player .. "_" .. owner
             local p = playerData[player]
-            local takeoverPower = isTakeoverPower(op.takeoverPower)
+
+            Global.UI.setValue(nameId, Player[player].steam_name or player)
 
             if takeoverPower == "TAKEOVER_MILITARY" and p.powersSnapshot["EXTRA_MILITARY"] <= 0 or 
                 takeoverPower == "TAKEOVER_IMPERIUM" and not p.powersSnapshot["IMPERIUM"] then
@@ -253,18 +251,20 @@ function refreshTakeoverMenu(owner)
 
             for card in allCardsInTableau(player) do
                 local info = card_db[card.getName()]
-
+                local btnId = "btn" .. indexValues[owner][player] .. btnCount + 1 .. "_" .. owner
+                
                 if takeoverPower == "TAKEOVER_REBEL" and not info.flags["REBEL"] then
                     goto skip_card
                 end
-
+        
                 if info.type == 1 and (not conquerSettle and info.flags["MILITARY"] or conquerSettle and not info.flags["MILITARY"]) then
                     local yourStrength = calcStrength(owner, card, false, owner)
                     local theirDefense = calcStrength(player, card, true, owner)
+                    local class = ""
                     local canTake = yourStrength >= theirDefense
-                    local class = canTake and "" or "disabled"
                     local reselect = canTake and op.takeoverTarget == card.getGUID()
-
+                    local txt = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
+        
                     -- Disable previously selected target if can no longer take it
                     if not canTake and op.takeoverTarget == card.getGUID() then
                         op.takeoverTarget = nil
@@ -272,21 +272,32 @@ function refreshTakeoverMenu(owner)
                         reselected = true
                     end
 
-                    local btn = {
-                        tag="ToggleButton",
-                        attributes = {
-                            id=owner .. "_" .. card.getGUID(),
-                            interactable=canTake,
-                            class=reselect and "selected" or class,
-                            onValueChanged="menuValueChanged",
-                            isOn=reselect,
-                        },
-                        children = {},
-                        value = card.getName() .. " - [" .. yourStrength .. "]vs[" .. theirDefense .. "]"
-                    }
+                    if reselect then
+                        class = "selected"
+                    elseif canTake then
+                        class = ""
+                    else
+                        class = "disabled"
+                    end
+
+                    Global.UI.setAttributes(btnId, {
+                        active=true,
+                        interactable=canTake,
+                        class=class,
+                        onValueChanged="menuValueChanged",
+                        isOn=reselect,
+                        text=txt,
+                    })
+
+                    log(txt)
+
+                    if class == "" then
+                        Global.UI.setAttribute(btnId, "color", "White")
+                    end
+
+                    op.takeoverMenuMap[btnId] = card.getGUID()
 
                     btnCount = btnCount + 1
-                    column[#column + 1] = btn
                 end
 
                 ::skip_card::
@@ -294,8 +305,15 @@ function refreshTakeoverMenu(owner)
 
             ::skip_player::
 
-            groupBody[indexValues[owner][player]].children = column
-            -- if btnCount > largestCount then largestCount = btnCount end
+            -- disable the rest of the buttons
+            for i=btnCount+1, 12 do
+                local btnId = "btn" .. indexValues[owner][player] .. i .. "_" .. owner
+                Global.UI.setAttribute(btnId, "active", false)
+            end
+        end
+
+        if btnCount > largestCount then
+            largestCount = btnCount
         end
     end
 
@@ -304,9 +322,7 @@ function refreshTakeoverMenu(owner)
     end
 
     -- need to readjust height of the toggle group to fit all the buttons
-    --mainPanelBody.children[1].children[3].children[1].attributes.height = 48 * largestCount
-
-    Global.UI.setXmlTable(xml)
+    Global.UI.setAttribute("group_" .. owner, "preferredHeight", 48 * largestCount)
 end
 
 function calcStrength(player, card, addDefense, activePlayer)
@@ -345,11 +361,11 @@ function calcStrength(player, card, addDefense, activePlayer)
     return value
 end
 
-function menuValueChanged(player, value, id)
+function menuValueChanged(player, value, id, ok)
     local p = playerData[player.color]
     if value == "True" then
         Global.UI.setAttribute(id, "color", "rgb(0.4,0.8,1)")
-        p.takeoverTarget = split(id, "_")[2]
+        p.takeoverTarget = p.takeoverMenuMap[id]
     else
         Global.UI.setAttribute(id, "color", "White")
         p.takeoverTarget = nil
