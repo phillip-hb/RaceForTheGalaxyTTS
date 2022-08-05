@@ -1411,7 +1411,7 @@ function finalizeUsedResources(player)
     -- remove used prestige
     discardPrestige(player, p.consumedPrestige)
 
-    p.markedGoods = nil
+    p.markedGoods = {}
     p.consumedPrestige = 0
 end
 
@@ -1591,6 +1591,7 @@ function checkAllReadyCo()
 
     -- figure out who the 'first' player is going to be
     if firstRound then
+        wait(0.2)
         local lowest = 100
         local index = 0
 
@@ -1602,6 +1603,8 @@ function checkAllReadyCo()
                 index = i
             end
         end
+
+        firstRound = false
     end
 
     for _, player in pairs(players) do

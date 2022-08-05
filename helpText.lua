@@ -175,11 +175,13 @@ function updateHelpText(playerColor)
                 node = node.next
             end
 
-            for goodsGuid, usedPowers in pairs(p.markedGoods) do
-                if usedPowers.power.codes["REDUCE"] then
-                    payDiscount = payDiscount + usedPowers.power.strength
-                elseif usedPowers.power.codes["EXTRA_MILITARY"] then
-                    tempMilitary = tempMilitary + usedPowers.power.strength
+            if p.markedGoods then
+                for goodsGuid, usedPowers in pairs(p.markedGoods) do
+                    if usedPowers.power.codes["REDUCE"] then
+                        payDiscount = payDiscount + usedPowers.power.strength
+                    elseif usedPowers.power.codes["EXTRA_MILITARY"] then
+                        tempMilitary = tempMilitary + usedPowers.power.strength
+                    end
                 end
             end
 

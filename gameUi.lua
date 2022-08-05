@@ -288,9 +288,7 @@ function refreshTakeoverMenu(owner)
                         isOn=reselect,
                         text=txt,
                     })
-
-                    log(txt)
-
+                    
                     if class == "" then
                         Global.UI.setAttribute(btnId, "color", "White")
                     end

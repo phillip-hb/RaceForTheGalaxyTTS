@@ -1705,7 +1705,7 @@ P:5:DRAW:3:0
 startWorlds = {
      ["Gateway Station"] = -6,
      ["Abandoned Mine Squatters"] = -5,
-     ["Transforming Colonists"] = -4,
+     ["Terraforming Colonists"] = -4,
      ["Galactic Trade Emissaries"] = -3,
      ["Industrial Robots"] = -2,
      ["Star Nomad Raiders"] = -1,
