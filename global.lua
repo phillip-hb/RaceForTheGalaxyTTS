@@ -99,8 +99,7 @@ goodsHighlightColor = {
      ["NOVELTY"] = color(0.345, 0.709, 0.974),
      ["RARE"] = color(0.709, 0.407, 0.129),
      ["GENE"] = color(0.278, 0.760, 0.141),
-     ["ALIEN"] = color(0.933, 0.909, 0.105),
-     ["ANY"] = "White"
+     ["ALIEN"] = color(0.933, 0.909, 0.105)
 }
 optionalPowers = {["DISCARD_HAND"]=1,["DISCARD"]=1,["CONSUME_PRESTIGE"]=1,["ANTE_CARD"]=1}
 
@@ -300,6 +299,8 @@ function onload(saved_data)
     redisplayXmlUi()
 end
 
+function none() end
+
 -- ======================
 -- Game specific helper functions
 -- ======================
@@ -315,6 +316,19 @@ end
 
 function getName(obj)
      return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
+end
+
+function getKind(card)
+    local info = card_db[card.getName()]
+    if info.goods then
+        if info.goods == "ANY" then
+            return card.getVar("kind")
+        else
+            return info.goods
+        end
+    end
+
+    return nil
 end
 
 function isTakeoverPower(power)
@@ -1127,7 +1141,7 @@ function onObjectEnterZone(zone, object)
                     if data and data.goods then
                         object.setScale({0.6, 1, 0.6})
                         object.setDescription(o.getGUID())
-                        object.highlightOn(goodsHighlightColor[data.goods])
+                        object.highlightOn(goodsHighlightColor[getKind(o)])
                         playerData[player].incomingGood = false
                         break
                     end
@@ -2609,15 +2623,12 @@ function updateTableauState(player)
 
         if obj.type == 'Card' and not obj.is_face_down then
             local parentData = card_db[obj.getName()]
+            if parentData.goods and parentData.goods == "ANY" then
+                createKindTypeUI(obj)
+            end
+
             if parentData.flags["WINDFALL"] and not getGoods(obj) then
-                if parentData.goods == "ANY" then
-                    windfallCount["NOVELTY"] = windfallCount["NOVELTY"] + 1
-                    windfallCount["RARE"] = windfallCount["RARE"] + 1
-                    windfallCount["GENE"] = windfallCount["GENE"] + 1
-                    windfallCount["ALIEN"] = windfallCount["ALIEN"] + 1
-                else
-                    windfallCount[parentData.goods] = windfallCount[parentData.goods] + 1
-                end
+                windfallCount[getKind(obj)] = windfallCount[getKind(obj)] + 1
                 windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
             end
         elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then  -- facedown goods on tableau
@@ -2630,20 +2641,22 @@ function updateTableauState(player)
                 local activeCard = selectedCard
                 local activeInfo = selectedInfo
                 local selectedCardPower = p.selectedCardPower
-                obj.highlightOn(goodsHighlightColor[parentData.goods])
+                obj.highlightOn(goodsHighlightColor[getKind(parentCard)])
 
                 if p.markedGoods[obj.getGUID()] then
                     displayXOn(obj, player)
                 else
-                    if parentData.goods == "ANY" then
-                        goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
-                        goodsCount["RARE"] = goodsCount["RARE"] + 1
-                        goodsCount["GENE"] = goodsCount["GENE"] + 1
-                        goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
-                    else
-                        goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
-                    end
-                    uniques[parentData.goods] = 1
+                    -- if parentData.goods == "ANY" then
+                    --     goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
+                    --     goodsCount["RARE"] = goodsCount["RARE"] + 1
+                    --     goodsCount["GENE"] = goodsCount["GENE"] + 1
+                    --     goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
+                    -- else
+                    --     goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
+                    -- end
+                    local kind = getKind(parentCard)
+                    goodsCount[kind] = goodsCount[kind] + 1
+                    uniques[kind] = 1
                     goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
 
                     -- change active selections based on the misc selected cards
@@ -2678,7 +2691,7 @@ function updateTableauState(player)
                             end
 
                             p.canReady = false
-                            createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[parentData.goods])
+                            createGoodsButton(parentCard, "$➧" .. price, goodsHighlightColor[kind])
                             obj.memo = price
                         elseif ap then -- using normal consume powers
                             local makeButton = false
@@ -2700,7 +2713,7 @@ function updateTableauState(player)
                             if makeButton then
                                 dontAutoPass = true
                                 p.canReady = false
-                                createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[parentData.goods])
+                                createGoodsButton(parentCard, p.selectedGoods[obj.getGUID()] and "✔" or "", goodsHighlightColor[kind])
                             end
                         end
                     end

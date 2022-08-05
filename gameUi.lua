@@ -458,3 +458,85 @@ function securitySelectTarget(player, button, id)
     p.securityCouncilTarget = id:sub(9, id:len())
     Global.UI.setValue("securityTarget", "Target: " .. (player.steam_name or player.color))
 end
+
+function createKindTypeUI(card)
+    local choiceLocked = card.getVar("choiceLocked")
+    if not choiceLocked then
+        card.createButton({
+            click_function = "selectKindNoveltyClick",
+            function_owner = Global,
+            tooltip = "Select Novelty",
+            width = 100,
+            height = 100,
+            color = goodsHighlightColor["NOVELTY"],
+            position = {-1.4, 0.5, -1.3},
+        })
+
+        card.createButton({
+            click_function = "selectKindRareClick",
+            function_owner = Global,
+            tooltip = "Select Rare",
+            width = 100,
+            height = 100,
+            color = goodsHighlightColor["RARE"],
+            position = {-1.2, 0.5, -1.3},
+        })
+
+        card.createButton({
+            click_function = "selectKindGeneClick",
+            function_owner = Global,
+            tooltip = "Select Genes",
+            width = 100,
+            height = 100,
+            color = goodsHighlightColor["GENE"],
+            position = {-1.4, 0.5, -1.1},
+        })
+
+        card.createButton({
+            click_function = "selectKindAlienClick",
+            function_owner = Global,
+            tooltip = "Select Alien",
+            width = 100,
+            height = 100,
+            color = goodsHighlightColor["ALIEN"],
+            position = {-1.2, 0.5, -1.1},
+        })
+    end
+
+    card.createButton({
+        click_function = "none",
+        function_owner = Global,
+        label = card.getVar("kind"),
+        width = 500,
+        height = 120,
+        font_size = 100,
+        font_color = goodsHighlightColor[card.getVar("kind")],
+        color=color(0,0,0),
+        position = {0, 0.5, -0.72},
+        tooltip = "Kind"
+    })
+end
+
+function selectKindNoveltyClick(obj, player, rightClick)
+    if rightClick then return end
+    obj.setVar("kind", "NOVELTY")
+    queueUpdate(player, true)
+end
+
+function selectKindRareClick(obj, player, rightClick)
+    if rightClick then return end
+    obj.setVar("kind", "RARE")
+    queueUpdate(player, true)
+end
+
+function selectKindGeneClick(obj, player, rightClick)
+    if rightClick then return end
+    obj.setVar("kind", "GENE")
+    queueUpdate(player, true)
+end
+
+function selectKindAlienClick(obj, player, rightClick)
+    if rightClick then return end
+    obj.setVar("kind", "ALIEN")
+    queueUpdate(player, true)
+end
