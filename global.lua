@@ -3211,7 +3211,9 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
                 -- Use power instantly
                 if p.selectedCardPower == "DRAW" then
-                    dealTo(power.strength, player)
+                    local n = power.strength
+                    broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+                    dealTo(n, player)
                     markUsed(player, obj, power)
                     queueUpdate(player, true)
                     return
@@ -3234,7 +3236,9 @@ function usePowerClick(obj, player, rightClick, powerIndex)
 
         if power.name:sub(1,9) == "DRAW_EACH" then
             local targetGood = p.selectedCardPower:sub(11, power.name:len())
-            dealTo(p.produceCount[targetGood] * power.strength, player)
+            local n = p.produceCount[targetGood] * power.strength
+            broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+            dealTo(n, player)
             usedPower = true
         elseif power.name == "DRAW_WORLD_GENE" then
             local n = countTrait(player, "goods", "GENE")
@@ -3247,19 +3251,24 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                     n = n + 1
                 end
             end
-            dealTo(n * power.strength, player)
+            n = n * power.strength
+            broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+            dealTo(n, player)
             usedPower = true
         elseif power.name == "DRAW_MILITARY" then
-            local n = countTrait(player, "flags", "MILITARY")
-            dealTo(n * power.strength, player)
+            local n = countTrait(player, "flags", "MILITARY") * power.strength
+            broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+            dealTo(n, player)
             usedPower = true
         elseif power.name == "DRAW_CHROMO" then
-            local n = countTrait(player, "flags", "CHROMO")
-            dealTo(n * power.strength, player)
+            local n = countTrait(player, "flags", "CHROMO") * power.strength
+            broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+            dealTo(n, player)
             usedPower = true
         elseif power.name == "DRAW_REBEL" then
-            local n = countTrait(player, "flags", "REBEL", 1)
-            dealTo(n * power.strength, player)
+            local n = countTrait(player, "flags", "REBEL", 1) * power.strength
+            broadcastToColor(obj.getName() .. ": Drew " .. n .. " card(s).", player, player)
+            dealTo(n, player)
             usedPower = true
         elseif power.name == "TAKE_SAVED" then
             local hits = Physics.cast({
@@ -3311,7 +3320,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                 p.takeoverPower = power
                 p.takeoverTarget = nil
                 Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
-                --Wait.frames(function() Global.UI.setAttribute("takeoverMenu_" .. player, "active", true) end, 1)
             end
 
             if power.name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
@@ -3319,13 +3327,6 @@ function usePowerClick(obj, player, rightClick, powerIndex)
             end
             refreshTakeoverMenu(player)
         end
-
-        -- if not takeoverName then
-        --     -- for name, power in pairs(info.activePowers[currentPhase]) do
-        --     --     if power.index == powerIndex and name == "UPGRADE_WORLD" then
-        --     --     end
-        --     -- end
-        -- end
     end
 
     queueUpdate(player, true)
