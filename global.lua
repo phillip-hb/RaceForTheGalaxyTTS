@@ -3005,6 +3005,9 @@ function updateTableauState(player)
                 if not selectedCard and ap then
                     for name, power in pairs(ap) do
                         local used = p.cardsAlreadyUsed[card.getGUID()]
+                        if (not used or not used[name]) and wildGoodCount > 0 then
+                            dontAutoPass = true
+                        end
                         if (not used or not used[name]) and baseAmount[name] <= goodslimit[name] then
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
@@ -3052,15 +3055,15 @@ function updateTableauState(player)
                         local makeButton = true
                         local used = p.cardsAlreadyUsed[card.getGUID()]
                         local windfallCountTarget = windfallCount[targetGood]
-                        local open = getGoods(card)
+                        local open = not getGoods(card)
                         local prefix = optionalPowers[name] and "(Optional) " or ""
 
-                        if power.codes["NOT_THIS"] and not open then
+                        if power.codes["NOT_THIS"] and open then
                             windfallCountTarget = windfallCountTarget - 1
                         end
 
                         if used and used[name] or
-                            power.codes["PRODUCE"] and open or 
+                            power.codes["PRODUCE"] and not open or 
                             windfallPrefix and targetGood == "ANY" and windfallCount["TOTAL"] <= 0 or
                             windfallPrefix and windfallCountTarget and windfallCountTarget <= 0 then
                             goto skip
@@ -3073,6 +3076,10 @@ function updateTableauState(player)
                         createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], optionalPowers[name] and optColor or "White")
 
                         ::skip::
+
+                        if wildWorldCount > 0 and (not used or not used[name]) then
+                            dontAutoPass = true
+                        end
                     end
                 elseif selectedCard then
                     -- Check to create 'place goods on windfall' button
