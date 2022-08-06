@@ -397,7 +397,7 @@ function countTrait(player, trait, name, cardType)
                 goto skip
             end
 
-            if trait == "goods" and info[trait] == name or
+            if trait == "goods" and getKind(card) == name or
                 trait ~= "goods" and info[trait][name] then
                 count = count + 1
             end
@@ -436,9 +436,10 @@ function tryProduceAt(player, card)
     local goods = getGoods(card)
     if not goods then
         local p = playerData[player]
+        local kind = getKind(card)
 
         -- no goods, produce on planet
-        p.produceCount[info.goods] = p.produceCount[info.goods] + 1
+        p.produceCount[kind] = p.produceCount[kind] + 1
         card.memo = placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), card.getRotation()[2], player)
 
         if powers and powers["DRAW_IF"] then dealTo(powers["DRAW_IF"].strength, player) end
@@ -2545,6 +2546,8 @@ function updateTableauState(player)
     local goodsCount = {["NOVELTY"]=0,["RARE"]=0,["GENE"]=0,["ALIEN"]=0,["TOTAL"]=0}
     local uniques = {}
     local dontAutoPass = false
+    local wildWorldCount = 0
+    local wildGoodCount = 0
     local selectedUniqueGoods = {}
 
     p.recordedCards = {}
@@ -2578,8 +2581,7 @@ function updateTableauState(player)
         if selected then
             local good = getObjectFromGUID(guid)
             local parent = getObjectFromGUID(good.getDescription())
-
-            selectedUniqueGoods[card_db[parent.getName()].goods] = true
+            selectedUniqueGoods[getKind(parent)] = true
         end
     end
 
@@ -2628,8 +2630,13 @@ function updateTableauState(player)
             end
 
             if parentData.flags["WINDFALL"] and not getGoods(obj) then
-                windfallCount[getKind(obj)] = windfallCount[getKind(obj)] + 1
+                local kind = getKind(obj)
+                windfallCount[kind] = windfallCount[kind] + 1
                 windfallCount["TOTAL"] = windfallCount["TOTAL"] + 1
+
+                if parentData.goods and parentData.goods == "ANY" then
+                    wildWorldCount = wildWorldCount + 1
+                end
             end
         elseif obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then  -- facedown goods on tableau
             local parentCard = getObjectFromGUID(obj.getDescription())
@@ -2646,18 +2653,14 @@ function updateTableauState(player)
                 if p.markedGoods[obj.getGUID()] then
                     displayXOn(obj, player)
                 else
-                    -- if parentData.goods == "ANY" then
-                    --     goodsCount["NOVELTY"] = goodsCount["NOVELTY"] + 1
-                    --     goodsCount["RARE"] = goodsCount["RARE"] + 1
-                    --     goodsCount["GENE"] = goodsCount["GENE"] + 1
-                    --     goodsCount["ALIEN"] = goodsCount["ALIEN"] + 1
-                    -- else
-                    --     goodsCount[parentData.goods] = goodsCount[parentData.goods] + 1
-                    -- end
                     local kind = getKind(parentCard)
                     goodsCount[kind] = goodsCount[kind] + 1
                     uniques[kind] = 1
                     goodsCount["TOTAL"] = goodsCount["TOTAL"] + 1
+
+                    if parentData.goods and parentData.goods == "ANY" then
+                        wildGoodCount = wildGoodCount + 1
+                    end
 
                     -- change active selections based on the misc selected cards
                     if currentPhase == "2" or currentPhase == "3" then
@@ -2682,7 +2685,7 @@ function updateTableauState(player)
                             local bonus = not power.codes["TRADE_NO_BONUS"]
                             local basePrice = {NOVELTY = 2, RARE = 3, GENE = 4, ALIEN = 5}
 
-                            price = basePrice[parentData.goods] + (bonus and p.powersSnapshot["TRADE_" .. parentData.goods] or 0)
+                            price = basePrice[kind] + (bonus and p.powersSnapshot["TRADE_" .. kind] or 0)
                             price = price + (bonus and p.powersSnapshot["TRADE_ANY"] or 0)
 
                             local parentPassive = parentData.passivePowers[currentPhase]
@@ -2697,8 +2700,8 @@ function updateTableauState(player)
                             local makeButton = false
                             local power = ap[selectedCardPower]
 
-                            if selectedCardPower == "CONSUME_ANY" or selectedCardPower == "CONSUME_ALL" or selectedCardPower == "CONSUME_" .. (parentData.goods or "") or
-                                (((selectedCardPower == "CONSUME_3_DIFF" or selectedCardPower == "CONSUME_N_DIFF") and not selectedUniqueGoods[parentData.goods]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
+                            if selectedCardPower == "CONSUME_ANY" or selectedCardPower == "CONSUME_ALL" or selectedCardPower == "CONSUME_" .. (kind or "") or
+                                (((selectedCardPower == "CONSUME_3_DIFF" or selectedCardPower == "CONSUME_N_DIFF") and not selectedUniqueGoods[kind]) or (p.selectedGoods and p.selectedGoods[obj.getGUID()])) then
                                 makeButton = true
                             end
 
@@ -2728,6 +2731,10 @@ function updateTableauState(player)
 
     local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
+
+    if selectedCard and selectedCard.getName() == "Consume ($)" then
+        goodsCount["TOTAL"] = goodsCount["TOTAL"] - wildGoodCount
+    end
 
     -- Auto cancel certain cards
     if not p.incomingGood and p.usedPower and
@@ -2980,9 +2987,9 @@ function updateTableauState(player)
                             elseif name == "CONSUME_ALL" then
                                 baseAmount[name] = math.max(1, goodsCount["TOTAL"])
                             elseif name == "CONSUME_3_DIFF" then
-                                baseAmount[name] = uniqueCount < 3 and 100 or 3
+                                baseAmount[name] = (uniqueCount >= 3 and goodsCount["TOTAL"] >= 3) and 3 or 100
                             elseif name == "CONSUME_N_DIFF" then
-                                baseAmount[name] = math.max(1, uniqueCount)
+                                baseAmount[name] = math.max(1, math.min(goodsCount["TOTAL"], uniqueCount))
                             elseif not requiresGoods[name] then
                                 baseAmount[name] = 0
                             end
@@ -3072,16 +3079,17 @@ function updateTableauState(player)
                     local power = selectedInfo.activePowers[currentPhase][p.selectedCardPower]
                     local open = not getGoods(card)
                     local paidCost = p.paidCost[selectedCard.getGUID()]
+                    local kind = getKind(card)
                     paidCost = paidCost and paidCost[power.name .. power.index]
 
                     local makeButton = false
-                    if (info.flags["WINDFALL"] and (power.codes["WINDFALL_ANY"] and info.goods or power.codes["WINDFALL_" .. (info.goods or "")])) and paidCost and open then
+                    if (info.flags["WINDFALL"] and (power.codes["WINDFALL_ANY"] and kind or power.codes["WINDFALL_" .. (kind or "")])) and paidCost and open then
                         makeButton = true
                     end
 
-                    if info.goods and info.flags["WINDFALL"] and open and p.selectedCardPower:sub(1,8) == "WINDFALL" and card ~= selectedCard or makeButton then
+                    if kind and info.flags["WINDFALL"] and open and p.selectedCardPower:sub(1,8) == "WINDFALL" and card ~= selectedCard or makeButton then
                         local targetGood = p.selectedCardPower:sub(10, p.selectedCardPower:len())
-                        if targetGood == "ANY" or targetGood == info.goods or power.codes["WINDFALL_ANY"] or power.codes["WINDFALL_" .. info.goods] then
+                        if targetGood == "ANY" or targetGood == kind or power.codes["WINDFALL_ANY"] or power.codes["WINDFALL_" .. kind] then
                             dontAutoPass = true
                             p.canReady = false
                             createGoodsButton(card, "▼", color(1, 1, 1, 0.9))

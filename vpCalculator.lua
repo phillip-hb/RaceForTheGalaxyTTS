@@ -37,9 +37,10 @@ function updateVp(player)
                 cardNames[obj.getName()] = true
                 flatVp = flatVp + info.vp
 
-                if info.goods and not uniqueWorlds[info.goods] then
+                local kind = getKind(obj)
+                if kind and not uniqueWorlds[kind] then
                     uniqueWorldsCount = uniqueWorldsCount + 1
-                    uniqueWorlds[info.goods] = true
+                    uniqueWorlds[kind] = true
                 end
 
                 if info.vpFlags then

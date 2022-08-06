@@ -103,19 +103,18 @@ end
 function createGoodsButton(card, label, color)
     local goodsSnapPointOffset = {0.6, 1, 0.4}
     local slot = getCardSlot(card)
-
-    local pos = card.positionToWorld(goodsSnapPointOffset)
+    local pos = slot.positionToLocal(card.positionToWorld(goodsSnapPointOffset))
 
     slot.createButton({
-        click_function = "goodSelectClick",
-        function_owner = Global,
-        label = label or "",
-        font_size = 175,
-        color = color or "White",
-        width = 500,
-        height = 750,
-        position = slot.positionToLocal(pos),
-        scale = {0.5, 1, 0.35}
+            click_function = "goodSelectClick",
+            function_owner = Global,
+            label = label or "",
+            font_size = 175,
+            color = color or "White",
+            width = 500,
+            height = 750,
+            position = pos,
+            scale = {0.5, 1, 0.35}
     })
 end
 
@@ -461,7 +460,7 @@ end
 
 function createKindTypeUI(card)
     local choiceLocked = card.getVar("choiceLocked")
-    if not choiceLocked then
+    if not choiceLocked and enforceRules or not enforceRules then
         card.createButton({
             click_function = "selectKindNoveltyClick",
             function_owner = Global,
