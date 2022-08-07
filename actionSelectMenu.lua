@@ -10,6 +10,7 @@ function onload()
      actionZone = getObjectFromGUID(actionZone_GUID)
      selectedActionCardTile = getObjectFromGUID(selectedActionCardTile_GUID)
      selectedActionCardZone = getObjectFromGUID(selectedActionCardZone_GUID)
+     componentsBag = getObjectFromGUID("4c1650")
 
      buttonIndex = {}
      adv2pButtonIndex = {}
@@ -286,7 +287,9 @@ function returnSelectedActionCard(name)
                if not name or name == getName(obj) then
                     obj.setPosition(actionZone.getPosition())
                     obj.setRotationSmooth({obj.getRotation()[1],obj.getRotation()[2], 0})
-                    if name then return end
+                    if name then
+                         return
+                    end
                end
           end
      end
@@ -379,8 +382,11 @@ function refreshButtonHighlights()
           if obj.hasTag("Action Card") then
                local ind = adv2pButtonIndex[getName(obj)]
 
-               if ind then
+               if ind or obj.hasTag("PrestigeSearch") then
                     local name = getName(obj)
+                    if obj.hasTag("PrestigeSearch") then
+                         name = "Prestige / Search"
+                    end
                     local index = adv2p and adv2pButtonIndex[name] + adv2pBtnIndexOffset or buttonIndex[name] + btnIndexOffset
 
                     if prestigeSearch and obj.hasTag("PrestigeSearch") then

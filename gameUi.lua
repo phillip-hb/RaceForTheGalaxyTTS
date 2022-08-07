@@ -539,3 +539,29 @@ function selectKindAlienClick(obj, player, rightClick)
     obj.setVar("kind", "ALIEN")
     queueUpdate(player, true)
 end
+
+function getPrestigeSearchActionCard(player)
+    local p = playerData[player]
+    local zone = getObjectFromGUID(selectedActionZone_GUID[p.index])
+    local objs = zone.getObjects()
+
+    for _, obj in pairs(objs) do
+         if obj.hasTag("PrestigeSearch") then
+            return obj
+         end
+    end
+end
+
+function prestigeExplore5Click(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Explore (+5)")
+    broadcastToColor("Selected Prestige Explore (+5).", player.color, player.color)
+end
+
+function prestigeExplore11Click(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Explore (+1,+1)")
+    broadcastToColor("Selected Prestige Explore (+1,+1).", player.color, player.color)
+end

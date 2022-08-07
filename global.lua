@@ -315,7 +315,11 @@ function redisplayXmlUi()
 end
 
 function getName(obj)
-     return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
+    local name = obj.getName()
+    if obj.hasTag("PrestigeSearch") then
+        name = name:sub(10, name:len())
+    end
+    return name .. (obj.hasTag("Adv2p") and "Adv2p" or "")
 end
 
 function getKind(card)
@@ -1161,7 +1165,7 @@ function onObjectEnterZone(zone, object)
         end
 
         queueUpdate(player)
-     end
+    end
 end
 
 function onObjectEnterContainer(container, enter_object)
@@ -1318,10 +1322,21 @@ function playerReadyClicked(playerColor, forced, playSound)
 
         updateReadyButtons({playerColor, false})
         return
+    elseif currentPhaseIndex == 0 and expansionLevel >= 3 then
+        local prestigeSearchCard = getPrestigeSearchActionCard(playerColor)
+        if enforceRules and prestigeSearchCard and p.prestigeCount <= 0 and prestigeSearchCard.getName() ~= "Search" then
+            broadcastToColor("You require at least 1 Prestige to perform this action.", playerColor, "White")
+            return
+        elseif prestigeSearchCard and prestigeSearchCard.getName() == "Prestige / Search" then
+            broadcastToColor("You must select what your Prestige / Search action is.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
+            return
+        end
     elseif currentPhase == 1 then
         if enforceRules then
             if p.beforeExplore then
                 broadcastToColor("You must confirm the card's power before clicking ready!", playerColor, "White")
+                updateReadyButtons({playerColor, false})
                 return
             elseif not p.canReady then
                 broadcastToColor("Please discard the required number of cards.", playerColor, "White")
@@ -1792,7 +1807,7 @@ function checkAllReadyCo()
         firstRound = false
 
         -- flip over all selected phase cards and phase tiles
-        for _, guid in pairs(selectedActionZone_GUID) do
+        for i, guid in pairs(selectedActionZone_GUID) do
             local zone = getObjectFromGUID(guid)
             local selectedActions = {}
 
@@ -1801,6 +1816,11 @@ function checkAllReadyCo()
                     if obj.is_face_down then obj.flip() end
                     local name = split(getName(obj), " ")[1]
                     selectedActions[name] = true
+
+                    if obj.hasTag("PrestigeSearch") and name ~= "Search" then
+                        local player = playerOrder[i]
+                        discardPrestige(player, 1)
+                    end
                 end
             end
 
@@ -1892,8 +1912,18 @@ end
 
 function returnActionCardsCo()
      for i=1, 4 do
-          local o = getObjectFromGUID(actionSelectorMenu_GUID[i])
-          o.call("returnSelectedActionCard")
+        if expansionLevel >= 3 then
+            -- check to remove used prestige search cards
+            local player = playerOrder[i]
+            local card = getPrestigeSearchActionCard(player)
+            if card then
+                componentsBag.putObject(card)
+                local btn = getObjectFromGUID(prestigeButton_GUID[i])
+                if btn then componentsBag.putObject(btn) end
+            end
+        end
+        local o = getObjectFromGUID(actionSelectorMenu_GUID[i])
+        o.call("returnSelectedActionCard")
      end
 
      return 1
