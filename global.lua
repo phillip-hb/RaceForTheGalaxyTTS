@@ -73,6 +73,7 @@ function player(i)
         ignoreCards = {},
         discardLaterFromTableau = {},
         takeoverMenuMap = {},
+        searchAction = nil,
     }
 end
 
@@ -115,6 +116,18 @@ compatible = {
     ["TAKEOVER_PRESTIGE"] = {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
     ["TAKEOVER_MILITARY"]= {["MILITARY_HAND"]=1,["DISCARD|EXTRA_MILITARY"]=1,["CONSUME_PRESTIGE"]=1,["DISCARD_CONQUER_SETTLE"]=1},
     ["PAY_MILITARY"] = {["DISCARD|REDUCE_ZERO"]=1,["CONSUME_GENE"]=1},
+}
+
+searchActions = {
+    ["MilitaryDev"] = 1,
+    ["MilitaryWindfall"] = 2,
+    ["Windfall"] = 3,
+    ["ChromoWorld"] = 4,
+    ["AlienWorld"] = 5,
+    ["MultiConsume"] = 6,
+    ["Military5World"] = 7,
+    ["6Dev"] = 8,
+    ["Takeover"] = 9
 }
 
 handZone_GUID = {"7556a6", "2a2c18", "0180e0", "84db02"}
@@ -316,6 +329,12 @@ function redisplayXmlUi()
         if p.securityCouncil then
             showSecurityCouncilMenu(player)
         end
+
+        local card = getPrestigeSearchActionCard(player)
+        if card and card.hasTag("PrestigeSearch") then
+            uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
+            updatePrestigeSearchTextBack(card, player)
+       end
     end
 end
 
@@ -1174,6 +1193,7 @@ function onObjectEnterZone(zone, object)
     elseif isActionCardHandZone then
         if object.hasTag("PrestigeSearch") then
             object.setName("Prestige / Search")
+            displayBackTextOff(object)
         end
     end
 end

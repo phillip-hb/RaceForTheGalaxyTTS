@@ -184,11 +184,16 @@ function displayXOn(o, player)
     displayBackTextOn(o, "✘", {color="Red", fontSize=200}, player)
 end
 
+function displayPrestigeSearchActionText(o, text, player)
+    displayBackTextOn(o, text, {color="White", fontSize=30, fontStyle="Bold"}, player)
+end
+
 function displayBackTextOn(o, text, attributes, player)
     if o.UI.getXml() == '' then
         local fontSz = attributes.fontSize or 200
         local color = attributes.color or "White"
-        o.UI.setXml('<Text id="x" fontSize="' .. fontSz .. '" color="' .. color ..'" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">' .. text .. '</Text>' ..
+        local style = attributes.fontStyle or ""
+        o.UI.setXml('<Text id="x" fontStyle="' .. style .. '" fontSize="' .. fontSz .. '" color="' .. color ..'" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">' .. text .. '</Text>' ..
 [[
 <Panel id="highlight" width="220" height="314" active="false"/>
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
@@ -199,6 +204,7 @@ function displayBackTextOn(o, text, attributes, player)
     else
         attributes.active = true
         attributes.visibility = "Black|" .. player
+        attributes.fontStyle = attributes.fontStyle or ""
         o.UI.setAttributes("x", attributes)
         o.UI.setValue("x", text)
     end
@@ -563,7 +569,7 @@ function prestigeExplore5Click(player, button)
     local card = getPrestigeSearchActionCard(player.color)
     card.setName("Prestige Explore (+5)")
     broadcastToColor("Selected Prestige Explore (+5).", player.color, player.color)
-    
+    updatePrestigeSearchTextBack(card, player.color)
 end
 
 function prestigeExplore11Click(player, button)
@@ -571,4 +577,157 @@ function prestigeExplore11Click(player, button)
     local card = getPrestigeSearchActionCard(player.color)
     card.setName("Prestige Explore (+1,+1)")
     broadcastToColor("Selected Prestige Explore (+1,+1).", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function prestigeDevelopClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Develop")
+    broadcastToColor("Selected Prestige Develop.", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function prestigeSettleClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Settle")
+    broadcastToColor("Selected Prestige Settle.", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function prestigeConsumeTradeClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Consume ($)")
+    broadcastToColor("Selected Prestige Consume ($).", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function prestigeConsumex2Click(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Consume (x2)")
+    broadcastToColor("Selected Prestige Consume (x2).", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function prestigeProduceClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Prestige Produce")
+    broadcastToColor("Selected Prestige Produce.", player.color, player.color)
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchDevMilitaryClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for military developments.", player.color, player.color)
+    playerData[player.color].searchAction = "MilitaryDev"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchMilitaryWindfallClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for military windfall worlds.", player.color, player.color)
+    playerData[player.color].searchAction = "MilitaryWindfall"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchWindfallClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for windfall worlds.", player.color, player.color)
+    playerData[player.color].searchAction = "Windfall"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchChromoWorldClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for Chromosome worlds.", player.color, player.color)
+    playerData[player.color].searchAction = "ChromoWorld"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchAlienWorldClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for Aliens worlds.", player.color, player.color)
+    playerData[player.color].searchAction = "AlienWorld"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchConsumePowerClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for multi-consume powers.", player.color, player.color)
+    playerData[player.color].searchAction = "MultiConsume"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchMilitary5WorldClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for defense 5+ military worlds.", player.color, player.color)
+    playerData[player.color].searchAction = "Military5World"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function search6CostDevClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for 6-cost developments.", player.color, player.color)
+    playerData[player.color].searchAction = "6Dev"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function searchTakeoverPowerClick(player, button)
+    if button ~= "-1" then return end
+    local card = getPrestigeSearchActionCard(player.color)
+    card.setName("Search")
+    broadcastToColor("You will search for takeover / defense powers.", player.color, player.color)
+    playerData[player.color].searchAction = "Takeover"
+    updatePrestigeSearchTextBack(card, player.color)
+end
+
+function updatePrestigeSearchTextBack(card, player)
+    local tbl = {
+        ["Prestige Explore (+5)"] = "Prestige\nExplore (+5)",
+        ["Prestige Explore (+1,+1)"] = "Prestige\nExplore (+1,+1)",
+        ["Prestige Develop"] = "Prestige\nDevelop",
+        ["Prestige Settle"] = "Prestige\nSettle",
+        ["Prestige Consume ($)"] = "Prestige\nConsume ($)",
+        ["Prestige Consume (x2)"] = "Prestige\nConsume (x2)",
+        ["Prestige Produce"] = "Prestige\nProduce",
+        ["MilitaryDev"] = "Search for\nMilitary\nDevelopment",
+        ["MilitaryWindfall"] = "Search for\nMilitary\nWindfall World",
+        ["Windfall"] = "Search for\nWindfall World",
+        ["ChromoWorld"] = "Search for\nChromosome\nWorld",
+        ["AlienWorld"] = "Search for\nAlien World",
+        ["MultiConsume"] = "Search for\nMulti-Consume\nPower",
+        ["Military5World"] = "Search for\nMilitary 5+\nWorld",
+        ["6Dev"] = "Search for\n6-cost\nDevelopment",
+        ["Takeover"] = "Search for\nTakeover/Defense\nPower"
+    }
+    local text = ""
+    local name = card.getName()
+
+    if name == "Search" then
+        text = tbl[playerData[player].searchAction]
+    else
+        text = tbl[name]
+    end
+
+    displayPrestigeSearchActionText(card, text, player)
 end
