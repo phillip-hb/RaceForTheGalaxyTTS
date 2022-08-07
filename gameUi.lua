@@ -181,8 +181,14 @@ function displayVpHexOff(o)
 end
 
 function displayXOn(o, player)
+    displayBackTextOn(o, "✘", {color="Red", fontSize=200}, player)
+end
+
+function displayBackTextOn(o, text, attributes, player)
     if o.UI.getXml() == '' then
-        o.UI.setXml('<Text id="x" fontSize="200" color="Red" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">✘</Text>' ..
+        local fontSz = attributes.fontSize or 200
+        local color = attributes.color or "White"
+        o.UI.setXml('<Text id="x" fontSize="' .. fontSz .. '" color="' .. color ..'" position="0 0 100" rotation="180 0 0" visibility="Black|' .. player .. '">' .. text .. '</Text>' ..
 [[
 <Panel id="highlight" width="220" height="314" active="false"/>
 <Panel id="hex" width="100" height="100" position="45 -113 -30" scale="0.3" rotation="0 0 180" active="false">
@@ -191,14 +197,14 @@ function displayXOn(o, player)
 </Panel>
 ]])
     else
-        o.UI.setAttributes("x",{
-            active = true,
-            visibility = "Black|" .. player,
-        })
+        attributes.active = true
+        attributes.visibility = "Black|" .. player
+        o.UI.setAttributes("x", attributes)
+        o.UI.setValue("x", text)
     end
 end
 
-function displayXOff(o)
+function displayBackTextOff(o)
     if o.UI.getXml() ~= '' then
         o.UI.setAttribute("x", "active", false)
     end
@@ -557,6 +563,7 @@ function prestigeExplore5Click(player, button)
     local card = getPrestigeSearchActionCard(player.color)
     card.setName("Prestige Explore (+5)")
     broadcastToColor("Selected Prestige Explore (+5).", player.color, player.color)
+    
 end
 
 function prestigeExplore11Click(player, button)

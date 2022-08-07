@@ -265,6 +265,11 @@ function onload(saved_data)
         tableauZoneMap[tableauZone_GUID[i]] = true
     end
 
+    actionZoneMap = {}
+    for i=1, #actionZone_GUID do
+        actionZoneMap[actionZone_GUID[i]] = true
+    end
+
     sound = getObjectFromGUID("416393")
     sound.interactable = false
 
@@ -1083,7 +1088,7 @@ function onObjectLeaveZone(zone, object)
             if object.getScale()[1] < 1 and object.type == "Card" then
                 object.setScale({1, 1, 1})
                 object.setDescription("")
-                displayXOff(object)
+                displayBackTextOff(object)
 
                 if p.selectedGoods[object.getGUID()] then
                     p.selectedGoods[object.getGUID()] = nil
@@ -1109,6 +1114,7 @@ function onObjectEnterZone(zone, object)
 
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
+    local isActionCardHandZone = actionZoneMap[zone.getGUID()]
 
     if isHandZone then
         local player = handZoneOwner[zone.getGUID()]
@@ -1165,6 +1171,10 @@ function onObjectEnterZone(zone, object)
         end
 
         queueUpdate(player)
+    elseif isActionCardHandZone then
+        if object.hasTag("PrestigeSearch") then
+            object.setName("Prestige / Search")
+        end
     end
 end
 
@@ -1429,7 +1439,7 @@ function finalizeUsedResources(player)
     for guid, v in pairs(p.markedGoods) do
         local good = getObjectFromGUID(guid)
         if good then
-            displayXOff(good)
+            displayBackTextOff(good)
             discardCard(good)
         end
 
@@ -3393,7 +3403,7 @@ function cancelUsedCard(player, info)
             local card = getObjectFromGUID(guid)
             card.setTags({})
             highlightOff(card)
-            displayXOff(card)
+            displayBackTextOff(card)
             if card.is_face_down then
                 card.flip()
             end
@@ -3401,7 +3411,7 @@ function cancelUsedCard(player, info)
 
         for guid, v in pairs(info.markedGoods) do
             local card = getObjectFromGUID(guid)
-            displayXOff(card)
+            displayBackTextOff(card)
             p.markedGoods[guid] = nil
         end
 
