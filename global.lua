@@ -544,7 +544,8 @@ function checkIfSelectedAction(player, actionName)
     local zone = getObjectFromGUID(selectedActionZone_GUID[playerData[player].index])
 
     for _, obj in pairs(zone.getObjects()) do
-        if obj.hasTag("Action Card") and obj.getName() == actionName then
+        if obj.hasTag("Action Card") and
+            (obj.getName() == actionName or actionName == "Consume ($)" and obj.getName() == "Prestige Consume ($)" or actionName == "Produce" and obj.getName() == "Prestige Produce") then
             return obj
         end
     end
@@ -759,7 +760,7 @@ end
 
 function getTooltip(phase, power)
     local tooltip = activePowers[phase][power.name]
-    if power.name == "DISCARD" or power.name == "CONSUME_PRESTIGE" then
+    if power.name == "DISCARD" or power.name == "CONSUME_PRESTIGE" or power.name == "DISCARD_HAND" then
         for code, v in pairs(power.codes) do
             if subtooltip[code] then
                 tooltip = tooltip .. subtooltip[code]
@@ -1217,7 +1218,7 @@ end
 function onObjectEnterContainer(container, enter_object)
     if container.hasTag("VP") then
         for _, zone in pairs(container.getZones()) do
-            local owner = tableauZoneOwner[zone.getGUID()]
+            local owner = tableauZoneMap[zone.getGUID()]
             if owner then
                 queueUpdate(owner)
                 return
@@ -1229,7 +1230,7 @@ end
 function onObjectLeaveContainer(container, leave_object)
     if container.hasTag("VP") then
         for _, zone in pairs(container.getZones()) do
-            local owner = tableauZoneOwner[zone.getGUID()]
+            local owner = tableauZoneMap[zone.getGUID()]
             if owner then
                 queueUpdate(owner)
                 return
@@ -1380,12 +1381,12 @@ function playerReadyClicked(playerColor, forced, playSound)
         return
     elseif currentPhaseIndex == 0 and expansionLevel >= 3 then
         local prestigeSearchCard = getPrestigeSearchActionCard(playerColor)
-        if enforceRules and prestigeSearchCard and p.prestigeCount <= 0 and prestigeSearchCard.getName() ~= "Search" then
-            broadcastToColor("You require at least 1 Prestige to perform this action.", playerColor, "White")
+        if prestigeSearchCard and prestigeSearchCard.getName() == "Prestige / Search" then
+            broadcastToColor("You must select what your Prestige / Search action is.", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
-        elseif prestigeSearchCard and prestigeSearchCard.getName() == "Prestige / Search" then
-            broadcastToColor("You must select what your Prestige / Search action is.", playerColor, "White")
+        elseif enforceRules and prestigeSearchCard and p.prestigeCount <= 0 and prestigeSearchCard.getName() ~= "Search" then
+            broadcastToColor("You require at least 1 Prestige to perform this action.", playerColor, "White")
             updateReadyButtons({playerColor, false})
             return
         end
@@ -1742,7 +1743,7 @@ function checkAllReadyCo()
                 end
 
                 local card = getObjectFromGUID(p.takeoverTarget)
-                local targetPlayer = tableauZoneOwner[card.getZones()[1].getGUID()]
+                local targetPlayer = tableauZoneMap[card.getZones()[1].getGUID()]
                 local otherp = playerData[targetPlayer]
 
                 if not otherp.beingTargeted then otherp.beingTargeted = {} end
@@ -2423,7 +2424,7 @@ function startConsumePhase()
 
         -- Force first selection choice to be the consume trade card, otherwise it'll be nil
         local card = checkIfSelectedAction(player, "Consume ($)")
-        if card then
+        if checkIfSelectedAction(player, "Consume ($)") then
             data.selectedCard = card.getGUID()
             data.selectedCardPower = "TRADE_ACTION"
         end
@@ -2997,14 +2998,14 @@ function updateTableauState(player)
     local uniqueCount = tableLength(uniques)
     p.mustConsumeCount = 0
 
-    if selectedCard and selectedCard.getName() == "Consume ($)" then
+    if selectedCard and (selectedCard.getName() == "Consume ($)" or selectedCard.getName() == "Prestige Consume ($)") then
         goodsCount["TOTAL"] = goodsCount["TOTAL"] - wildGoodCount
     end
 
     -- Auto cancel certain cards
     if not p.incomingGood and p.usedPower and
-            (currentPhase == "4" and selectedCard and selectedCard.getName() == "Consume ($)" and goodsCount["TOTAL"] <= 0
-            or currentPhase == "5" and selectedCard and selectedCard.getName() == "Produce" and windfallCount["TOTAL"] <= 0) then
+            (currentPhase == "4" and selectedCard and (selectedCard.getName() == "Consume ($)" or selectedCard.getName() == "Prestige Consume ($)") and goodsCount["TOTAL"] <= 0
+            or currentPhase == "5" and selectedCard and (selectedCard.getName() == "Produce" or selectedCard.getName() == "Prestige Produce") and windfallCount["TOTAL"] <= 0) then
         selectedCard = nil
         selectedInfo = nil
         p.selectedCard = nil
@@ -3070,7 +3071,7 @@ function updateTableauState(player)
             end
         end
 
-        if not card.hasTag("Action Card") then
+        if not card.hasTag("Action Card") or card.hasTag("PrestigeSearch") or card.getName() == "Produce" then
             local ap = info.activePowers[currentPhase]
             local miscSelected = miscSelectedCardsTable[card.getGUID()]
             local passives = info.passivePowers[currentPhase]
@@ -3290,7 +3291,7 @@ function updateTableauState(player)
                             dontAutoPass = true
                             if not optionalPowers[name] then p.canReady = false end
                             local prefix = (currentPhase == "4" and optionalPowers[name]) and "(Optional) " or ""
-                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. activePowers[currentPhase][name], (currentPhase == "4" and optionalPowers[name]) and optColor or "White")
+                            createUsePowerButton(card, power.index, info.activeCount[currentPhase], prefix .. " " .. getTooltip(currentPhase, power), (currentPhase == "4" and optionalPowers[name]) and optColor or "White")
                         end
                     end
                 elseif selectedCard == card then
@@ -3338,6 +3339,11 @@ function updateTableauState(player)
 
                         if power.codes["NOT_THIS"] and open then
                             windfallCountTarget = windfallCountTarget - 1
+                        end
+
+                        -- Mainly used for prestige produce, which can produce twice on windfalls
+                        if power.times > 0 and used and used[name] and used[name].strength < power.times then
+                            used = false
                         end
 
                         if used and used[name] or
@@ -3414,7 +3420,7 @@ function markUsed(player, card, power, n)
     local p = playerData[player]
 
     if not p.cardsAlreadyUsed[card.getGUID()] then p.cardsAlreadyUsed[card.getGUID()] = {} end
-    local data = cardAlreadyUsedInit()
+    local data = p.cardsAlreadyUsed[card.getGUID()][power.name] or cardAlreadyUsedInit()
 
     data.selectedCard = p.selectedCard
     data.strength = data.strength + (n or 1)
@@ -3497,6 +3503,9 @@ function usePowerClick(obj, player, rightClick, powerIndex)
                     return
                 elseif p.selectedCardPower == "VP" then
                     local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
+                    if p.powersSnapshot["TRIPLE_VP"] then
+                        vpMultiplier = 3
+                    end
                     getVpChips(player, power.strength * vpMultiplier)
                     markUsed(player, obj, power)
                     queueUpdate(player, true)
@@ -3983,6 +3992,9 @@ function confirmPowerClick(obj, player, rightClick)
 
     if paidCost and power then
         local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
+        if p.powersSnapshot["TRIPLE_VP"] then
+            vpMultiplier = 3
+        end
 
         if power.codes["GET_VP"] then
             getVpChips(player, power.strength * vpMultiplier)
@@ -4052,6 +4064,9 @@ function goodSelectClick(slot, player, rightClick)
 
         if selectedGoodsCount >= p.mustConsumeCount then
             local vpMultiplier = p.powersSnapshot["DOUBLE_VP"] and 2 or 1
+            if p.powersSnapshot["TRIPLE_VP"] then
+                vpMultiplier = 3
+            end
             local times = 1
 
             if p.selectedCardPower == "TRADE_ACTION" then
@@ -4097,7 +4112,7 @@ function goodSelectClick(slot, player, rightClick)
     end
 
     if powerUsed then
-        markUsed(player, selectedCard, power)
+        markUsed(player, selectedCard, power, 1)
     end
 
     queueUpdate(player, true)

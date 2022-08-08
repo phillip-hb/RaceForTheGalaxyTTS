@@ -61,6 +61,7 @@ N:Prestige Consume ($)
 T:0:0:0
 E@0:3
 F:ACTION_CARD | PRESTIGE_SEARCH
+P:4:TRADE_ACTION:0:0
 P:4:TRADE_ANY:3:0
 P:4:DISCARD_HAND | GET_VP:1:2
 P:4:DOUBLE_VP:0:0
@@ -1819,7 +1820,7 @@ activePowers = {
           CONSUME_N_DIFF = "Consume different goods.",
           CONSUME_ALL = "Consume all goods.",
           CONSUME_PRESTIGE = "Consume prestige.",
-          DISCARD_HAND = "Discard from hand.",
+          DISCARD_HAND = "Discard from hand to ",
           DRAW = "Draw card(s).",
           ANTE_CARD = "Ante card and draw if lucky.",
           DRAW_LUCKY = "Draw if lucky.",
@@ -1848,7 +1849,8 @@ subtooltip = {
      REDUCE_ZERO = "settle normal world (non-Alien) for free.",
      EXTRA_MILITARY = "gain extra military.",
      TAKEOVER_MILITARY = "takeover military world.",
-     TAKEOVER_IMPERIUM = "takeover military world from IMPERIUM tableau."
+     TAKEOVER_IMPERIUM = "takeover military world from IMPERIUM tableau.",
+     GET_VP = "get VPs."
 }
 
 takeoverPowers = {
