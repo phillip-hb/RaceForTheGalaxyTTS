@@ -22,6 +22,7 @@ expansionLevel = 0
 selectedPhases = {}
 firstPlayer = "Yellow"
 firstRound = false
+activeSearchPlayer = nil
 -- nil if no choice was made, otherwise GUID of selected object
 
 function player(i)
@@ -74,6 +75,8 @@ function player(i)
         discardLaterFromTableau = {},
         takeoverMenuMap = {},
         searchAction = nil,
+        searchAttempts = 0,
+        searchedCardGuid = nil,
     }
 end
 
@@ -90,8 +93,10 @@ gameDone = false
 enforceRules = true
 delayNextPhase = false
 delayNextPhaseTime = 0
+reshuffleCount = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
+searching = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1,["PREVENT_TAKEOVER"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
@@ -218,6 +223,7 @@ function onSave()
     saved_data.rebelSneakAttackPhase = rebelSneakAttackPhase
     saved_data.queueRebelSneakAttackPhase = queueRebelSneakAttackPhase
     saved_data.securityCouncilPhase = securityCouncilPhase
+    saved_data.activeSearchPlayer = activeSearchPlayer
     return JSON.encode(saved_data)
 end
 
@@ -248,6 +254,7 @@ function onload(saved_data)
         rebelSneakAttackPhase = data.rebelSneakAttackPhase
         queueRebelSneakAttackPhase = data.queueRebelSneakAttackPhase
         securityCouncilPhase = data.securityCouncilPhase
+        activeSearchPlayer = data.activeSearchPlayer
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -270,17 +277,22 @@ function onload(saved_data)
 
     handZoneMap = {}
     for i=1, #handZone_GUID do
-        handZoneMap[handZone_GUID[i]] = true
+        handZoneMap[handZone_GUID[i]] = playerOrder[i]
     end
 
     tableauZoneMap = {}
     for i=1, #tableauZone_GUID do
-        tableauZoneMap[tableauZone_GUID[i]] = true
+        tableauZoneMap[tableauZone_GUID[i]] = playerOrder[i]
     end
 
     actionZoneMap = {}
     for i=1, #actionZone_GUID do
-        actionZoneMap[actionZone_GUID[i]] = true
+        actionZoneMap[actionZone_GUID[i]] = playerOrder[i]
+    end
+
+    selectedActionZoneMap = {}
+    for i=1, #selectedActionZone_GUID do
+        selectedActionZoneMap[selectedActionZone_GUID[i]] = playerOrder[i]
     end
 
     sound = getObjectFromGUID("416393")
@@ -330,17 +342,19 @@ function redisplayXmlUi()
             showSecurityCouncilMenu(player)
         end
 
-        local card = getPrestigeSearchActionCard(player)
-        if card and card.hasTag("PrestigeSearch") then
-            uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
-            updatePrestigeSearchTextBack(card, player)
-       end
+        if currentPhaseIndex == 0 and not searchPhase then
+            local card = getPrestigeSearchActionCard(player)
+            if card and card.hasTag("PrestigeSearch") then
+                uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
+                updatePrestigeSearchTextBack(card, player)
+            end
+        end
     end
 end
 
 function getName(obj)
     local name = obj.getName()
-    if obj.hasTag("PrestigeSearch") then
+    if obj.hasTag("PrestigeSearch") and name ~= "Search" then
         name = name:sub(10, name:len())
     end
     return name .. (obj.hasTag("Adv2p") and "Adv2p" or "")
@@ -603,6 +617,8 @@ function getOwner(card)
     for _, zone in pairs(card.getZones()) do
         if tableauZoneOwner[zone.getGUID()] then
             return tableauZoneOwner[zone.getGUID()]
+        elseif selectedActionZoneMap[zone.getGUID()] then
+            return selectedActionZoneMap[zone.getGUID()]
         end
     end
     return nil
@@ -794,6 +810,7 @@ function reshuffleDiscardPile()
           item.shuffle()
      end
 
+     reshuffleCount = reshuffleCount + 1
      return item
 end
 
@@ -1339,6 +1356,16 @@ function playerReadyClicked(playerColor, forced, playSound)
             updateReadyButtons({playerColor, false})
             return
         end
+    elseif enforceRules and currentPhaseIndex == 0 and searchPhase then
+        if p.searchAction then
+            if activeSearchPlayer == player then
+                broadcastToColor("You must confirm the card's power before clicking ready!", playerColor, "White")
+            else
+                broadcastToColor("You haven't resolved your search action yet.", playerColor, "White")
+            end
+            updateReadyButtons({playerColor, false})
+            return
+        end
     elseif currentPhaseIndex == 0 and (advanced2p and count < maxCount or not advanced2p and count < maxCount) then
         if advanced2p then
             if p.powersSnapshot["SELECT_LAST"] then
@@ -1356,6 +1383,7 @@ function playerReadyClicked(playerColor, forced, playSound)
         local prestigeSearchCard = getPrestigeSearchActionCard(playerColor)
         if enforceRules and prestigeSearchCard and p.prestigeCount <= 0 and prestigeSearchCard.getName() ~= "Search" then
             broadcastToColor("You require at least 1 Prestige to perform this action.", playerColor, "White")
+            updateReadyButtons({playerColor, false})
             return
         elseif prestigeSearchCard and prestigeSearchCard.getName() == "Prestige / Search" then
             broadcastToColor("You must select what your Prestige / Search action is.", playerColor, "White")
@@ -1835,6 +1863,7 @@ function checkAllReadyCo()
     if currentPhaseIndex == 0 then  -- All players have selected an action
         local phases = {}
         firstRound = false
+        Global.UI.setAttribute("prestigeSearchMenu", "visibility", "Brown")
 
         -- flip over all selected phase cards and phase tiles
         for i, guid in pairs(selectedActionZone_GUID) do
@@ -1884,18 +1913,36 @@ function checkAllReadyCo()
             return 1
         end
 
+        -- Search phase
+        if not searchPhase and phases["Search"] then
+            searchPhase = true
+            wait(1.25)
+            sound.AssetBundle.playTriggerEffect(0)
+            broadcastToAll("Search Phase", "White")
+            wait(0.5)
+            transitionNextPhase = false
+            beginNextSearchPlayer()
+            return 1
+        end
+
         for phase, _ in pairs(phases) do
-            local index = phaseIndex[phase]
-            local tile = getObjectFromGUID(phaseTilePlacement[index][1])
-            tile.setRotationSmooth({0, 180, 0})
-            selectedPhases[#selectedPhases + 1] = phaseIndex[phase]
+            if phase ~= "Search" then
+                local index = phaseIndex[phase]
+                local tile = getObjectFromGUID(phaseTilePlacement[index][1])
+                tile.setRotationSmooth({0, 180, 0})
+                selectedPhases[#selectedPhases + 1] = phaseIndex[phase]
+            end
         end
 
         selectedPhases[#selectedPhases + 1] = 100
         table.sort(selectedPhases)
         currentPhaseIndex = -1000
 
-        wait(1.25)
+        if not searchPhase then
+            wait(1.25)
+        else
+            searchPhase = false
+        end
 
         beginNextPhase()
     elseif currentPhaseIndex >= 1 then
@@ -2156,6 +2203,98 @@ function resetPhaseTiles()
           local tile = getObjectFromGUID(phaseTilePlacement[i][1])
           tile.setRotationSmooth({0, 180, 180})
      end
+end
+
+function beginNextSearchPlayer()
+    local txt = {
+        ["MilitaryDev"] = "military developments.",
+        ["MilitaryWindfall"] = "military windfall worlds.",
+        ["Windfall"] = "windfall worlds.",
+        ["ChromoWorld"] = "Chromosome worlds.",
+        ["AlienWorld"] = "Alien worlds.",
+        ["MultiConsume"] = "cards with multi-consume powers.",
+        ["Military5World"] = "defense 5+ military worlds.",
+        ["6Dev"] = "6-cost developments.",
+        ["Takeover"] = "cards with takeover/defense powers."
+    }
+    local firstIndex = playerData[firstPlayer].index
+    local count = 0
+    while count < 4 do
+        local i = firstIndex + count
+        if i > #playerOrder then
+            i = 1
+        end
+
+        local player = playerOrder[i]
+        local p = playerData[player]
+        if p.searchAction then
+            activeSearchPlayer = player
+            reshuffleCount = 0
+            p.searchAttempts = 0
+            broadcastToAll("Resolving " .. (Player[player].steam_name or player) .. "'s search for " .. txt[p.searchAction], player)
+            startLuaCoroutine(self, "performSearch")
+            return
+        end
+        count = count + 1
+    end
+
+    -- No more players doing a search action.
+end
+
+-- Performs search on the active player
+function performSearch()
+    if not activeSearchPlayer then
+        broadcastToAll("Error: No players detected performing search action.", color(1,0,0))
+        return 1
+    end
+
+    searching = true
+
+    local players = getSeatedPlayersWithHands()
+    for _, player in pairs(players) do
+        queueUpdate(player, true)
+    end
+
+    local p = playerData[activeSearchPlayer]
+    local name = Player[activeSearchPlayer].steam_name or activeSearchPlayer
+
+    while reshuffleCount < 2 do
+        searching = true
+        local card = drawCard()
+        local info = card_db[card.getName()]
+        printToAll("Search: " .. name .. " drew \"" .. card.getName() .. '." (cost: ' .. info.cost .. ')', "Grey")
+        wait(0.05)
+
+        if info then
+            local foundCard = false
+            local pp3 = info.passivePowers["3"]
+            -- If correct card, give to player, otherwise draw another card
+            if p.searchAction == "MilitaryDev" and info.type == 2 and pp3 and pp3["EXTRA_MILITARY"] and (pp3["EXTRA_MILITARY"].strength >= 1 or pp3["EXTRA_MILITARY"].strength <= 2) then
+                foundCard = true
+            end
+
+            if foundCard then
+                searching = false
+                p.searchAttempts = p.searchAttempts + 1
+                if p.searchAttempts < 2 then
+                    -- give card to player, prompt if draw another
+                    card.deal(1, activeSearchPlayer)
+                    card.addTag("Explore Highlight")
+                    broadcastToColor("Do you wish to keep this card?", activeSearchPlayer, "White")
+                    p.searchedCardGuid = card.getGUID()
+                else
+                    -- forced to take the card
+                end
+                return 1
+            else
+                discardCard(card)
+            end
+        end
+    end
+
+    -- Failed
+    broadcastToAll(name .. "'s search attempt has failed.", "Purple")
+    return 1
 end
 
 function startExplorePhase()
@@ -2562,7 +2701,7 @@ function updateHandState(playerColor)
             end
 
             -- Explore orange highlight
-            if phase == 1 and obj.hasTag("Explore Highlight") or obj.hasTag("Gamble Reward") then
+            if (phase == 1 or searchPhase) and obj.hasTag("Explore Highlight") or obj.hasTag("Gamble Reward") then
                 obj.highlightOn("Orange")
             elseif currentPhaseIndex == 0 or phase and (phase ~= 1) and obj.hasTag("Explore Highlight") then
                 obj.highlightOff()
@@ -2812,6 +2951,19 @@ function updateTableauState(player)
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
         p.recordedCards[card.getName()] = true
+
+        if searchPhase and card.getName() == "Search" then
+            if activeSearchPlayer == player then
+                card.highlightOn(color(0,1,0))
+                if p.searchedCardGuid and not searching then
+                    createCancelButton(card)
+                    createConfirmButton(card)
+                end
+            else
+                card.highlightOff()
+            end
+            break
+        end
 
         if selectedCard == card then
             if card.hasTag("Action Card") then

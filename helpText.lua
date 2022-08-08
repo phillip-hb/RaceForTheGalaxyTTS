@@ -48,6 +48,16 @@ function updateHelpText(playerColor)
                 p.canConfirm = false
             end
             setHelpText(playerColor, "▼ Select card to save. (" .. discarded .. "/1)")
+        elseif searchPhase then
+            if activeSearchPlayer == playerColor then
+                if searching then
+                    setHelpText(playerColor, "Search: searching through deck...")
+                else
+                    setHelpText(playerColor, "▼ Search: keep this card?")
+                end
+            else
+                setHelpText(playerColor, "Search: waiting for other players.")
+            end
         else
             setHelpText(playerColor, "▲ Select an action.")
         end

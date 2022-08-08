@@ -44,18 +44,30 @@ function createSelectWorldButton(card)
 end
 
 function createConfirmButton(card)
-    local slot = getCardSlot(card)
-    if not slot then return end
+    local obj = getCardSlot(card)
+    if not slot and not card.hasTag("PrestigeSearch") then return end
 
-    slot.createButton({
+    local pos = {0, 0, .63}
+    local w = 900
+    local h = 220
+    local fontSz = 150
+    local sc = {0.5, 1, 0.4}
+
+    if card.hasTag("PrestigeSearch") then
+        obj = card
+        sc = {1,1,1}
+        pos = {0, 0, 1.8}
+    end
+
+    obj.createButton({
         click_function = "confirmPowerClick",
         function_owner = Global,
         label = "Confirm",
-        font_size = 150,
-        width = 900,
-        height = 220,
-        position = {0, 0, .63},
-        scale = {0.5, 1, 0.4}
+        font_size = fontSz,
+        width = w,
+        height = h,
+        position = pos,
+        scale = sc
     })
 end
 
@@ -85,17 +97,33 @@ end
 function createCancelButton(card)
     local slot = getCardSlot(card)
 
-    if not slot then return end
+    if not slot and not card.hasTag("PrestigeSearch") then return end
 
-    slot.createButton({
+    if card.hasTag("PrestigeSearch") then
+        obj = card
+    end
+
+    local pos = {0, 0, -.63}
+    local w = 900
+    local h = 220
+    local fontSz = 150
+    local sc = {0.5, 1, 0.4}
+
+    if card.hasTag("PrestigeSearch") then
+        obj = card
+        sc = {1,1,1}
+        pos = {0, 0, -1.8}
+    end
+
+    obj.createButton({
         click_function = "cancelPowerClick",
         function_owner = Global,
         label = "Cancel",
-        font_size = 150,
-        width = 900,
-        height = 220,
-        position = {0, 0, -.63},
-        scale = {0.5, 1, 0.4},
+        font_size = fontSz,
+        width = w,
+        height = h,
+        position = pos,
+        scale = sc,
         tooltip = "Cancel power.",
     })
 end

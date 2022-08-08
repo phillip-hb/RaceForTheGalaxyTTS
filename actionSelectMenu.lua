@@ -340,7 +340,7 @@ end
 function onObjectEnterZone(zone, obj)
      if zone == selectedActionCardZone then
           refreshButtonHighlights()
-          if obj.hasTag("PrestigeSearch") then
+          if obj.hasTag("PrestigeSearch") and Global.getVar('currentPhaseIndex') == 0 and not Global.getVar('searchPhase') then
                uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
           end
      end
