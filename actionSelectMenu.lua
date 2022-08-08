@@ -379,6 +379,10 @@ function refreshButtonHighlights()
      end
 
      for _, obj in pairs(selectedActionCardZone.getObjects()) do
+          if obj.hasTag("Adv2p") and not adv2p then
+               goto skip
+          end
+
           if obj.hasTag("Action Card") then
                local ind = adv2pButtonIndex[getName(obj)]
 
@@ -399,5 +403,7 @@ function refreshButtonHighlights()
                     })
                end
           end
+
+          ::skip::
      end
 end

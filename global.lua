@@ -158,20 +158,6 @@ drawZone_GUID = "32297e"
 discardZone_GUID = "fe5c37"
 prestigeBag_GUID = "f3bcc8"
 
-handZoneOwner = {
-     ["7556a6"] = "Yellow",
-     ["2a2c18"] = "Red",
-     ["0180e0"] = "Blue",
-     ["84db02"] = "Green"
-}
-
-tableauZoneOwner = {
-     ["2f8337"] = "Yellow",
-     ["6a2b88"] = "Red",
-     ["6707c2"] = "Blue",
-     ["970244"] = "Green",
-}
-
 phaseTilePlacement = {
      {"e536e3", {-4.48, 1.68, -5.60}},
      {"34d2e8", {-2.24, 1.68, -5.60}},
@@ -1087,14 +1073,14 @@ function onObjectLeaveZone(zone, object)
 
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
+    local isSelectedActionZone = selectedActionZoneMap[zone.getGUID()]
 
     if zone == drawZone then
     --      drawDeck = nil
     -- elseif zone == discardZone then
     --      discardPile = nil
     elseif isHandZone then
-        local player = handZoneOwner[zone.getGUID()]
-
+        local player = isHandZone
         object.removeTag("Discard")
         object.clearButtons()
 
@@ -1106,7 +1092,7 @@ function onObjectLeaveZone(zone, object)
     elseif isTableauZone then
         if object.hasTag("Ignore Tableau") then return end
 
-        local player = tableauZoneOwner[zone.getGUID()]
+        local player = isTableauZone
         local p = playerData[player]
         local selectedCard = getObjectFromGUID(p.selectedCard)
 
@@ -1142,6 +1128,9 @@ function onObjectLeaveZone(zone, object)
             p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, object.getGUID())
             queueUpdate(player)
         end
+    elseif isSelectedActionZone and object.hasTag("PrestigeSearch") then
+        local player = isSelectedActionZone
+        queueUpdate(player)
     end
 end
 
@@ -1151,9 +1140,10 @@ function onObjectEnterZone(zone, object)
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
     local isActionCardHandZone = actionZoneMap[zone.getGUID()]
+    local isSelectedActionZone = selectedActionZoneMap[zone.getGUID()]
 
     if isHandZone then
-        local player = handZoneOwner[zone.getGUID()]
+        local player = isHandZone
 
         if object.is_face_down then
             object.addTag("Discard")
@@ -1171,7 +1161,7 @@ function onObjectEnterZone(zone, object)
     elseif isTableauZone and (object.type == 'Card' or object.hasTag("VP")) then
         if object.hasTag("Ignore Tableau") then return end
 
-        local player = tableauZoneOwner[zone.getGUID()]
+        local player = isTableauZone
 
         if object.is_face_down then
             -- Check to see if card is below it to decide if this card is a goods card
@@ -1212,6 +1202,9 @@ function onObjectEnterZone(zone, object)
             object.setName("Prestige / Search")
             displayBackTextOff(object)
         end
+    elseif isSelectedActionZone and object.hasTag("PrestigeSearch") then
+        local player = isSelectedActionZone
+        queueUpdate(player)
     end
 end
 

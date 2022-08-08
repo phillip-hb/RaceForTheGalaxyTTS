@@ -44,30 +44,19 @@ function createSelectWorldButton(card)
 end
 
 function createConfirmButton(card)
-    local obj = getCardSlot(card)
-    if not slot and not card.hasTag("PrestigeSearch") then return end
+    local slot = getCardSlot(card)
+    if not slot then return end
 
-    local pos = {0, 0, .63}
-    local w = 900
-    local h = 220
-    local fontSz = 150
-    local sc = {0.5, 1, 0.4}
-
-    if card.hasTag("PrestigeSearch") then
-        obj = card
-        sc = {1,1,1}
-        pos = {0, 0, 1.8}
-    end
-
-    obj.createButton({
+    slot.createButton({
         click_function = "confirmPowerClick",
         function_owner = Global,
         label = "Confirm",
-        font_size = fontSz,
-        width = w,
-        height = h,
-        position = pos,
-        scale = sc
+        font_size = 150,
+        width = 900,
+        height = 220,
+        position = {0, 0, .63},
+        scale = {0.5, 1, 0.4},
+        tooltip = "Confirm power / selection.",
     })
 end
 
@@ -96,34 +85,17 @@ end
 
 function createCancelButton(card)
     local slot = getCardSlot(card)
+    if not slot then return end
 
-    if not slot and not card.hasTag("PrestigeSearch") then return end
-
-    if card.hasTag("PrestigeSearch") then
-        obj = card
-    end
-
-    local pos = {0, 0, -.63}
-    local w = 900
-    local h = 220
-    local fontSz = 150
-    local sc = {0.5, 1, 0.4}
-
-    if card.hasTag("PrestigeSearch") then
-        obj = card
-        sc = {1,1,1}
-        pos = {0, 0, -1.8}
-    end
-
-    obj.createButton({
+    slot.createButton({
         click_function = "cancelPowerClick",
         function_owner = Global,
         label = "Cancel",
-        font_size = fontSz,
-        width = w,
-        height = h,
-        position = pos,
-        scale = sc,
+        font_size = 150,
+        width = 900,
+        height = 220,
+        position = {0, 0, -.63},
+        scale = {0.5, 1, 0.4},
         tooltip = "Cancel power.",
     })
 end
@@ -446,19 +418,19 @@ end
 -- The default vector lines are the colored square around each player action selection box
 function getDefaultVectorLines()
     return {{
-        points={{-2.79, 1.49, -8.34},{2.77, 1.49, -8.34},{2.77, 1.49, -11.66},{-2.79, 1.49, -11.66}},
+        points={{-2.79, 1.49, -8.14},{2.77, 1.49, -8.14},{2.77, 1.49, -11.46},{-2.79, 1.49, -11.46}},
         color="Yellow", thickness=0.1, loop=true
     },
     {
-        points={{8.31, 1.49, -2.79},{8.31, 1.49, 2.78},{11.70, 1.49, 2.78},{11.70, 1.49, -2.79}},
+        points={{8.11, 1.49, -2.79},{8.11, 1.49, 2.78},{11.50, 1.49, 2.78},{11.50, 1.49, -2.79}},
         color="Green", thickness=0.1, loop=true
     },
     {
-        points={{2.83, 1.49, 8.27},{-2.78, 1.49, 8.27},{-2.78, 1.49, 11.70},{2.83, 1.49, 11.70},},
+        points={{2.83, 1.49, 8.07},{-2.78, 1.49, 8.07},{-2.78, 1.49, 11.50},{2.83, 1.49, 11.50},},
         color="Blue", thickness=0.1, loop=true
     },
     {
-        points={{-8.31, 1.49, 2.78},{-8.31, 1.49, -2.78},{-11.67, 1.49, -2.78},{-11.67, 1.49, 2.78}},
+        points={{-8.11, 1.49, 2.78},{-8.11, 1.49, -2.78},{-11.47, 1.49, -2.78},{-11.47, 1.49, 2.78}},
         color="Red", thickness=0.1, loop=true
     }}
 end
