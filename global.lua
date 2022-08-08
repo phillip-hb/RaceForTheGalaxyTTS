@@ -97,6 +97,7 @@ reshuffleCount = 0
 transitionNextPhase = false
 triggerExploreAfterPhase = false
 searching = false
+reshuffleSearchDelay = false
 
 requiresConfirm = {["DISCARD_HAND"]=1, ["MILITARY_HAND"]=1, ["DISCARD"]=1, ["CONSUME_PRESTIGE"]=1, ["UPGRADE_WORLD"]=1,["DRAW_LUCKY"]=1,["ANTE_CARD"]=1,["PREVENT_TAKEOVER"]=1}
 requiresGoods = {["TRADE_ACTION"]=1,["CONSUME_ANY"]=1,["CONSUME_NOVELTY"]=1,["CONSUME_RARE"]=1,["CONSUME_GENE"]=1,["CONSUME_ALIEN"]=1,["CONSUME_3_DIFF"]=1,["CONSUME_N_DIFF"]=1,["CONSUME_ALL"]=1}
@@ -601,8 +602,8 @@ end
 
 function getOwner(card)
     for _, zone in pairs(card.getZones()) do
-        if tableauZoneOwner[zone.getGUID()] then
-            return tableauZoneOwner[zone.getGUID()]
+        if tableauZoneMap[zone.getGUID()] then
+            return tableauZoneMap[zone.getGUID()]
         elseif selectedActionZoneMap[zone.getGUID()] then
             return selectedActionZoneMap[zone.getGUID()]
         end
@@ -791,9 +792,10 @@ function reshuffleDiscardPile()
      item = getDeckOrCardInZone(discardZone)
      if item then
           broadcastToAll("Reshuffling the discard pile.", "White")
-          item.setRotationSmooth({0,180,180})
-          item.setPositionSmooth(drawZone.getPosition())
+          item.setRotation({0,180,180})
+          item.setPosition(drawZone.getPosition())
           item.shuffle()
+          reshuffleSearchDelay = true
      end
 
      reshuffleCount = reshuffleCount + 1
@@ -810,12 +812,16 @@ function getDeckOrCardInZone(zone)
     return nil
 end
 
-function drawCard()
+function drawCard(allowReshuffle)
+    if allowReshuffle == nil then allowReshuffle = true end
+
     local card = nil
     if not drawDeck or drawDeck.isDestroyed() then
         drawDeck = getDeckOrCardInZone(drawZone)
-        if not drawDeck then
+        if allowReshuffle and not drawDeck then
             drawDeck = reshuffleDiscardPile()
+        elseif not allowReshuffle then
+            return nil
         end
     end
 
@@ -848,12 +854,12 @@ function discardCard(card)
     card.setScale({1,1,1})
     card.setLock(false)
 
-    if not discardPile or discardPile.isDestroyed() then
+    --if not discardPile or discardPile.isDestroyed() then
         discardPile = getDeckOrCardInZone(discardZone)
-    end
+    --end
 
     if discardPile then
-        card.setPosition(add(card.getPosition(), {0, discardZone.getPosition()[2], 0}))
+        --card.setPosition(add(card.getPosition(), {0, 4, 0}))
         discardPile = discardPile.putObject(card)
         if good then
             discardCard(good)
@@ -1130,7 +1136,7 @@ function onObjectLeaveZone(zone, object)
         end
     elseif isSelectedActionZone and object.hasTag("PrestigeSearch") then
         local player = isSelectedActionZone
-        queueUpdate(player)
+        queueUpdate(player, true)
     end
 end
 
@@ -1204,7 +1210,7 @@ function onObjectEnterZone(zone, object)
         end
     elseif isSelectedActionZone and object.hasTag("PrestigeSearch") then
         local player = isSelectedActionZone
-        queueUpdate(player)
+        queueUpdate(player, true)
     end
 end
 
@@ -2254,6 +2260,29 @@ function performSearch()
     while reshuffleCount < 2 do
         searching = true
         local card = drawCard()
+
+        if reshuffleCount >= 2 then
+            -- Failed
+            broadcastToAll(name .. "'s search has failed.", "Purple")
+            for _, obj in pairs(getObjectFromGUID(selectedActionZone_GUID[p.index]).getObjects()) do
+                if obj.getName() == "Search" and obj.hasTag("PrestigeSearch") then
+                    local actionZone = getObjectFromGUID(actionZone_GUID[p.index])
+                    obj.setPosition(actionZone.getPosition())
+                    obj.highlightOff()
+                    break
+                end
+            end
+            p.searchAction = nil
+            wait(0.1)
+            card = getObjectFromGUID(p.searchedCardGuid)
+            if card then discardCard(card) end
+            p.searchedCardGuid = nil
+            updateReadyButtons({activeSearchPlayer, true})
+            activeSearchPlayer = nil
+            beginNextSearchPlayer()
+            break
+        end
+
         local info = card_db[card.getName()]
         printToAll("Search: " .. name .. " drew \"" .. card.getName() .. '." (cost: ' .. info.cost .. ')', "Grey")
         wait(0.05)
@@ -2262,7 +2291,7 @@ function performSearch()
             local foundCard = false
             local pp3 = info.passivePowers["3"]
             -- If correct card, give to player, otherwise draw another card
-            if p.searchAction == "MilitaryDev" and info.type == 2 and pp3 and pp3["EXTRA_MILITARY"] and (pp3["EXTRA_MILITARY"].strength >= 1 or pp3["EXTRA_MILITARY"].strength <= 2) then
+            if p.searchAction == "MilitaryDev" and info.type == 2 and pp3 and pp3["EXTRA_MILITARY"] and (pp3["EXTRA_MILITARY"].strength == 1 or pp3["EXTRA_MILITARY"].strength == 2) then
                 foundCard = true
             end
 
@@ -2276,7 +2305,18 @@ function performSearch()
                     broadcastToColor("Do you wish to keep this card?", activeSearchPlayer, "White")
                     p.searchedCardGuid = card.getGUID()
                 else
-                    -- forced to take the card
+                    -- forced to take the new card
+                    card.deal(1, activeSearchPlayer)
+                    local dc = getObjectFromGUID(p.searchedCardGuid)
+                    if dc then discardCard(getObjectFromGUID(p.searchedCardGuid)) end
+                    broadcastToAll("Search: " .. name .. ' took "' .. card.getName() .. '."', activeSearchPlayer)
+                    p.searchAction = nil
+                    p.searchedCardGuid = nil
+                    p.searchAttempts = 0
+                    wait(1)
+                    updateReadyButtons({activeSearchPlayer, true})
+                    activeSearchPlayer = nil
+                    beginNextSearchPlayer()
                 end
                 return 1
             else
@@ -2285,8 +2325,6 @@ function performSearch()
         end
     end
 
-    -- Failed
-    broadcastToAll(name .. "'s search attempt has failed.", "Purple")
     return 1
 end
 
@@ -3608,6 +3646,11 @@ function cancelPowerClick(obj, player, rightClick)
     local currentPhase = getCurrentPhase()
     local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
     local info = card_db[obj.getName()]
+
+    if currentPhaseIndex == 0 and searchPhase and obj.hasTag("PrestigeSearch") then
+        startLuaCoroutine(self, "performSearch")
+        return
+    end
 
     if currentPhase == 3 and (isUpgradingWorld(player) or info.activePowers["3"] and info.activePowers["3"]["UPGRADE_WORLD"]) then
         if p.upgradeWorldNew then
