@@ -2290,9 +2290,38 @@ function performSearch()
         if info then
             local foundCard = false
             local pp3 = info.passivePowers["3"]
+            local ap3 = info.activePowers["3"]
+            local ap4 = info.activePowers["4"]
+
             -- If correct card, give to player, otherwise draw another card
             if p.searchAction == "MilitaryDev" and info.type == 2 and pp3 and pp3["EXTRA_MILITARY"] and (pp3["EXTRA_MILITARY"].strength == 1 or pp3["EXTRA_MILITARY"].strength == 2) then
                 foundCard = true
+            elseif p.searchAction == "MilitaryWindfall" and info.type == 1 and info.flags["WINDFALL"] and info.flags["MILITARY"] and (info.cost == 1 or info.cost == 2) then
+                foundCard = true
+            elseif p.searchAction == "Windfall" and info.type == 1 and info.flags["WINDFALL"] and not info.flags["MILITARY"] and (info.cost == 1 or info.cost == 2) then
+                foundCard = true
+            elseif p.searchAction == "ChromoWorld" and info.type == 1 and info.flags["CHROMO"] then
+                foundCard = true
+            elseif p.searchAction == "AlienWorld" and info.type == 1 and info.goods and (info.goods == "ALIEN" or info.goods == "ANY") then
+                foundCard = true
+            elseif p.searchAction == "MultiConsume" and ap4 then
+                for name, power in pairs(ap4) do
+                    if name == "CONSUME_3_DIFF" or name == "CONSUME_N_DIFF" or name == "CONSUME_ALL" or (power.codes["CONSUME_TWO"] and not name == "DISCARD_HAND") or power.times >= 2 then
+                        foundCard = true
+                        break
+                    end
+                end
+            elseif p.searchAction == "Military5World" and info.type == 1 and info.flags["MILITARY"] and info.cost >= 5 then
+                foundCard = true
+            elseif p.searchAction == "6Dev" and info.type == 2 and info.cost == 6 then
+                foundCard = true
+            elseif p.searchAction == "Takeover" and ap3 then
+                for name, power in pairs(ap3) do
+                    if isTakeoverPower(power) or name == "TAKEOVER_DEFENSE" then
+                        foundCard = true
+                        break
+                    end
+                end
             end
 
             if foundCard then
@@ -3737,6 +3766,16 @@ function confirmPowerClick(obj, player, rightClick)
         p.selectedCard = nil
         p.selectedCardPower = nil
         storeCard(obj, discard[1])
+        return
+    elseif currentPhaseIndex == 0 and searchPhase and p.searchedCardGuid then
+        local card = getObjectFromGUID(p.searchedCardGuid)
+        broadcastToAll("Search: " .. (Player[player].steam_name or player) .. ' took "' .. card.getName() .. '."', player)
+        card.removeTag("Explore Highlight")
+        p.searchAction = nil
+        p.searchedCardGuid = nil
+        activeSearchPlayer = nil
+        updateReadyButtons({player, true})
+        beginNextSearchPlayer()
         return
     elseif currentPhase == "1" and p.beforeExplore then
         -- Discarding cards for prestige from hand before explore
