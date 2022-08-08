@@ -694,6 +694,12 @@ end
 
 function searchTakeoverPowerClick(player, button)
     if button ~= "-1" then return end
+
+    if enforceRules and not useTakeovers then
+        broadcastToColor("Takeovers is turned off.", player.color, "White")
+        return
+    end
+
     local card = getPrestigeSearchActionCard(player.color)
     card.setName("Search")
     broadcastToColor("You will search for takeover / defense powers.", player.color, player.color)
@@ -725,7 +731,7 @@ function updatePrestigeSearchTextBack(card, player)
 
     if name == "Search" then
         text = tbl[playerData[player].searchAction]
-    else
+    elseif tbl[name] then
         text = tbl[name]
     end
 

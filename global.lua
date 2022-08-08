@@ -246,7 +246,7 @@ function onload(saved_data)
     rulesBtn = getObjectFromGUID("fe78ab")
     Wait.frames(function() rulesBtn.call("changeEnforceRulesButtonLabel", enforceRules) end, 1)
 
-    card_db = loadData(0)
+    card_db = loadData()
 
     trySetAdvanced2pMode()
 
@@ -2761,6 +2761,12 @@ function updateTableauState(player)
 
     if currentPhase == "4" or currentPhase == "5" then
         p.canReady = true
+    end
+
+    for _, obj in pairs(getObjectFromGUID(selectedActionZone_GUID[i]).getObjects()) do
+        if obj.hasTag("Slot") then
+            obj.clearButtons()
+        end
     end
 
     for card in allCardsInTableau(player) do

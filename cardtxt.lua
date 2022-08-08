@@ -1858,7 +1858,7 @@ takeoverPowers = {
      ["TAKEOVER_PRESTIGE"] = 1
 }
 
-function loadData(expansions)
+function loadData()
      local tbl = {}
      local cardInfo = {}
 

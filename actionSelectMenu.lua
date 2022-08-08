@@ -270,7 +270,7 @@ function selectPhaseCo()
           if obj.type == "Card" and getName(obj) == targetName then
                local pos = selectedActionCardTile.positionToWorld(sp[targetSnapIndex].position)
 
-               obj.setPosition({pos[1], pos[2] + 1, pos[3]})
+               obj.setPosition({pos[1], pos[2] + 0.5, pos[3]})
                obj.setRotation({rot[1], rot[2], 180})
                return 1
           end
