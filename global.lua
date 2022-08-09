@@ -144,7 +144,7 @@ tableauZone_GUID = {"2f8337", "6a2b88", "6707c2", "970244"}
 actionSelectorMenu_GUID = {"b44250", "7552ef", "5c95f7", "74c6f0"}
 actionZone_GUID = {"98db35", "eec17a", "be1ba1", "dc1b97"}
 selectedActionZone_GUID = {"d507c0", "820d9e", "b1409d", "326786"}
-presentedPhaseCardTile_GUID = {"082406", "3e3772", "a5737a", "2c39a5"}
+selectedActionCardTile_GUID = {"082406", "3e3772", "a5737a", "2c39a5"}
 tableau_GUID = {"3f1c4d", "bcf758", "a22fe5", "b4aab3"}
 consumeTradeCard_GUID = {"8723c4", "095953", "1f756f", "0f845a"}
 readyTokens_GUID = {"8f6042", "6ed6bc", "169b57", "718265"}
@@ -154,7 +154,7 @@ statTracker_GUID = {"3b078d", "2ed5dd", "dc9bac", "8865a8"}
 advanced2pCards_GUID = {"f4313a", "eead6a", "3ee2da", "09a79a"}
 prestigeButton_GUID = {"a276bc", "b5027c", "09bbe0", "77721b"}
 
-disableInteract_GUID = {presentedPhaseCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID}
+disableInteract_GUID = {selectedActionCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID}
 
 vpPoolBag_GUID = "c2e459"
 vpInfBag_GUID = "5719f7"
@@ -1091,7 +1091,7 @@ function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
 end
 
 function onObjectLeaveZone(zone, object)
-    if object.isDestroyed() then return end
+    if not object or object.isDestroyed() then return end
 
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
@@ -1157,7 +1157,7 @@ function onObjectLeaveZone(zone, object)
 end
 
 function onObjectEnterZone(zone, object)
-    if object.isDestroyed() then return end
+    if not object or object.isDestroyed() then return end
 
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
@@ -2497,6 +2497,14 @@ function startProducePhase()
     end
 end
 
+function checkIfLeftMost(player, card)
+    local p = playerData[player]
+    local tile = getObjectFromGUID(selectedActionCardTile_GUID[p.index])
+    local sp = tile.getSnapPoints()[2]
+    local sqrDistance = card.getPosition():sqrDistance(tile.positionToWorld(sp.position))
+    return sqrDistance <= 1
+end
+
 -- phase = (string) current phase
 function capturePowersSnapshot(player, phase)
     local p = playerData[player]
@@ -2528,8 +2536,6 @@ function capturePowersSnapshot(player, phase)
     results["BONUS_MILITARY"] = 0
     results["CHROMO_WORLDS"] = 0
 
-    local ignore2ndDevelop = false
-    local ignore2ndSettle = false
     local chromoCount = 0
     local rebelMilitaryWorldCount = 0
     local militaryWorldCount = 0
@@ -2537,6 +2543,24 @@ function capturePowersSnapshot(player, phase)
     local perMilitary = 0
     local perChromoWorld = 0
     local takeoverDefense = false
+    local adv2pDoubleAction = false
+
+    -- Checking for case of selecting double develop or double settle
+    if advanced2p and (phase == "2" or phase == "3") then
+        local count = 0
+
+        for _, obj in pairs(getObjectFromGUID(selectedActionZone_GUID[p.index]).getObjects()) do
+            if obj.hasTag("Action Card") and
+                (phase == "2" and obj.getName():find("Develop") or
+                phase == "3" and obj.getName():find("Settle")) then
+                    count = count + 1
+            end
+        end
+
+        if count >= 2 then
+            adv2pDoubleAction = true
+        end
+    end
 
     for card in allCardsInTableau(player) do
         local info = card_db[card.getName()]
@@ -2576,14 +2600,20 @@ function capturePowersSnapshot(player, phase)
 
                 -- count certain powers only in specific cases
                 if phase == "2" then
-                    if advanced2p and (card.getName() == "Develop" or card.getName() == "Develop [2p]") then
-                        if ignore2ndDevelop then goto skip end
-                        ignore2ndDevelop = true
+                    if adv2pDoubleAction and card.hasTag("Action Card") then
+                        local rawPhase = selectedPhases[currentPhaseIndex]
+                        local isLeftMost = checkIfLeftMost(player, card)
+                        if rawPhase == phaseIndexAdv2p["Develop"] and not isLeftMost or rawPhase == phaseIndexAdv2p["Develop2"] and isLeftMost then
+                            goto skip
+                        end
                     end
                 elseif phase == "3" then
-                    if advanced2p and (card.getName() == "Settle" or card.getName() == "Settle [2p]") then
-                        if ignore2ndSettle then goto skip end
-                        ignore2ndSettle = true
+                    if adv2pDoubleAction and card.hasTag("Action Card") then
+                        local rawPhase = selectedPhases[currentPhaseIndex]
+                        local isLeftMost = checkIfLeftMost(player, card)
+                        if rawPhase == phaseIndexAdv2p["Settle"] and not isLeftMost or rawPhase == phaseIndexAdv2p["Settle2"] and isLeftMost then
+                            goto skip
+                        end
                     end
 
                     -- record specialized military for takeovers

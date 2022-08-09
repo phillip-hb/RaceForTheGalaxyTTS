@@ -348,6 +348,7 @@ function onObjectEnterZone(zone, obj)
 end
 
 function onObjectLeaveZone(zone, obj)
+     if not obj or obj.isDestroyed() then return end
      if zone == selectedActionCardZone and obj.hasTag("Action Card") then
           refreshButtonHighlights()
           if obj.hasTag("PrestigeSearch") then
