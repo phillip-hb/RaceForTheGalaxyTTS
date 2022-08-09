@@ -77,6 +77,9 @@ function player(i)
         searchAction = nil,
         searchAttempts = 0,
         searchedCardGuid = nil,
+        gainedPrestige = false,
+        activatedPrestigeLeader = false,
+        hasPrestigeLeader = nil
     }
 end
 
@@ -85,8 +88,8 @@ playerOrder = {"Yellow", "Red", "Blue", "Green"}
 queueUpdateState = {Yellow=false, Red=false, Blue=false, Green=false}
 updateTimeSnapshot = {Yellow=0, Red=0, Blue=0, Green=0}
 
-playmat12 = "http://cloud-3.steamusercontent.com/ugc/1867319584733434168/76E4F818BB730F1F8713043E8000EC832B60EE87/"
-playmat14 = "http://cloud-3.steamusercontent.com/ugc/1930373378495832995/BB2FCAE46BF72CF143C028808B787EB109064297/"
+playmat12 = "http://cloud-3.steamusercontent.com/ugc/1914612251251536838/A8D80913AF5727A67615FCAF49FD4324A7830CF6/"
+playmat14 = "http://cloud-3.steamusercontent.com/ugc/1914612251251536985/B07CDD3E62A0F93D3D0E6152DF8B851CE4F20A9C/"
 
 gameEndMessage = false
 gameDone = false
@@ -158,6 +161,7 @@ vpInfBag_GUID = "5719f7"
 drawZone_GUID = "32297e"
 discardZone_GUID = "fe5c37"
 prestigeBag_GUID = "f3bcc8"
+prestigeTile_GUID = "17753d"
 
 phaseTilePlacement = {
      {"e536e3", {-4.48, 1.68, -5.60}},
@@ -176,6 +180,8 @@ phaseTilePlacementAdv2p = {
      {"842722", {4.48, 1.68, -5.60}},
      {"6c0780", {6.72, 1.68, -5.60}},
 }
+
+prestigeLeaderPlacement = {5.70, 1.58, 4.45}
 
 phaseIndex = {["Explore"] = 1, ["Develop"] = 2, ["Settle"] = 3, ["Consume"] = 4, ["Produce"] = 5}
 phaseIndexAdv2p = {["Explore"] = 1, ["Develop"] = 2, ["DevelopAdv2p"] = 3, ["Settle"] = 4, ["SettleAdv2p"] = 5, ["Consume"] = 6, ["Produce"] = 7}
@@ -254,7 +260,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            if obj then obj.interactable = false end
+            --if obj then obj.interactable = false end
         end
     end
 
@@ -489,6 +495,8 @@ function getVpChips(player, n)
     end
 
     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    local sp = tableau.getSnapPoints()
+    local pos = tableau.positionToWorld(sp[26].position)
 
     for i=1, n do
         if vpBag.type == "Bag" and #vpBag.getObjects() <= 0 then
@@ -499,7 +507,8 @@ function getVpChips(player, n)
             rotation = tableau.getRotation()
         })
 
-        token.setPositionSmooth(tableau.positionToWorld({-1.4, 2, -0.8}), false, true)
+
+        token.setPositionSmooth(add(pos, {0, 1, 0}), false, true)
     end
 
     if n > 0 then
@@ -514,11 +523,15 @@ function getPrestigeChips(player, n)
     if not bag then return end
 
     local tableau = getObjectFromGUID(tableau_GUID[playerData[player].index])
+    local sp = tableau.getSnapPoints()
+    local pos = tableau.positionToWorld(sp[27].position)
+
     for i=1, n do
         local token = bag.takeObject({
             rotation = tableau.getRotation(),
         })
-        token.setPositionSmooth(tableau.positionToWorld({-1.8, 2, -0.8}), false, true)
+        token.setPositionSmooth(add(pos, {0, 1, 0}), false, true)
+        playerData[player].gainedPrestige = true
     end
 
     if n > 0 then
@@ -921,11 +934,13 @@ function resetPlayerState(playerColor)
     local index = p.index
     local incomingGood = p.incomingGood
     local recordedCards = p.recordedCards
+    local actLeader = p.activatedPrestigeLeader
 
     playerData[playerColor] = player(index)
     playerData[playerColor].incomingGood = incomingGood
     playerData[playerColor].canReady = false
     playerData[playerColor].recordedCards = recordedCards
+    playerData[playerColor].activatedPrestigeLeader = actLeader
 end
 
 -- Check to see if player is planning to do a takeover
@@ -1950,6 +1965,9 @@ function checkAllReadyCo()
             capturePowersSnapshot(player, tostring(getCurrentPhase()))
         end
         endOfPhaseGoalCheck()
+        if expansionLevel >= 3 then
+            checkForPrestigeLeader()
+        end
 
         if currentPhaseIndex > #selectedPhases then
             -- round end
@@ -1974,6 +1992,10 @@ function startNewRound()
     elseif currentPhaseIndex ~= 0 then
         broadcastToAll("Starting new round.", color(0, 1, 1))
         sound.AssetBundle.playTriggerEffect(2)
+
+        if expansionLevel >= 3 then
+            startLuaCoroutine(self, "rewardPrestigeLeaderCo")
+        end
     end
 
     currentPhaseIndex = 0
@@ -1985,6 +2007,7 @@ function startNewRound()
     end
 
     startLuaCoroutine(self, "returnActionCardsCo")
+    return 1
 end
 
 function returnActionCardsCo()
@@ -2991,6 +3014,8 @@ function updateTableauState(player)
         elseif obj.hasTag("Prestige") then
             p.prestigeChips[obj.getGUID()] = obj.getGUID()
             p.prestigeCount = p.prestigeCount + math.max(1, obj.getQuantity())
+        elseif obj.hasTag("PrestigeLeader") then
+            p.hasPrestigeLeader = obj.getGUID()
         end
     end
     if p.consumedPrestige then p.prestigeCount = p.prestigeCount - p.consumedPrestige end
@@ -4222,11 +4247,12 @@ function moveGoalToPlayer(params)
     local i = playerData[player].index
     local tableau = getObjectFromGUID(tableau_GUID[i])
     local sp = tableau.getSnapPoints()
+    local start = 19
     local spIndexOffset = 5
 
     -- find first empty spot
     local spot = sp[#sp-spIndexOffset]
-    for i=#sp-spIndexOffset, #sp do
+    for i=start, start+spIndexOffset do
         local pos = tableau.positionToWorld(sp[i].position)
         local hits = Physics.cast({
             origin = add(pos, {0, 1, 0}),
@@ -4240,6 +4266,158 @@ function moveGoalToPlayer(params)
             break
         end
     end
+end
+
+function checkForPrestigeLeader()
+    local tile = getObjectFromGUID(prestigeTile_GUID)
+
+    if not tile then return end
+
+    local winningAmount = 1
+    local winners = {}
+
+    for player, data in pairs(playerData) do
+        if data.prestigeCount == winningAmount then
+            winners[#winners + 1] = player
+        elseif data.prestigeCount > winningAmount then
+            winningAmount = data.prestigeCount
+            winners = {player}
+        end
+    end
+
+    if #winners == 1 and (winners[1] ~= tile.getVar("owner") or tile.getVar("ownerType") ~= 2) then
+        -- New prestige leader
+        local player = winners[1]
+        destroyPrestigeTileClones()
+        broadcastToAll((Player[player].steam_name or player) .. ' is now the Prestige Leader!', player)
+        tile.setVar("owner", player)
+        tile.setVar("ownerType", 2) -- 0: none, 1: tie, 2: leader
+        if playerData[player].gainedPrestige then
+            playerData[player].activatedPrestigeLeader = true
+        end
+        movePrestigeTileToPlayer(tile)
+    elseif #winners > 1 then
+        local oldOwners = {}
+        local doSwap = false
+
+        -- Remove clones from players no longer tied
+        for _, otile in pairs(getObjectsWithTag("PrestigeLeader")) do
+            local player = otile.getVar("owner")
+            if player then
+                local p = playerData[player]
+                if p.prestigeCount == winningAmount and otile.getVar('ownerType') == 1 then
+                    oldOwners[player] = true
+                end
+
+                if p.prestigeCount ~= winningAmount and otile ~= tile then
+                    p.activatedPrestigeLeader = false
+                    otile.destruct()
+                elseif p.prestigeCount ~= winningAmount and otile == tile then
+                    -- is the same, will need to swap this tile with another valid tile
+                    doSwap = true
+                end
+            end
+        end
+
+        -- Give to players who tied
+        for i, winner in ipairs(winners) do
+            if not oldOwners[winner] then
+                local otile = tile
+
+                if i > 1 then
+                    otile = tile.clone()
+                end
+
+                Wait.frames(function()
+                    otile.setVar("owner", winner)
+                    otile.setVar("ownerType", 1)
+                    movePrestigeTileToPlayer(otile)
+                end,1)
+                broadcastToAll((Player[winner].steam_name or winner) .. ' is tied for Prestige Leader!', winner)
+            end
+        end
+
+        if doSwap then
+            Wait.frames(function()
+                for _, otile in pairs(getObjectsWithTag("PrestigeLeader")) do
+                    if tile ~= otile then
+                        tile.setVar('owner', otile.getVar('owner'))
+                        tile.setVar('ownerType', otile.getVar('ownerType'))
+                        tile.setPosition(otile.getPosition())
+                        tile.setRotation(otile.getRotation())
+                        otile.destruct()
+                        break
+                    end
+                end
+            end, 2)
+        end
+    elseif #winners <= 0 then
+        destroyPrestigeTileClones()
+        if tile.getVar("owner") ~= nil then
+            if tile.getVar("ownerType") == 2 then
+                local player = tile.getVar("owner")
+                playerData[player].activatedPrestigeLeader = false
+                broadcastToAll((Player[player].steam_name or player) .. ' is no longer the Prestige Leader.', player)
+            end
+            tile.setVar("owner", nil)
+            tile.setVar("ownerType", 0)
+            tile.setPosition(prestigeLeaderPlacement)
+            tile.setRotation({0, 180, 180})
+        end
+    end
+end
+
+function destroyPrestigeTileClones()
+    local tiles = getObjectsWithTag("PrestigeLeader")
+    for _, tile in pairs(tiles) do
+        if tile.getGUID() ~= prestigeTile_GUID then
+            local player = tile.getVar("owner")
+            if player then playerData[player].activatedPrestigeLeader = false end
+            tile.destruct()
+        end
+    end
+end
+
+function rewardPrestigeLeaderCo()
+    wait(0.5)
+    for player, data in pairs(playerData) do
+        local tile = getObjectFromGUID(data.hasPrestigeLeader)
+        if tile then
+            local name = Player[player].steam_name or player
+            local ownerType = tile.getVar("ownerType")
+            if ownerType == 2 and p.activatedPrestigeLeader then
+                broadcastToAll("Prestige Leader Bonus: " .. name .. " gains 1 VP and draws 1 card.", player)
+                getVpChips(player, 1)
+                dealTo(1, player)
+            elseif ownerType == 2 then
+                broadcastToAll("Prestige Leader Bonus: " .. name .. " gains 1 VP.", player)
+                getVpChips(player, 1)
+            elseif ownerType == 1 then
+                broadcastToAll("Tied Prestige Leader Bonus: " .. name .. " gains 1 VP.", player)
+                getVpChips(player, 1)
+            end
+        end
+        data.gainedPrestige = false
+        data.activatedPrestigeLeader = false
+    end
+    return 1
+end
+
+function movePrestigeTileToPlayer(tile)
+    local player = tile.getVar("owner")
+    local tileType = tile.getVar("ownerType")
+    local i = playerData[player].index
+    local tableau = getObjectFromGUID(tableau_GUID[i])
+    local sp = tableau.getSnapPoints()
+    local index = 25
+
+    if tileType == 1 then
+        tile.setRotation({tableau.getRotation().x, tableau.getRotation().y, 180})
+    elseif tileType == 2 then
+        tile.setRotation({tableau.getRotation().x, tableau.getRotation().y, 0})
+    end
+
+    tile.setPosition(add(tableau.positionToWorld(sp[index].position), {0, 0.3, 0}))
 end
 
 function getStartWorldNumber(player)
