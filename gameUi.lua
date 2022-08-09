@@ -33,7 +33,7 @@ function createSelectWorldButton(card)
     slot.createButton({
         click_function = "worldSelectClick",
         function_owner = self,
-        position = {0.16, 3, -0.38},
+        position = slot.positionToLocal(card.positionToWorld({0.3, 1, -1.15})),
         width = 560,
         height = 350,
         font_size = 150,

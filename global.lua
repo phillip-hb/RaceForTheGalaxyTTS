@@ -20,7 +20,7 @@ rebelSneakAttackPhase = false
 queueRebelSneakAttackPhase = false
 expansionLevel = 0
 selectedPhases = {}
-firstPlayer = "Yellow"
+firstPlayer = nil
 firstRound = false
 activeSearchPlayer = nil
 -- nil if no choice was made, otherwise GUID of selected object
@@ -217,6 +217,7 @@ function onSave()
     saved_data.queueRebelSneakAttackPhase = queueRebelSneakAttackPhase
     saved_data.securityCouncilPhase = securityCouncilPhase
     saved_data.activeSearchPlayer = activeSearchPlayer
+    saved_data.firstRound = firstRound
     return JSON.encode(saved_data)
 end
 
@@ -243,11 +244,12 @@ function onload(saved_data)
         searchPhase = data.searchPhase
         selectLastPhase = data.selectLastPhase
         exploreAfterPhase = data.exploreAfterPhase
-        firstPlayer = data.firstPlayer or "Yellow"
+        firstPlayer = data.firstPlayer
         rebelSneakAttackPhase = data.rebelSneakAttackPhase
         queueRebelSneakAttackPhase = data.queueRebelSneakAttackPhase
         securityCouncilPhase = data.securityCouncilPhase
         activeSearchPlayer = data.activeSearchPlayer
+        firstRound = data.firstRound
     end
 
     rulesBtn = getObjectFromGUID("fe78ab")
@@ -637,7 +639,7 @@ function discardMarkedCards(player, markForDiscard)
 
     local cards = {}
     for _, obj in pairs(Player[player].getHandObjects(1)) do
-        if obj.type == 'Card' and (obj.hasTag("Discard") or obj.is_face_down) then
+        if obj.type == 'Card' and obj.hasTag("Discard") then
             if markForDiscard and not obj.hasTag("Marked") then
                 obj.addTag("Marked")
                 cards[#cards + 1] = obj.getGUID()
@@ -1622,6 +1624,7 @@ function checkAllReadyCo()
         for _, obj in pairs(Player[player].getHandObjects(1)) do
             if obj.type == 'Card' and obj.hasTag("Selected") then
                 attemptPlayCard(obj, player)
+                if not phase then p.selectedCard = nil end
             elseif not phase and obj.hasTag("Explore Highlight") then
                 -- discard not selected starting homeworld
                 discardCard(obj)
@@ -1645,7 +1648,7 @@ function checkAllReadyCo()
             new.setRotation(oldRot)
             new.setLock(true)
 
-            p.ignoreCards[#p.ignoreCards + 1] = new
+            p.ignoreCards[new.getGUID()] = true
 
             if newInfo.flags["WINDFALL"] then
                 wait(0.1)
@@ -1693,7 +1696,7 @@ function checkAllReadyCo()
     wait(0.1)
 
     -- figure out who the 'first' player is going to be
-    if firstRound then
+    if firstRound and not firstPlayer then
         wait(0.2)
         local lowest = 100
         local index = 0
@@ -1706,8 +1709,6 @@ function checkAllReadyCo()
                 index = i
             end
         end
-
-        firstRound = false
     end
 
     for _, player in pairs(players) do
@@ -3076,23 +3077,26 @@ function updateTableauState(player)
                 max_distance = 0.5
             })
 
-            if #hits > 0 then
-                local n = 0
-                if hits[1].hit_object.type == 'Card' and hits[1].hit_object.getDescription() == "" then
-                    n = 1
-                elseif hits[1].hit_object.type == 'Deck' then
-                    n = hits[1].hit_object.getQuantity()
+            for _, hit in pairs(hits) do
+                if hit.hit_object ~= card then
+                    local n = 0
+                    if hit.hit_object.type == 'Card' and hit.hit_object.getDescription() == "" then
+                        n = 1
+                    elseif hit.hit_object.type == 'Deck' then
+                        n = hit.hit_object.getQuantity()
+                    end
+                    card.createButton({
+                        click_function = "none",
+                        function_owner = Global,
+                        label = "Saved: " .. n,
+                        font_color = "White",
+                        width = 0,
+                        height = 0,
+                        font_size = 100,
+                        position = {0, 1, -0.72}
+                    })
+                    break
                 end
-                card.createButton({
-                    click_function = "none",
-                    function_owner = Global,
-                    label = "Saved: " .. n,
-                    font_color = "White",
-                    width = 0,
-                    height = 0,
-                    font_size = 100,
-                    position = {0, 1, -0.72}
-                })
             end
         end
 
@@ -3251,7 +3255,7 @@ function updateTableauState(player)
                         end
 
                         -- make buttons for takeover powers
-                        if useTakeovers and isTakeoverPower and not miscSelected or ap["UPGRADE_WORLD"] then
+                        if useTakeovers and isTakeoverPower and not miscSelected or (ap["UPGRADE_WORLD"] and not takeoverPhase and not rebelSneakAttackPhase and not securityCouncilPhase and not placeTwoPhase) then
                             local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
                             dontAutoPass = true
                             if not used then
@@ -4385,7 +4389,7 @@ function rewardPrestigeLeaderCo()
         if tile then
             local name = Player[player].steam_name or player
             local ownerType = tile.getVar("ownerType")
-            if ownerType == 2 and p.activatedPrestigeLeader then
+            if ownerType == 2 and data.activatedPrestigeLeader then
                 broadcastToAll("Prestige Leader Bonus: " .. name .. " gains 1 VP and draws 1 card.", player)
                 getVpChips(player, 1)
                 dealTo(1, player)

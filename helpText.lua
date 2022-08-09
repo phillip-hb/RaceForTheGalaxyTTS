@@ -42,7 +42,7 @@ function updateHelpText(playerColor)
     -- start of round
     elseif currentPhaseIndex == 0 then
         if powers["START_SAVE"] and p.selectedCard then
-            discarded = countDiscardInHand(playerColor, false)
+            discarded = #getDiscardInHand(playerColor, false)
             if discarded < 1 then
                 p.canFlip = true
                 p.canConfirm = false
