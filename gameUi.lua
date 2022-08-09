@@ -124,6 +124,12 @@ function createStrengthLabel(player, card, addDefense)
         calcCard = getObjectFromGUID(playerData[player].takeoverTarget)
     end
 
+    local str = calcStrength(player, calcCard, addDefense)
+    local lbl = "Strength "
+    if str >= 0 then
+        lbl = lbl .. "+"
+    end
+
     card.createButton({
         click_function = "none",
         function_owner = Global,
@@ -132,7 +138,7 @@ function createStrengthLabel(player, card, addDefense)
         position = {-1.2, 1, 0},
         rotation = {0, -90, 0},
         font_size = 150,
-        label = "Military +" .. calcStrength(player, calcCard, addDefense),
+        label = lbl .. str,
         font_color = "White",
     })
 end
@@ -340,7 +346,7 @@ function calcStrength(player, card, addDefense, activePlayer)
 
     local value = p.powersSnapshot["EXTRA_MILITARY"]
     if activePlayer == player or activePlayer == nil then
-        value = value + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
+        value = value + p.powersSnapshot["BONUS_MILITARY"]
     end
 
     -- Check for bonus military
@@ -361,11 +367,13 @@ function calcStrength(player, card, addDefense, activePlayer)
     if addDefense then
         value = value + info.cost + (p.powersSnapshot["TAKEOVER_DEFENSE"] or 0)
         if activePlayer == nil then
-            value = value + p.powersSnapshot["BONUS_MILITARY"] + p.tempMilitary
+            value = value + p.powersSnapshot["BONUS_MILITARY"]
         end
     elseif p.takeoverPower and p.takeoverPower.name == "TAKEOVER_IMPERIUM" then
         value = value + p.powersSnapshot["REBEL_MILITARY_WORLD_COUNT"] * p.takeoverPower.strength
     end
+
+    value = value + p.tempMilitary
 
     return value
 end

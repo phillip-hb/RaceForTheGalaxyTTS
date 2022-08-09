@@ -203,8 +203,6 @@ function updateHelpText(playerColor)
             if takeoverPhase then
                 if p.beingTargeted then
                     setHelpText(playerColor, "Settle: defend against takeover.")
-                else
-                    setHelpText(playerColor, "Settle: waiting for other players.")
                 end
             elseif doMilitary and not payMilitary then
                 local def = info.cost - militaryDiscount
@@ -246,6 +244,8 @@ function updateHelpText(playerColor)
                 end
             elseif securityCouncilPhase then
                 setHelpText(playerColor, "Settle: prevent takeover?")
+            elseif takeoverPhase then
+                setHelpText(playerColor, "Settle: resolving takeovers.")
             else
                 setHelpText(playerColor, "▼ Settle: may play a world.")
             end

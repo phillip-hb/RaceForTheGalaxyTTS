@@ -1774,12 +1774,12 @@ function checkAllReadyCo()
         end
 
         if takeoverTriggered then
+            sound.AssetBundle.playTriggerEffect(1)
             takeoverPhase = true
             drawTakeoverLines()
             if canPreventTakeover then
                 wait(1)
                 securityCouncilPhase = true
-                sound.AssetBundle.playTriggerEffect(1)
                 local activePlayer = canPreventTakeover
                 broadcastToAll("Waiting for " .. (Player[activePlayer].steam_name or activePlayer) .. " to resolve \"Pan-Galactic Security Council.\"", activePlayer)
                 playerData[activePlayer].securityCouncilTarget = nil
@@ -1919,7 +1919,7 @@ function checkAllReadyCo()
             if selectedActions["Develop"] and selectedActions["Develop"] > 1 then
                 selectedActions["Develop2"] = 1
             end
-            if selectedActions["Settle"] and selectedActions["Settle2"] > 1 then
+            if selectedActions["Settle"] and selectedActions["Settle"] > 1 then
                 selectedActions["Settle2"] = 1
             end
 
@@ -2707,7 +2707,7 @@ function capturePowersSnapshot(player, phase)
                 local info = card_db[card.getName()]
 
                 for name, power in pairs(info.activePowers[phase]) do
-                    if name == "DISCARD" and power.codes["EXTRA_MILITARY"] then
+                    if name == "DISCARD" and power.codes["EXTRA_MILITARY"] and not takeoverPhase then
                         results["BONUS_MILITARY"] = results["BONUS_MILITARY"] + power.strength
                     end
                 end
@@ -3210,26 +3210,26 @@ function updateTableauState(player)
                             if selectedMilitary and miscPowerSnapshot["PAY_MILITARY"] then selectedMilitary = false end
                             if not selectedMilitary and (planningTakeover or miscPowerSnapshot["DISCARD_CONQUER_SETTLE"]) then selectedMilitary = true end
 
-                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien then
+                            if name == "DISCARD" and power.codes["REDUCE_ZERO"] and not selectedMilitary and not selectedAlien and not takeoverPhase then
                                 powerName = name
                             elseif name == "DISCARD" and power.codes["EXTRA_MILITARY"] and (takeoverPhase or selectedMilitary) then
                                 powerName = name
-                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedMilitary or (planningTakeover and not power.codes["NO_TAKEOVER"]) then
+                            elseif name == "DISCARD_CONQUER_SETTLE" and not selectedMilitary and not takeoverPhase or (planningTakeover and not power.codes["NO_TAKEOVER"]) then
                                 powerName = name
-                            elseif name == "PAY_MILITARY" and selectedMilitary and
+                            elseif name == "PAY_MILITARY" and selectedMilitary and not takeoverPhase and
                                     (not next(power.codes) and not selectedAlien or 
                                     power.codes["ALIEN"] and selectedAlien or 
                                     power.codes["AGAINST_CHROMO"] and selectedInfo.flags["CHROMO"])  then
                                 powerName = name
                             elseif name == "MILITARY_HAND" and (takeoverPhase or selectedMilitary) then
                                 powerName = name
-                            elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and selectedMilitary and p.prestigeCount > 0 then
+                            elseif name == "CONSUME_PRESTIGE" and power.codes["EXTRA_MILITARY"] and (selectedMilitary or p.beingTargeted) and p.prestigeCount > 0 then
                                 powerName = name
-                            elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and not selectedMilitary then
+                            elseif name == "CONSUME_GENE" and goodsCount["GENE"] > 0 and power.codes["REDUCE"] and not selectedMilitary and not takeoverPhase then
                                 powerName = name
                             elseif name == "CONSUME_RARE" and goodsCount["RARE"] > 0 and power.codes["EXTRA_MILITARY"] and selectedMilitary then
                                 powerName = name
-                            elseif name == "DISCARD_PLACE_MILITARY" then
+                            elseif name == "DISCARD_PLACE_MILITARY" and not takeoverPhase then
                                 powerName = name
                             end
 
@@ -3242,12 +3242,17 @@ function updateTableauState(player)
                                     powerName = ""
                                 end
                             end
+
+                            -- Prevent creating multiple use power buttons when a card is selected during takeovers.
+                            if takeoverPhase and miscSelectedCount > 0 then
+                                powerName = ""
+                            end
                         end
 
                         if powerName ~= "" and not miscSelected and not used then
                             dontAutoPass = true
                             createUsePowerButton(card, power.index, info.activeCount[currentPhase], getTooltip(currentPhase, power))
-                        elseif miscSelected or (used and canCancelAfter[name]) then
+                        elseif miscSelected or (used and canCancelAfter[name] and not takeoverPhase) then
                             dontAutoPass = true
                             createCancelButton(card)
 
@@ -3882,6 +3887,7 @@ function confirmPowerClick(obj, player, rightClick)
         local marked = {}
         local node = getLinkedListNode(p.miscSelectedCards, obj.getGUID())
         local n = 0
+        local queueForDiscard = false
         power = node.power
         if power.name == "MILITARY_HAND" then
             marked = discardMarkedCards(player, not takeoverPhase)
@@ -3893,13 +3899,17 @@ function confirmPowerClick(obj, player, rightClick)
             p.tempMilitary = p.tempMilitary + math.min(n, power.strength - usedAmount)
             refreshTakeoverMenu(player)
         elseif power.name == "DISCARD" then
-            n = 1
+            n = power.strength
             paidCost = true
-            discardCard(obj)
+            queueForDiscard = true
         elseif power.name == "CONSUME_PRESTIGE" then
             n = power.strength
             paidCost = true
-            p.consumedPrestige = p.consumedPrestige + 1
+            if not takeoverPhase then
+                p.consumedPrestige = p.consumedPrestige + 1
+            else
+                discardPrestige(player, 1)
+            end
         elseif power.name == "UPGRADE_WORLD" then
             if not p.upgradeWorldOld or not p.upgradeWorldNew then
                 broadcastToColor("Please select a world on your tableau and a new world to replace it.", player, "White")
@@ -3912,6 +3922,11 @@ function confirmPowerClick(obj, player, rightClick)
         if n == 0 then return end
 
         local data = markUsedMisc(player, obj, power, n)
+
+        if queueForDiscard then
+            discardCard(obj)
+        end
+
         if #marked > 0 then
             data.markedDiscards = appendList(data.markedDiscards, marked)
         end
@@ -3920,6 +3935,7 @@ function confirmPowerClick(obj, player, rightClick)
             p.tempMilitary = p.tempMilitary + power.strength
         end
 
+        -- update now, then update again with delay
         queueUpdate(player, true)
         return
     elseif currentPhase == "4" then
