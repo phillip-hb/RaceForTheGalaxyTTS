@@ -184,11 +184,9 @@ phaseTilePlacementAdv2p = {
 prestigeLeaderPlacement = {5.70, 1.58, 4.45}
 
 phaseIndex = {["Explore"] = 1, ["Develop"] = 2, ["Settle"] = 3, ["Consume"] = 4, ["Produce"] = 5}
-phaseIndexAdv2p = {["Explore"] = 1, ["Develop"] = 2, ["DevelopAdv2p"] = 3, ["Settle"] = 4, ["SettleAdv2p"] = 5, ["Consume"] = 6, ["Produce"] = 7}
+phaseIndexAdv2p = {["Explore"] = 1, ["Develop"] = 2, ["Develop2"] = 3, ["Settle"] = 4, ["Settle2"] = 5, ["Consume"] = 6, ["Produce"] = 7}
 phaseText = {"Phase I: Explore", "Phase II: Develop", "Phase III: Settle", "Phase IV: Consume", "Phase V: Produce"}
 phaseTextAdv2p = {"Phase I: Explore", "Phase II: Develop 1", "Phase II: Develop 2", "Phase III: Settle 1", "Phase III: Settle 2", "Phase IV: Consume", "Phase V: Produce"}
-phaseCardNames = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Settle", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
-phaseCardNamesAdv2p = {"Explore (+5)", "Explore (+1,+1)", "Develop", "DevelopAdv2p", "Settle", "SettleAdv2p", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
 
 goodsSnapPointOffset = {-0.6, 0.1, 0.4}
 drawDeck_GUID = ""
@@ -347,13 +345,13 @@ function redisplayXmlUi()
     end
 end
 
-function getName(obj)
-    local name = obj.getName()
-    if obj.hasTag("PrestigeSearch") and name ~= "Search" then
-        name = name:sub(10, name:len())
-    end
-    return name .. (obj.hasTag("Adv2p") and "Adv2p" or "")
-end
+-- function getName(obj)
+--     local name = obj.getName()
+--     if obj.hasTag("PrestigeSearch") and name ~= "Search" then
+--         name = name:sub(10, name:len())
+--     end
+--     return name .. (obj.hasTag("Adv2p") and "Adv2p" or "")
+-- end
 
 function getKind(card)
     local info = card_db[card.getName()]
@@ -1889,8 +1887,16 @@ function checkAllReadyCo()
             for _, obj in pairs(zone.getObjects()) do
                 if obj.hasTag("Action Card") then
                     if obj.is_face_down then obj.flip() end
-                    local name = split(getName(obj), " ")[1]
-                    selectedActions[name] = true
+                    local tokens = split(obj.getName(), " ")
+                    local name = tokens[1]
+
+                    if name == "Prestige" then
+                        name = tokens[2]
+                    end
+                    if not selectedActions[name] then
+                        selectedActions[name] = 0
+                    end
+                    selectedActions[name] = selectedActions[name] + 1
 
                     if obj.hasTag("PrestigeSearch") and name ~= "Search" then
                         local player = playerOrder[i]
@@ -1900,14 +1906,21 @@ function checkAllReadyCo()
             end
 
             -- Doing some checks for double selection of phase cards for 2p advanced variant
-            if selectedActions["DevelopAdv2p"] and not selectedActions["Develop"] then
-                selectedActions["DevelopAdv2p"] = nil
-                selectedActions["Develop"] = true
-            end
+            -- if selectedActions["DevelopAdv2p"] and not selectedActions["Develop"] then
+            --     selectedActions["DevelopAdv2p"] = nil
+            --     selectedActions["Develop"] = true
+            -- end
 
-            if selectedActions["SettleAdv2p"] and not selectedActions["Settle"] then
-                selectedActions["SettleAdv2p"] = nil
-                selectedActions["Settle"] = true
+            -- if selectedActions["SettleAdv2p"] and not selectedActions["Settle"] then
+            --     selectedActions["SettleAdv2p"] = nil
+            --     selectedActions["Settle"] = true
+            -- end
+
+            if selectedActions["Develop"] and selectedActions["Develop"] > 1 then
+                selectedActions["Develop2"] = 1
+            end
+            if selectedActions["Settle"] and selectedActions["Settle2"] > 1 then
+                selectedActions["Settle2"] = 1
             end
 
             for name, value in pairs(selectedActions) do
@@ -2024,7 +2037,7 @@ function returnActionCardsCo()
             end
         end
         local o = getObjectFromGUID(actionSelectorMenu_GUID[i])
-        o.call("returnSelectedActionCard")
+        o.call("returnAllSelectedActionCards")
      end
 
      return 1
@@ -2563,12 +2576,12 @@ function capturePowersSnapshot(player, phase)
 
                 -- count certain powers only in specific cases
                 if phase == "2" then
-                    if advanced2p and card.getName() == "Develop" then
+                    if advanced2p and (card.getName() == "Develop" or card.getName() == "Develop [2p]") then
                         if ignore2ndDevelop then goto skip end
                         ignore2ndDevelop = true
                     end
                 elseif phase == "3" then
-                    if advanced2p and card.getName() == "Settle" then
+                    if advanced2p and (card.getName() == "Settle" or card.getName() == "Settle [2p]") then
                         if ignore2ndSettle then goto skip end
                         ignore2ndSettle = true
                     end

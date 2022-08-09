@@ -98,7 +98,19 @@ E@0:1
 F:ACTION_CARD
 P:2:REDUCE:1:0
 
+N:Develop [2p]
+T:0:0:0
+E@0:1
+F:ACTION_CARD
+P:2:REDUCE:1:0
+
 N:Settle
+T:0:0:0
+E@0:1
+F:ACTION_CARD
+P:3:DRAW_AFTER:1:0
+
+N:Settle [2p]
 T:0:0:0
 E@0:1
 F:ACTION_CARD

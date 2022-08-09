@@ -1,5 +1,8 @@
 require("util")
 
+phaseCardNames = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Settle", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
+phaseCardNamesAdv2p = {"Explore (+5)", "Explore (+1,+1)", "Develop", "Develop [2p]", "Settle", "Settle [2p]", "Consume ($)", "Consume (x2)", "Produce", "Prestige / Search"}
+
 prestigeButton_GUID = {['b5027c']=1,['77721b']=1,['a276bc']=1,['09bbe0']=1}
 targetActionCardName = ""
 selectedActions = {}
@@ -24,13 +27,13 @@ function onload()
           adv2pButtonIndex["Prestige / Search"] = 1
      else
           local i = 0
-          for _, entry in ipairs(Global.getVar("phaseCardNames")) do
+          for _, entry in ipairs(phaseCardNames) do
                buttonIndex[entry] = i
                i = i + 1
           end
 
           local i = 14
-          for _, entry in ipairs(Global.getVar("phaseCardNamesAdv2p")) do
+          for _, entry in ipairs(phaseCardNamesAdv2p) do
                adv2pButtonIndex[entry] = i
                i = i + 1
           end
@@ -185,7 +188,7 @@ function developClick()
 end
 
 function develop2Click()
-     targetActionCardName = "DevelopAdv2p"
+     targetActionCardName = "Develop [2p]"
      startLuaCoroutine(self, "selectPhaseCo")
 end
 
@@ -195,7 +198,7 @@ function settleClick()
 end
 
 function settle2Click()
-     targetActionCardName = "SettleAdv2p"
+     targetActionCardName = "Settle [2p]"
      startLuaCoroutine(self, "selectPhaseCo")
 end
 
@@ -232,12 +235,13 @@ function selectPhaseCo()
 
      if adv2p then
           -- Check to see if action was already selected. If so, just return it back to selection area
-          if checkIfSelected(targetName) then
-               returnSelectedActionCard(targetName)
+          local card = checkIfSelected(targetName)
+          if card then
+               returnSelectedActionCard(card)
                return 1
           end
      else
-          returnSelectedActionCard()
+          returnAllSelectedActionCards()
      end
 
      wait(0.01)
@@ -257,7 +261,7 @@ function selectPhaseCo()
                -- move the other card into the correct spot just in case
                for _, obj in pairs(selectedActionCardZone.getObjects()) do
                     if obj.hasTag("Action Card") then
-                         obj.setPositionSmooth(selectedActionCardTile.positionToWorld(sp[2].position))
+                         obj.setPositionSmooth(add(selectedActionCardTile.positionToWorld(sp[2].position), {0, 0.04, 0}))
                          break
                     end
                end
@@ -267,7 +271,7 @@ function selectPhaseCo()
      end
 
      for _, obj in pairs(objs) do
-          if obj.type == "Card" and getName(obj) == targetName then
+          if obj.type == "Card" and obj.getName() == targetName then
                local pos = selectedActionCardTile.positionToWorld(sp[targetSnapIndex].position)
 
                obj.setPosition({pos[1], pos[2] + 0.5, pos[3]})
@@ -279,18 +283,18 @@ function selectPhaseCo()
      return 1
 end
 
-function returnSelectedActionCard(name)
-     local objs = selectedActionCardZone.getObjects()
+-- Returns the card into the hidden action card hand.
+function returnSelectedActionCard(card)
+     card.setPosition(actionZone.getPosition())
+     card.setRotationSmooth({card.getRotation().x, card.getRotation().y, 0})
+end
 
-     for _, obj in pairs(objs) do
+-- Returns all selected action cards.
+function returnAllSelectedActionCards()
+     for _, obj in pairs(selectedActionCardZone.getObjects()) do
           if obj.hasTag("Action Card") then
-               if not name or name == getName(obj) then
-                    obj.setPosition(actionZone.getPosition())
-                    obj.setRotationSmooth({obj.getRotation()[1],obj.getRotation()[2], 0})
-                    if name then
-                         return
-                    end
-               end
+               obj.setPosition(actionZone.getPosition())
+               obj.setRotationSmooth({obj.getRotation().x, obj.getRotation().y, 0})
           end
      end
 end
@@ -305,24 +309,21 @@ function placeCardAtSnapPoint(card, spOwner, sp, faceDown)
      if faceDown then rot[3] = 180 end
 
      local pos = spOwner.positionToWorld(sp.position)
-     card.setPositionSmooth({pos[1], pos[2] + 0.15, pos[3]})
+     card.setPositionSmooth({pos[1], pos[2] + 0.5, pos[3]})
      card.setRotationSmooth(rot)
 end
 
+-- Returns the card with the matching name
 function checkIfSelected(actionName)
      local adv2p = Global.getVar("advanced2p")
 
      for _, obj in pairs(selectedActionCardZone.getObjects()) do
-          if obj.type == 'Card' and obj.hasTag("Action Card") and getName(obj) == actionName then
-               return true
+          if obj.type == 'Card' and obj.hasTag("Action Card") and (obj.getName() == actionName or actionName == "Prestige / Search" and obj.hasTag("PrestigeSearch")) then
+               return obj
           end
      end
 
-     return false
-end
-
-function getName(obj)
-     return obj.getName() .. (obj.hasTag("Adv2p") and "Adv2p" or "")
+     return nil
 end
 
 function countSelectedActionCards()
@@ -338,7 +339,7 @@ function countSelectedActionCards()
 end
 
 function onObjectEnterZone(zone, obj)
-     if zone == selectedActionCardZone then
+     if zone == selectedActionCardZone and obj.hasTag("Action Card") then
           refreshButtonHighlights()
           if obj.hasTag("PrestigeSearch") and Global.getVar('currentPhaseIndex') == 0 and not Global.getVar('searchPhase') then
                uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
@@ -347,7 +348,7 @@ function onObjectEnterZone(zone, obj)
 end
 
 function onObjectLeaveZone(zone, obj)
-     if zone == selectedActionCardZone then
+     if zone == selectedActionCardZone and obj.hasTag("Action Card") then
           refreshButtonHighlights()
           if obj.hasTag("PrestigeSearch") then
                uiSetVisibilityToPlayer("prestigeSearchMenu", player, false)
@@ -379,22 +380,21 @@ function refreshButtonHighlights()
      end
 
      for _, obj in pairs(selectedActionCardZone.getObjects()) do
-          if obj.hasTag("Adv2p") and not adv2p then
+          if obj.hasTag("Adv2p") and not adv2p or obj.hasTag("PrestigeSearch") and not prestigeSearch or not obj.hasTag("PrestigeSearch") and prestigeSearch then
                goto skip
           end
 
           if obj.hasTag("Action Card") then
-               local ind = adv2pButtonIndex[getName(obj)]
+               local name = obj.getName()
+               local ind = adv2pButtonIndex[name]
 
                if ind or obj.hasTag("PrestigeSearch") then
-                    local name = getName(obj)
-                    if obj.hasTag("PrestigeSearch") then
-                         name = "Prestige / Search"
-                    end
-                    local index = adv2p and adv2pButtonIndex[name] + adv2pBtnIndexOffset or buttonIndex[name] + btnIndexOffset
-
-                    if prestigeSearch and obj.hasTag("PrestigeSearch") then
+                    local index = 1
+                    
+                    if prestigeSearch then
                          index = 1
+                    else
+                         index = adv2p and adv2pButtonIndex[name] + adv2pBtnIndexOffset or buttonIndex[name] + btnIndexOffset
                     end
 
                     self.editButton({
