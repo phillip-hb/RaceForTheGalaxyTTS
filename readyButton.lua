@@ -18,7 +18,7 @@ function onload(saved_data)
           width = 800,
           height = 800,
           color = color(0, 0, 0, 0),
-          tooltip = "Ready"
+          tooltip = "Click to Unready"
      })
 
      self.createButton({
@@ -28,7 +28,7 @@ function onload(saved_data)
           height = 800,
           rotation = {0, 0, 180},
           color = color(0, 0, 0, 0),
-          tooltip = "Not Ready"
+          tooltip = "Click to Ready"
      })
 end
 

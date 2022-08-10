@@ -233,6 +233,8 @@ function selectPhaseCo()
      local adv2p = Global.getVar("advanced2p")
      local targetName = targetActionCardName
 
+     Global.call("updateReadyButtons", {player, false})
+
      if adv2p then
           -- Check to see if action was already selected. If so, just return it back to selection area
           local card = checkIfSelected(targetName)
@@ -348,7 +350,6 @@ function onObjectEnterZone(zone, obj)
 end
 
 function onObjectLeaveZone(zone, obj)
-     if not obj or obj.isDestroyed() then return end
      if zone == selectedActionCardZone and obj.hasTag("Action Card") then
           refreshButtonHighlights()
           if obj.hasTag("PrestigeSearch") then

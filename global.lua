@@ -320,6 +320,8 @@ function onload(saved_data)
     end
 
     redisplayXmlUi()
+
+    startLuaCoroutine(self, "refreshGoodsCo")
 end
 
 function none() end
@@ -327,6 +329,20 @@ function none() end
 -- ======================
 -- Game specific helper functions
 -- ======================
+
+-- Wierd anomoly in script where loading from a saved game causes goods to not be detected unless moved out of zone and back in
+function refreshGoodsCo()
+    for _, guid in pairs(tableauZone_GUID) do
+        local zone = getObjectFromGUID(guid)
+        for _, obj in pairs(zone.getObjects()) do
+            if obj.type == 'Card' and obj.is_face_down and obj.getDescription() ~= "" then
+                obj.setPosition(add(obj.getPosition(), {0,0.6,0}))
+            end
+        end
+    end
+    return 1
+end
+
 function redisplayXmlUi()
     local players = getSeatedPlayersWithHands()
     for _, player in pairs(players) do
@@ -341,17 +357,12 @@ function redisplayXmlUi()
                 uiSetVisibilityToPlayer("prestigeSearchMenu", player, true)
                 updatePrestigeSearchTextBack(card, player)
             end
+        elseif getCurrentPhase() == 3 and planningTakeover(player) then
+            Global.UI.setAttribute("takeoverMenu_" .. player, "active", true)
+            refreshTakeoverMenu(player)
         end
     end
 end
-
--- function getName(obj)
---     local name = obj.getName()
---     if obj.hasTag("PrestigeSearch") and name ~= "Search" then
---         name = name:sub(10, name:len())
---     end
---     return name .. (obj.hasTag("Adv2p") and "Adv2p" or "")
--- end
 
 function getKind(card)
     local info = card_db[card.getName()]
@@ -1091,8 +1102,6 @@ function tryObjectRotate(object, spin, flip, player_color, old_spin, old_flip)
 end
 
 function onObjectLeaveZone(zone, object)
-    if not object or object.isDestroyed() then return end
-
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
     local isSelectedActionZone = selectedActionZoneMap[zone.getGUID()]
@@ -1157,8 +1166,6 @@ function onObjectLeaveZone(zone, object)
 end
 
 function onObjectEnterZone(zone, object)
-    if not object or object.isDestroyed() then return end
-
     local isHandZone = handZoneMap[zone.getGUID()]
     local isTableauZone = tableauZoneMap[zone.getGUID()]
     local isActionCardHandZone = actionZoneMap[zone.getGUID()]
@@ -1950,6 +1957,12 @@ function checkAllReadyCo()
             broadcastToAll("Search Phase", "White")
             wait(0.5)
             transitionNextPhase = false
+            -- Auto ready players not searching
+            for _, player in pairs(players) do
+                if not playerData[player].searchAction then
+                    updateReadyButtons({player, true})
+                end
+            end
             beginNextSearchPlayer()
             return 1
         end
@@ -1979,9 +1992,6 @@ function checkAllReadyCo()
             capturePowersSnapshot(player, tostring(getCurrentPhase()))
         end
         endOfPhaseGoalCheck()
-        if expansionLevel >= 3 then
-            checkForPrestigeLeader()
-        end
 
         if currentPhaseIndex > #selectedPhases then
             -- round end
@@ -2127,6 +2137,16 @@ function beginNextPhase()
                 end
             end
         end
+    end
+
+    if delayNextPhase then
+        delayNextPhase = false
+        local delayTime = math.max(1.5 - (os.clock() - delayNextPhaseTime), 0)
+        wait(delayTime)
+    end
+
+    if expansionLevel >= 3 then
+        checkForPrestigeLeader()
     end
 
     currentPhaseIndex = currentPhaseIndex + 1
@@ -3861,6 +3881,7 @@ function confirmPowerClick(obj, player, rightClick)
         p.searchedCardGuid = nil
         activeSearchPlayer = nil
         updateReadyButtons({player, true})
+        queueUpdate(player, true)
         beginNextSearchPlayer()
         return
     elseif currentPhase == "1" and p.beforeExplore then

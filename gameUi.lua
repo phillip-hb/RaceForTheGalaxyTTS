@@ -305,9 +305,11 @@ function refreshTakeoverMenu(owner)
                         isOn=reselect,
                         text=txt,
                     })
-                    
+
                     if class == "" then
                         Global.UI.setAttribute(btnId, "color", "White")
+                    elseif class == "disabled" then
+                        Global.UI.setAttribute(btnId, "color", "Red")
                     end
 
                     op.takeoverMenuMap[btnId] = card.getGUID()
