@@ -265,7 +265,7 @@ function onload(saved_data)
     end
 
     for _, o in pairs(getObjectsWithTag("Slot")) do
-        o.interactable = false
+        --o.interactable = false
     end
 
     handZoneMap = {}
