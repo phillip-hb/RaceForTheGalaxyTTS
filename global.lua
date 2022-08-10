@@ -260,7 +260,7 @@ function onload(saved_data)
     for i=1, #disableInteract_GUID do
         for j=1, #disableInteract_GUID[i] do
             local obj = getObjectFromGUID(disableInteract_GUID[i][j])
-            --if obj then obj.interactable = false end
+            if obj then obj.interactable = false end
         end
     end
 
@@ -707,13 +707,29 @@ function attemptPlayCard(card, player)
             end
 
             local goods = getGoods(card)
-
             local pos = tableau.positionToWorld(sp[i].position)
             local rot = tableau.getRotation()
             if not takeoverPhase then
                 card.setPosition(add(pos, {0, 0.04, 0}))
             else
-                card.setPositionSmooth(add(pos, {0, 0.04, 0}))
+                local targetPos
+                local cardInfo = card_db[card.getName()]
+
+                if cardInfo.flags["START_SAVE"] then
+                    targetPos = pos
+                    pos.y = card.getPosition().y
+
+                    -- Grab the stored cards and move them as well
+                    local storedCards = getStoredCards(card)
+                    if storedCards then
+                        storedCards.setPositionSmooth({targetPos.x, storedCards.getPosition().y, targetPos.z})
+                        storedCards.setRotation({rot[1], rot[2], 180})
+                    end
+                else
+                    targetPos = add(pos, {0, 0.04, 0})
+                end
+
+                card.setPositionSmooth(targetPos)
             end
             card.setRotation({rot[1], rot[2], 0})
             card.removeTag("Selected")
@@ -729,7 +745,9 @@ function attemptPlayCard(card, player)
             if (isWindfall or p.powersSnapshot["AUTO_PRODUCE"]) and not takeoverPhase then
                 placeGoodsAt(card.positionToWorld(goodsSnapPointOffset), rot[2], player)
             elseif isWindfall and takeoverPhase and goods then
-                goods.setPositionSmooth(tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07})))
+                local gpos = tableau.positionToWorld(add(sp[i].position, {-0.1, 1, 0.07}))
+                gpos.y = goods.getPosition().y + 1
+                goods.setPositionSmooth(gpos)
                 goods.setRotationSmooth({rot[1], rot[2], 180})
                 p.incomingGood = true
             end
@@ -837,6 +855,15 @@ function getDeckOrCardInZone(zone)
     return nil
 end
 
+function isInPlay(card)
+    for _, zone in pairs(card.getZones()) do
+        if tableauZoneMap[zone.getGUID()] then
+            return true
+        end
+    end
+    return false
+end
+
 function drawCard(allowReshuffle)
     if allowReshuffle == nil then allowReshuffle = true end
 
@@ -868,8 +895,14 @@ end
 
 function discardCard(card)
     local good = nil
-    if card.getDescription() == '' then
+    if card.type == 'Card' and card.getDescription() == '' then
         good = getGoods(card)
+    end
+
+    local storedCards = nil
+    local info = card_db[card.getName()]
+    if info and info.flags["START_SAVE"] and isInPlay(card) then
+        storedCards = getStoredCards(card)
     end
 
     card.memo = ''
@@ -884,19 +917,18 @@ function discardCard(card)
     --end
 
     if discardPile then
-        --card.setPosition(add(card.getPosition(), {0, 4, 0}))
+        local pos = card.getPosition()
+        card.setPosition({pos.x, discardZone.getPosition().y + 2, pos.z})
         discardPile = discardPile.putObject(card)
-        if good then
-            discardCard(good)
-        end
-        return
+    else
+        -- Handle things differently if discard pile empty
+        discardPile = card
+        card.setPosition(discardZone.getPosition())
+        card.setRotation({0, 0, 180})
     end
 
-    discardPile = card
-    card.setPosition(discardZone.getPosition())
-    card.setRotation({0, 0, 180})
-
     if good then discardCard(good) end
+    if storedCards then discardCard(storedCards) end
 end
 
 function discardPrestige(player, n)
@@ -973,45 +1005,32 @@ end
 function storeCard(targetCard, card)
     local yoff = targetCard.getBounds().size.y / 2
     local good = getGoods(targetCard)
-    local hits = Physics.cast({
-        origin = targetCard.getPosition(),
-        direction = {0, -1, 0}
-    })
+    local other = getStoredCards(targetCard)
+    local pos = targetCard.getPosition()
 
     card.setTags({})
     card.highlightOff()
     highlightOff(card)
 
-    for _, hit in pairs(hits) do
-        local other = hit.hit_object
-        if other.type == 'Deck' or other.type == 'Card' and other.getDescription() == "" and other.is_face_down then
-            local bounds = other.getBounds()
-            local pos = other.getPosition()
+    if other then -- store the card with the existing card / deck
+        local bounds = other.getBounds()
+        pos = other.getPosition()
 
-            other.setLock(false)
-            other = other.putObject(card)
-            pos.y = pos.y + bounds.size.y/2 + yoff
-            targetCard.setPosition(pos)
+        other.setLock(false)
+        other = other.putObject(card)
+        pos.y = pos.y + bounds.size.y/2 + yoff
 
-            if good then
-                local p = good.getPosition()
-                p.y = pos.y + 0.03
-                good.setPosition(p)
-            end
-
-            Wait.frames(function()
-                other.setLock(true)
-            end, 5)
-            return     
-        end
+        Wait.frames(function()
+            other.setLock(true)
+        end, 5)
+        return     
+    else    -- create a new pile to store
+        card.setPosition(targetCard.getPosition())
+        card.setRotation({targetCard.getRotation().x, targetCard.getRotation().y, 180})
+        card.setLock(true)
+        local bounds = card.getBounds()
+        pos.y = pos.y + bounds.size.y/2 + yoff
     end
-
-    card.setPosition(targetCard.getPosition())
-    card.setRotation({targetCard.getRotation().x, targetCard.getRotation().y, 180})
-    card.setLock(true)
-    local bounds = card.getBounds()
-    local pos = targetCard.getPosition()
-    pos.y = pos.y + bounds.size.y/2 + yoff
 
     if good then
         local p = good.getPosition()
@@ -1020,6 +1039,23 @@ function storeCard(targetCard, card)
     end
 
     targetCard.setPosition(pos)
+end
+
+function getStoredCards(card)
+    local hits = Physics.cast({
+        origin = card.getPosition(),
+        direction = {0, -1, 0},
+        max_distance = 1,
+    })
+
+    for _, hit in pairs(hits) do
+        local other = hit.hit_object
+        if other.type == 'Deck' or other.type == 'Card' and other.getDescription() == "" and other.is_face_down then
+            return hit.hit_object
+        end
+    end
+
+    return nil
 end
 
 -- iterator to go through all face-up cards in tableau plus the selection action card(s)
@@ -1047,6 +1083,17 @@ function allCardsInTableau(player)
         if i <= n then
             return objs[i]
         end
+    end
+end
+
+function createGoodsSnappoint(card)
+    local data = card_db[card.getName()]
+    if data and data.goods then
+        card.setSnapPoints({{
+            position = goodsSnapPointOffset,
+            rotation = {0, 0, 0},
+            rotation_snap = true
+        }})
     end
 end
 
@@ -1154,6 +1201,15 @@ function onObjectLeaveZone(zone, object)
                 object.clearButtons()
                 local slot = getCardSlot(object)
                 if slot then slot.clearButtons() end
+
+                if p.miscSelectedCards.power and p.miscSelectedCards.power.name == "UPGRADE_WORLD" then
+                    local o = getObjectFromGUID(p.upgradeWorldOld)
+                    if o then highlightOff(o) end
+                    o = getObjectFromGUID(p.upgradeWorldNew)
+                    if o then highlightOff(o) end
+                    p.upgradeWorldOld = nil
+                    p.upgradeWorldNew = nil
+                end
             end
 
             p.miscSelectedCards = deleteLinkedListNode(p.miscSelectedCards, object.getGUID())
@@ -1215,14 +1271,7 @@ function onObjectEnterZone(zone, object)
             end
         -- face up card, check if need to place snap point for goods placement
         else
-            local data = card_db[object.getName()]
-            if data and data.goods then
-                object.setSnapPoints({{
-                    position = goodsSnapPointOffset,
-                    rotation = {0, 0, 0},
-                    rotation_snap = true
-                }})
-            end
+            createGoodsSnappoint(object)
         end
 
         queueUpdate(player)
@@ -1649,6 +1698,7 @@ function checkAllReadyCo()
 
             discardCard(old)
 
+            oldPos.y = 1.61
             new.setPosition(oldPos)
             new.setRotation(oldRot)
             new.setLock(true)
@@ -3313,7 +3363,7 @@ function updateTableauState(player)
 
                         ::skip_power::
                     end
-                elseif ap and not takeoverPhase then
+                elseif ap and not takeoverPhase and not transitionNextPhase then
                     for name, power in pairs(ap) do
                         local isTakeoverPower = isTakeoverPower(power)
 
@@ -3322,7 +3372,7 @@ function updateTableauState(player)
                             goto skip
                         end
 
-                        -- make buttons for takeover powers
+                        -- make buttons for takeover powers or upgrade world powers
                         if useTakeovers and isTakeoverPower and not miscSelected or (ap["UPGRADE_WORLD"] and not takeoverPhase and not rebelSneakAttackPhase and not securityCouncilPhase and not placeTwoPhase) then
                             local used = p.cardsAlreadyUsed[card.getGUID()] and p.cardsAlreadyUsed[card.getGUID()][name] and p.cardsAlreadyUsed[card.getGUID()][name].strength >= power.strength
                             dontAutoPass = true
@@ -3986,7 +4036,6 @@ function confirmPowerClick(obj, player, rightClick)
             p.tempMilitary = p.tempMilitary + power.strength
         end
 
-        -- update now, then update again with delay
         queueUpdate(player, true)
         return
     elseif currentPhase == "4" then
@@ -4576,6 +4625,10 @@ function resolveTakeovers()
                 else
                     attemptPlayCard(targetCard, player)
                     broadcastToAll((Player[player].steam_name or player) .. '\'s takeover of "' .. targetCard.getName() ..'" was successful!', player)
+
+                    Wait.time(function()
+                        createGoodsSnappoint(targetCard)
+                    end, 1.5)
                 end
                 takeoverSuccess = true
             else
