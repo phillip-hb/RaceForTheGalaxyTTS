@@ -154,7 +154,7 @@ statTracker_GUID = {"3b078d", "2ed5dd", "dc9bac", "8865a8"}
 advanced2pCards_GUID = {"f4313a", "eead6a", "3ee2da", "09a79a"}
 prestigeButton_GUID = {"a276bc", "b5027c", "09bbe0", "77721b"}
 
-disableInteract_GUID = {selectedActionCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID}
+disableInteract_GUID = {selectedActionCardTile_GUID, tableau_GUID, readyTokens_GUID, smallReadyTokens_GUID, helpDisplay_GUID, statTracker_GUID, actionSelectorMenu_GUID, {"021362"}}
 
 vpPoolBag_GUID = "c2e459"
 vpInfBag_GUID = "5719f7"
@@ -265,7 +265,16 @@ function onload(saved_data)
     end
 
     for _, o in pairs(getObjectsWithTag("Slot")) do
-        --o.interactable = false
+        o.interactable = false
+    end
+
+    for _, o in pairs(phaseTilePlacement) do
+        local tile = getObjectFromGUID(o[1])
+        if tile then tile.interactable = false end
+    end
+    for _, o in pairs(phaseTilePlacementAdv2p) do
+        local tile = getObjectFromGUID(o[1])
+        if tile then tile.interactable = false end
     end
 
     handZoneMap = {}
@@ -3418,6 +3427,13 @@ function updateTableauState(player)
                                 baseAmount[name] = math.max(1, math.min(goodsCount["TOTAL"], uniqueCount))
                             elseif not requiresGoods[name] then
                                 baseAmount[name] = 0
+                            end
+
+                            if power.codes["CONSUME_THIS"] then
+                                local hasGood = getGoods(card)
+                                if not hasGood then
+                                    goodslimit[name] = 0
+                                end
                             end
 
                             goodslimit[name] = math.min(math.max(1, power.times * baseAmount[name]), goodslimit[name])
