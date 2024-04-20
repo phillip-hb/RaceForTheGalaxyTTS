@@ -923,6 +923,14 @@ P:5:DRAW_IF:1:0
 # First expansion: The Gathering Storm
 #
 
+N:Bot Development (6)
+T:2:6:6
+E@1:2
+
+N:Bot Development (9)
+T:2:6:9
+E@1:2
+
 N:Separatist Colony
 T:1:2:1
 E@1:1

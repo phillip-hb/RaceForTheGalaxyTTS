@@ -809,6 +809,17 @@ function attemptPlayCard(card, player)
     end
 end
 
+function discardRebelSneakAttack(player)
+    for card in allCardsInTableau(player) do
+        local info = card_db[card.getName()]
+        if info.passivePowers["3"] and info.passivePowers["3"]["DISCARD_PLACE_MILITARY"] then
+            discardCard(card)
+            return true
+        end
+    end
+    return false
+end
+
 function getTooltip(phase, power)
     local tooltip = activePowers[phase][power.name]
     if power.name == "DISCARD" or power.name == "CONSUME_PRESTIGE" or power.name == "DISCARD_HAND" then
@@ -1666,6 +1677,10 @@ function checkAllReadyCo()
                 end
             end
             node = node.next
+        end
+
+        if rebelSneakAttackPhase and p.rebelSneakAttack and p.selectedCard then
+            discardRebelSneakAttack(player)
         end
 
         -- remove marked goods
@@ -2623,6 +2638,7 @@ function capturePowersSnapshot(player, phase)
     local perChromoWorld = 0
     local takeoverDefense = false
     local adv2pDoubleAction = false
+    local doNotCountTwice = {}
 
     -- Checking for case of selecting double develop or double settle
     if advanced2p and (phase == "2" or phase == "3") then
@@ -2677,22 +2693,29 @@ function capturePowersSnapshot(player, phase)
                     end
                 end
 
-                -- count certain powers only in specific cases
                 if phase == "2" then
+                    local rawPhase = selectedPhases[currentPhaseIndex]
+                    -- If player selected develop twice, only count the power once. Same for below with settle.
                     if adv2pDoubleAction and card.hasTag("Action Card") then
                         local rawPhase = selectedPhases[currentPhaseIndex]
                         local isLeftMost = checkIfLeftMost(player, card)
                         if rawPhase == phaseIndexAdv2p["Develop"] and not isLeftMost or rawPhase == phaseIndexAdv2p["Develop2"] and isLeftMost then
                             goto skip
                         end
+                    elseif advanced2p and not adv2pDoubleAction and rawPhase == phaseIndexAdv2p["Develop2"] and card.hasTag("Action Card") then
+                        -- Ignore develop bonus if doing second develop but didn't select a second develop action.
+                        goto skip
                     end
                 elseif phase == "3" then
+                    local rawPhase = selectedPhases[currentPhaseIndex]
                     if adv2pDoubleAction and card.hasTag("Action Card") then
-                        local rawPhase = selectedPhases[currentPhaseIndex]
                         local isLeftMost = checkIfLeftMost(player, card)
                         if rawPhase == phaseIndexAdv2p["Settle"] and not isLeftMost or rawPhase == phaseIndexAdv2p["Settle2"] and isLeftMost then
                             goto skip
                         end
+                    -- settle bonus from action card shouldn't apply again if only selected once
+                    elseif advanced2p and not adv2pDoubleAction and rawPhase == phaseIndexAdv2p["Settle2"] and card.hasTag("Action Card") then
+                        goto skip
                     end
 
                     -- record specialized military for takeovers
@@ -4445,6 +4468,11 @@ function checkForPrestigeLeader()
             playerData[player].activatedPrestigeLeader = true
         end
         movePrestigeTileToPlayer(tile)
+    elseif #winners == 1 and winners[1] == tile.getVar("owner") then
+        local player = winners[1]
+        if playerData[player].gainedPrestige then
+            playerData[player].activatedPrestigeLeader = true
+        end
     elseif #winners > 1 then
         local oldOwners = {}
         local doSwap = false
@@ -4539,7 +4567,7 @@ function rewardPrestigeLeaderCo()
                 getVpChips(player, 1)
                 dealTo(1, player)
             elseif ownerType == 2 then
-                broadcastToAll("Prestige Leader Bonus: " .. name .. " gains 1 VP.", player)
+                broadcastToAll("Prestige Leader Bonus: " .. name .. " gains 1 VP. No card bonus.", player)
                 getVpChips(player, 1)
             elseif ownerType == 1 then
                 broadcastToAll("Tied Prestige Leader Bonus: " .. name .. " gains 1 VP.", player)
